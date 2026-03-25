@@ -6,6 +6,8 @@ stages:
 
 build:
   stage: build
+  tags:
+    - sandbox
   script:
     - cd app
     - npm ci
@@ -16,6 +18,8 @@ build:
 
 pages:
   stage: deploy
+  tags:
+    - sandbox
   script:
     - mkdir -p public
     - cp -r app/dist/* public/
