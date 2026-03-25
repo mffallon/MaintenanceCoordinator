@@ -1,5 +1,3 @@
-image: node:22.14.0
-
 stages:
   - build
   - deploy
@@ -10,7 +8,7 @@ build:
     - sandbox
   script:
     - cd app
-    - npm ci
+    - npm install --legacy-peer-deps
     - npm run build
   artifacts:
     paths:
@@ -21,9 +19,7 @@ pages:
   tags:
     - sandbox
   script:
-    - mkdir -p public
-    - cp -r app/dist/* public/
-    - cp public/index.html public/404.html
+    - node -e "const fs=require('fs');fs.mkdirSync('public',{recursive:true});const p=require('path');function copyDir(s,d){fs.mkdirSync(d,{recursive:true});for(const f of fs.readdirSync(s)){const sp=p.join(s,f),dp=p.join(d,f);fs.statSync(sp).isDirectory()?copyDir(sp,dp):fs.copyFileSync(sp,dp)}}copyDir('app/dist','public');fs.copyFileSync('public/index.html','public/404.html')"
   artifacts:
     paths:
       - public
