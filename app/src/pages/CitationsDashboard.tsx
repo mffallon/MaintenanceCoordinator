@@ -722,8 +722,8 @@ export default function CitationsDashboard() {
               ]}
               slotProps={{
                 legend: {
-                  direction: 'row',
-                  position: { vertical: 'bottom', horizontal: 'middle' },
+                  direction: 'row' as const,
+                  position: { vertical: 'bottom' as const, horizontal: 'center' as const },
                   padding: 0,
                   itemMarkWidth: 10,
                   itemMarkHeight: 10,
