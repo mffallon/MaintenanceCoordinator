@@ -1,9 +1,10 @@
 import { ReactNode } from 'react';
 import {
   Box, Typography, FormControl, InputLabel, Select, MenuItem,
-  Tabs, Tab, IconButton,
+  Tabs, Tab, IconButton, Button,
 } from '@mui/material';
 import ClearIcon from '@mui/icons-material/Clear';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 interface PageHeaderTab {
   label: string;
@@ -18,6 +19,10 @@ interface Props {
   activeTab?: number;
   onTabChange?: (value: number) => void;
   actions?: ReactNode;
+  subtitle?: string;
+  hideCommunity?: boolean;
+  backLabel?: string;
+  onBack?: () => void;
 }
 
 const communities = [
@@ -38,6 +43,10 @@ export default function PageHeader({
   activeTab = 0,
   onTabChange,
   actions,
+  subtitle,
+  hideCommunity = false,
+  backLabel,
+  onBack,
 }: Props) {
   return (
     <Box
@@ -49,8 +58,19 @@ export default function PageHeader({
         borderBottom: '1px solid #E0E4E7',
       }}
     >
-      {/* Title row */}
       <Box sx={{ px: 3, pt: 2, pb: tabs ? 0 : 2 }}>
+        {/* Back link */}
+        {backLabel && onBack && (
+          <Button
+            size="small"
+            startIcon={<ArrowBackIcon sx={{ fontSize: '16px !important' }} />}
+            onClick={onBack}
+            sx={{ mb: 0.5, ml: -1, color: '#64748B', fontWeight: 500, fontSize: '0.8rem', '&:hover': { bgcolor: 'transparent', color: '#293036' } }}
+          >
+            {backLabel}
+          </Button>
+        )}
+        {/* Title row */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
           <Typography
             sx={{
@@ -66,9 +86,14 @@ export default function PageHeader({
           </Typography>
           {actions}
         </Box>
+        {subtitle && (
+          <Typography sx={{ color: '#64748B', fontSize: '0.875rem', mt: -1, mb: 0.5 }}>
+            {subtitle}
+          </Typography>
+        )}
 
         {/* Communities filter */}
-        <FormControl variant="outlined" size="small" sx={{ minWidth: 260, mb: tabs ? 1.5 : 0 }}>
+        {!hideCommunity && <FormControl variant="outlined" size="small" sx={{ minWidth: 260, mb: tabs ? 1.5 : 0 }}>
           <InputLabel shrink sx={{ fontSize: '0.75rem' }}>Communities</InputLabel>
           <Select
             value={community}
@@ -96,7 +121,7 @@ export default function PageHeader({
               <MenuItem key={c} value={c}>{c}</MenuItem>
             ))}
           </Select>
-        </FormControl>
+        </FormControl>}
       </Box>
 
       {/* Sub-tabs (Level 3) — only if tabs provided */}

@@ -116,36 +116,11 @@ export default function SurveyManagement() {
     { field: 'state', headerName: 'State', width: 65, align: 'center', headerAlign: 'center' },
     { field: 'region', headerName: 'Region', width: 110 },
     { field: 'surveyType', headerName: 'Survey Type', width: 150 },
-    { field: 'windowStart', headerName: 'Window Start', width: 120 },
     {
-      field: 'windowEnd', headerName: 'Window End', width: 120,
+      field: 'lastSurveyDate', headerName: 'Last Survey', width: 120,
       renderCell: (p: GridRenderCellParams) => (
         <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{p.value}</Typography>
       ),
-    },
-    {
-      field: 'daysUntilEnd', headerName: 'Days Left', width: 120, type: 'number',
-      renderCell: (p: GridRenderCellParams) => {
-        const d = p.value as number;
-        let color = '#16A34A'; let bg = '#DCFCE7'; let label = `${d}d`;
-        if (d < 0) { color = '#64748B'; bg = '#F1F5F9'; label = 'Passed'; }
-        else if (d <= 30) { color = '#991B1B'; bg = '#FEE2E2'; }
-        else if (d <= 60) { color = '#9A3412'; bg = '#FED7AA'; }
-        else if (d <= 90) { color = '#854D0E'; bg = '#FEF9C3'; }
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-            <Box sx={{
-              width: 8, height: 8, borderRadius: '50%',
-              bgcolor: d < 0 ? '#94A3B8' : d <= 30 ? '#DC2626' : d <= 60 ? '#EA580C' : d <= 90 ? '#CA8A04' : '#16A34A',
-            }} />
-            <Chip label={label} size="small" sx={{ bgcolor: bg, color, fontWeight: 700, fontSize: '0.75rem', height: 24 }} />
-          </Box>
-        );
-      },
-    },
-    {
-      field: 'surveyStatus', headerName: 'Status', width: 130,
-      renderCell: (p: GridRenderCellParams) => statusChip(p.value as string),
     },
     {
       field: 'uploaded', headerName: 'Uploaded', width: 90, align: 'center', headerAlign: 'center',
@@ -159,7 +134,6 @@ export default function SurveyManagement() {
     },
     { field: 'totalSurveys', headerName: 'Surveys', width: 80, type: 'number', align: 'center', headerAlign: 'center' },
     { field: 'totalCitations', headerName: 'Citations', width: 90, type: 'number', align: 'center', headerAlign: 'center' },
-    { field: 'lastSurveyDate', headerName: 'Last Survey', width: 110 },
   ];
 
   // Summary counts
@@ -245,7 +219,7 @@ export default function SurveyManagement() {
           columns={columns}
           initialState={{
             pagination: { paginationModel: { pageSize: 25 } },
-            sorting: { sortModel: [{ field: 'daysUntilEnd', sort: tab === 0 ? 'asc' : 'desc' }] },
+            sorting: { sortModel: [{ field: 'lastSurveyDate', sort: 'desc' }] },
           }}
           pageSizeOptions={[10, 25, 50, 100]}
           disableRowSelectionOnClick

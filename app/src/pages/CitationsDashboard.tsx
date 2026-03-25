@@ -540,6 +540,102 @@ function RecentSurveysTable() {
   );
 }
 
+function MissingDocumentationTable() {
+  const navigate = useNavigate();
+
+  // Facilities with any documentation gaps, sorted by total gaps descending
+  const facilitiesWithGaps = facilities
+    .filter((f) => f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs > 0)
+    .map((f) => ({
+      ...f,
+      totalGaps: f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs,
+    }))
+    .sort((a, b) => b.totalGaps - a.totalGaps)
+    .slice(0, 15);
+
+  const totalGapFacilities = facilities.filter((f) => f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs > 0).length;
+
+  return (
+    <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <WarningAmberIcon sx={{ color: '#DC2626' }} />
+          <Typography variant="h6">Missing Documentation</Typography>
+          <Chip label={`${totalGapFacilities} facilities`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
+        </Box>
+      </Box>
+
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC' }}>Facility</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 60 }}>State</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>Region</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Tasks</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Logs</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Docs</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Total Gaps</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">Citations</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>POC Status</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {facilitiesWithGaps.map((fac) => (
+              <TableRow key={fac.id} hover
+                sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
+                onClick={() => navigate(`/facility/${fac.id}`)}
+              >
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
+                    {fac.name.replace('Life Care Center of ', 'LCC ')}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">{fac.city}</Typography>
+                </TableCell>
+                <TableCell align="center">
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{fac.state}</Typography>
+                </TableCell>
+                <TableCell><Typography variant="caption">{fac.region}</Typography></TableCell>
+                <TableCell align="center">
+                  {fac.documentationGaps.tasks > 0
+                    ? <Chip label={fac.documentationGaps.tasks} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 30 }} />
+                    : <Typography variant="caption" color="text.secondary">0</Typography>}
+                </TableCell>
+                <TableCell align="center">
+                  {fac.documentationGaps.logs > 0
+                    ? <Chip label={fac.documentationGaps.logs} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700, minWidth: 30 }} />
+                    : <Typography variant="caption" color="text.secondary">0</Typography>}
+                </TableCell>
+                <TableCell align="center">
+                  {fac.documentationGaps.docs > 0
+                    ? <Chip label={fac.documentationGaps.docs} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700, minWidth: 30 }} />
+                    : <Typography variant="caption" color="text.secondary">0</Typography>}
+                </TableCell>
+                <TableCell align="center">
+                  <Chip label={fac.totalGaps} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 36 }} />
+                </TableCell>
+                <TableCell align="center">
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{fac.totalCitations}</Typography>
+                </TableCell>
+                <TableCell>
+                  {fac.pocStatus ? (
+                    <Chip label={fac.pocStatus === 'on-track' ? 'On Track' : fac.pocStatus === 'overdue' ? 'Overdue' : fac.pocStatus === 'completed' ? 'Completed' : 'Not Started'} size="small"
+                      sx={{
+                        fontWeight: 600,
+                        bgcolor: fac.pocStatus === 'overdue' ? '#FEE2E2' : fac.pocStatus === 'on-track' ? '#DBEAFE' : fac.pocStatus === 'completed' ? '#BBF7D0' : '#F1F5F9',
+                        color: fac.pocStatus === 'overdue' ? '#991B1B' : fac.pocStatus === 'on-track' ? '#1E40AF' : fac.pocStatus === 'completed' ? '#166534' : '#64748B',
+                      }} />
+                  ) : <Typography variant="caption" color="text.secondary">—</Typography>}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
+  );
+}
+
 export default function CitationsDashboard() {
   const navigate = useNavigate();
 
@@ -799,6 +895,9 @@ export default function CitationsDashboard() {
 
       {/* Recent Surveys */}
       <RecentSurveysTable />
+
+      {/* Missing Documentation */}
+      <MissingDocumentationTable />
     </Box>
   );
 }

@@ -24,8 +24,8 @@ const topTabs = [
 
 // Side nav items (Level 2) — flat list
 const sideNavItems = [
-  { label: 'Citations Dashboard', icon: <DashboardIcon fontSize="small" />, path: '/' },
-  { label: 'Citation Deadlines', icon: <AssignmentIcon fontSize="small" />, path: '/citations' },
+  { label: 'Dashboard', icon: <DashboardIcon fontSize="small" />, path: '/' },
+  { label: 'Deadlines', icon: <AssignmentIcon fontSize="small" />, path: '/citations' },
   { label: 'Surveys', icon: <CalendarTodayIcon fontSize="small" />, path: '/surveys' },
   { label: 'Facilities', icon: <BusinessIcon fontSize="small" />, path: '/facilities' },
 ];
@@ -43,6 +43,7 @@ export default function AppLayout() {
   // Determine active side nav
   const activeSidePath = sideNavItems.find((item) => {
     if (item.path === '/') return location.pathname === '/';
+    if (item.path === '/facilities') return location.pathname.startsWith('/facilities') || location.pathname.startsWith('/facility/');
     return location.pathname.startsWith(item.path);
   })?.path || '/';
 
@@ -169,6 +170,11 @@ export default function AppLayout() {
             overflowY: 'auto',
           }}
         >
+          <Box sx={{ px: 2, pt: 1.5, pb: 0.5 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '0.7rem', color: '#64748B', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Citations
+            </Typography>
+          </Box>
           <List sx={{ p: 1 }}>
             {sideNavItems.map((item) => {
               const isActive = item.path === activeSidePath;

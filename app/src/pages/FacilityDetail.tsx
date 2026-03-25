@@ -77,40 +77,75 @@ export default function FacilityDetail() {
 
   return (
     <Box>
-      <PageHeader title={facility.name} />
+      <PageHeader
+        title={facility.name}
+        subtitle={`${facility.city}, ${facility.state} · ${facility.region} · CCN: ${facility.ccn}`}
+        hideCommunity
+        backLabel="Back to Facilities"
+        onBack={() => navigate(-1)}
+        actions={
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" size="small" startIcon={<UploadFileIcon />}>Upload Survey</Button>
+            <Button variant="outlined" size="small" startIcon={<NotificationsActiveIcon />}>Notify</Button>
+            <Button variant="contained" size="small" startIcon={<AddTaskIcon />}>Create Tasks</Button>
+            <Button variant="outlined" size="small" startIcon={<FileDownloadIcon />}>Export</Button>
+          </Box>
+        }
+      />
 
-      {/* Facility Header */}
-      <Paper sx={{ p: 3, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
-        <Grid container spacing={3} alignItems="center">
-          <Grid size={{ xs: 12, md: 5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box sx={{
-                width: 56, height: 56, borderRadius: '14px', bgcolor: '#0065BD14',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <BusinessIcon sx={{ fontSize: 28, color: '#0065BD' }} />
-              </Box>
-              <Box>
-                <Typography variant="h5">{facility.name}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {facility.city}, {facility.state} &middot; {facility.region} &middot; CCN: {facility.ccn}
+      {/* Insights Panel */}
+      <Paper sx={{
+        p: 2.5, mb: 3, borderRadius: 3,
+        border: '1px solid #C084FC',
+        background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%)',
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <AutoAwesomeIcon sx={{ color: '#7C3AED' }} />
+          <Typography variant="h6" sx={{ color: '#5B21B6' }}>Insights</Typography>
+          <Chip label="Beta" size="small" sx={{ bgcolor: '#EDE9FE', color: '#7C3AED', fontWeight: 600 }} />
+        </Box>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card sx={{ bgcolor: 'rgba(255,255,255,0.7)', border: '1px solid #E9D5FF' }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Compliance Analysis</Typography>
+                <Typography variant="body2">
+                  {facility.totalCitations === 0
+                    ? `${facility.deficiencyFree ? 'Deficiency-free status is a notable achievement.' : 'No citations recorded. Continue current compliance practices.'}`
+                    : ijCount > 0
+                      ? `This facility has ${facility.totalCitations} citations including ${ijCount} Immediate Jeopardy citations that require urgent attention. Consider scheduling an immediate compliance review.`
+                      : `This facility has ${facility.totalCitations} citations across ${facility.surveys} surveys. ${facility.documentationGaps.tasks} task gaps need resolution.`
+                  }
                 </Typography>
-              </Box>
-            </Box>
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              {facility.deficiencyFree && <Chip label="Deficiency-Free" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700 }} />}
-              {facility.nearing90Days && <Chip label="Nearing 90 Days" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />}
-            </Box>
+              </CardContent>
+            </Card>
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-              <Button variant="outlined" size="small" startIcon={<UploadFileIcon />}>Upload Survey</Button>
-              <Button variant="outlined" size="small" startIcon={<NotificationsActiveIcon />}>Notify</Button>
-              <Button variant="contained" size="small" startIcon={<AddTaskIcon />}>Create Tasks</Button>
-              <Button variant="outlined" size="small" startIcon={<FileDownloadIcon />}>Export</Button>
-            </Box>
+            <Card sx={{ bgcolor: 'rgba(255,255,255,0.7)', border: '1px solid #E9D5FF' }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Key Patterns</Typography>
+                <Typography variant="body2">
+                  {facCitations.length > 0
+                    ? `Most citations fall under ${[...new Set(facCitations.map(c => c.category))].slice(0, 2).join(' and ')}. ${facility.state === 'WA' ? 'Washington state facilities average 36.3 citations/facility — significantly above the 9.5 national average.' : `${facility.state} facilities show a ${facility.benchmarkVsPeers > 0 ? 'higher' : 'lower'} citation rate than national average.`}`
+                    : 'No citation patterns to analyze. This facility has maintained a clean survey record.'
+                  }
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card sx={{ bgcolor: 'rgba(255,255,255,0.7)', border: '1px solid #E9D5FF' }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Recommended Actions</Typography>
+                <Typography variant="body2">
+                  {facility.documentationGaps.tasks > 0 && `Close ${facility.documentationGaps.tasks} open task gaps. `}
+                  {facility.documentationGaps.logs > 0 && `Update ${facility.documentationGaps.logs} missing logs. `}
+                  {facility.nearing90Days && 'Survey window closing soon — ensure all documentation is current. '}
+                  {facility.pocStatus === 'overdue' && 'POC is overdue — escalate to regional director immediately. '}
+                  {!facility.nearing90Days && facility.documentationGaps.tasks === 0 && 'Continue routine compliance monitoring.'}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
       </Paper>
@@ -217,64 +252,6 @@ export default function FacilityDetail() {
           </Paper>
         </Grid>
 
-        {/* AI Insights Panel */}
-        <Grid size={{ xs: 12 }}>
-          <Paper sx={{
-            p: 2.5, borderRadius: 3,
-            border: '1px solid #C084FC',
-            background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%)',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <AutoAwesomeIcon sx={{ color: '#7C3AED' }} />
-              <Typography variant="h6" sx={{ color: '#5B21B6' }}>AI Insights</Typography>
-              <Chip label="Beta" size="small" sx={{ bgcolor: '#EDE9FE', color: '#7C3AED', fontWeight: 600 }} />
-            </Box>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <Card sx={{ bgcolor: 'rgba(255,255,255,0.7)', border: '1px solid #E9D5FF' }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Compliance Analysis</Typography>
-                    <Typography variant="body2">
-                      {facility.totalCitations === 0
-                        ? `${facility.deficiencyFree ? 'Deficiency-free status is a notable achievement.' : 'No citations recorded. Continue current compliance practices.'}`
-                        : ijCount > 0
-                          ? `This facility has ${facility.totalCitations} citations including ${ijCount} Immediate Jeopardy citations that require urgent attention. Consider scheduling an immediate compliance review.`
-                          : `This facility has ${facility.totalCitations} citations across ${facility.surveys} surveys. ${facility.documentationGaps.tasks} task gaps need resolution.`
-                      }
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <Card sx={{ bgcolor: 'rgba(255,255,255,0.7)', border: '1px solid #E9D5FF' }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Key Patterns</Typography>
-                    <Typography variant="body2">
-                      {facCitations.length > 0
-                        ? `Most citations fall under ${[...new Set(facCitations.map(c => c.category))].slice(0, 2).join(' and ')}. ${facility.state === 'WA' ? 'Washington state facilities average 36.3 citations/facility — significantly above the 9.5 national average.' : `${facility.state} facilities show a ${facility.benchmarkVsPeers > 0 ? 'higher' : 'lower'} citation rate than national average.`}`
-                        : 'No citation patterns to analyze. This facility has maintained a clean survey record.'
-                      }
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <Card sx={{ bgcolor: 'rgba(255,255,255,0.7)', border: '1px solid #E9D5FF' }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Recommended Actions</Typography>
-                    <Typography variant="body2">
-                      {facility.documentationGaps.tasks > 0 && `Close ${facility.documentationGaps.tasks} open task gaps. `}
-                      {facility.documentationGaps.logs > 0 && `Update ${facility.documentationGaps.logs} missing logs. `}
-                      {facility.nearing90Days && 'Survey window closing soon — ensure all documentation is current. '}
-                      {facility.pocStatus === 'overdue' && 'POC is overdue — escalate to regional director immediately. '}
-                      {!facility.nearing90Days && facility.documentationGaps.tasks === 0 && 'Continue routine compliance monitoring.'}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
 
         {/* Citations Table */}
         <Grid size={{ xs: 12 }}>
