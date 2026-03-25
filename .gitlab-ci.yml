@@ -1,3 +1,5 @@
+image: node:22-alpine
+
 stages:
   - build
   - deploy
@@ -19,7 +21,9 @@ pages:
   tags:
     - sandbox
   script:
-    - node -e "const fs=require('fs');fs.mkdirSync('public',{recursive:true});const p=require('path');function copyDir(s,d){fs.mkdirSync(d,{recursive:true});for(const f of fs.readdirSync(s)){const sp=p.join(s,f),dp=p.join(d,f);fs.statSync(sp).isDirectory()?copyDir(sp,dp):fs.copyFileSync(sp,dp)}}copyDir('app/dist','public');fs.copyFileSync('public/index.html','public/404.html')"
+    - mkdir -p public
+    - cp -r app/dist/* public/
+    - cp public/index.html public/404.html
   artifacts:
     paths:
       - public
