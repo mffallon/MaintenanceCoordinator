@@ -39,9 +39,6 @@ export default function FacilityDetail() {
   const phCount = facCitations.filter((c) => c.severity === 'Potential Harm').length;
   const nhCount = facCitations.filter((c) => c.severity === 'No Harm').length;
 
-  const riskColor = facility.riskScore >= 30 ? '#D32F2F' : facility.riskScore >= 10 ? '#ED6C02' : '#2E7D32';
-  const riskLabel = facility.riskScore >= 30 ? 'High Risk' : facility.riskScore >= 10 ? 'Medium Risk' : 'Low Risk';
-
   const severityBar = (label: string, count: number, total: number, color: string) => (
     <Box sx={{ mb: 1.5 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
@@ -88,10 +85,10 @@ export default function FacilityDetail() {
           <Grid size={{ xs: 12, md: 5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box sx={{
-                width: 56, height: 56, borderRadius: '14px', bgcolor: `${riskColor}14`,
+                width: 56, height: 56, borderRadius: '14px', bgcolor: '#0065BD14',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <BusinessIcon sx={{ fontSize: 28, color: riskColor }} />
+                <BusinessIcon sx={{ fontSize: 28, color: '#0065BD' }} />
               </Box>
               <Box>
                 <Typography variant="h5">{facility.name}</Typography>
@@ -103,8 +100,6 @@ export default function FacilityDetail() {
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip label={riskLabel} sx={{ bgcolor: `${riskColor}20`, color: riskColor, fontWeight: 700 }} />
-              <Chip label={`Risk Score: ${facility.riskScore}`} variant="outlined" />
               {facility.deficiencyFree && <Chip label="Deficiency-Free" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700 }} />}
               {facility.nearing90Days && <Chip label="Nearing 90 Days" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />}
             </Box>
@@ -238,13 +233,13 @@ export default function FacilityDetail() {
               <Grid size={{ xs: 12, md: 4 }}>
                 <Card sx={{ bgcolor: 'rgba(255,255,255,0.7)', border: '1px solid #E9D5FF' }}>
                   <CardContent>
-                    <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Risk Analysis</Typography>
+                    <Typography variant="subtitle2" sx={{ color: '#7C3AED', fontWeight: 600, mb: 1 }}>Compliance Analysis</Typography>
                     <Typography variant="body2">
-                      {facility.riskScore >= 30
-                        ? `This facility has a risk score of ${facility.riskScore}, placing it in the top 5% of the portfolio. ${facility.ijCitations} Immediate Jeopardy citations require urgent attention. Consider scheduling an immediate compliance review.`
-                        : facility.riskScore >= 10
-                          ? `Risk score of ${facility.riskScore} indicates moderate compliance concerns. Focus on ${facility.totalCitations} citations across ${facility.surveys} surveys. ${facility.documentationGaps.tasks} task gaps need resolution.`
-                          : `Low risk profile with a score of ${facility.riskScore}. ${facility.deficiencyFree ? 'Deficiency-free status is a notable achievement.' : 'Continue current compliance practices.'}`
+                      {facility.totalCitations === 0
+                        ? `${facility.deficiencyFree ? 'Deficiency-free status is a notable achievement.' : 'No citations recorded. Continue current compliance practices.'}`
+                        : ijCount > 0
+                          ? `This facility has ${facility.totalCitations} citations including ${ijCount} Immediate Jeopardy citations that require urgent attention. Consider scheduling an immediate compliance review.`
+                          : `This facility has ${facility.totalCitations} citations across ${facility.surveys} surveys. ${facility.documentationGaps.tasks} task gaps need resolution.`
                       }
                     </Typography>
                   </CardContent>

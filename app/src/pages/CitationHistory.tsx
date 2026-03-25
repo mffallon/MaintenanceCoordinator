@@ -27,7 +27,7 @@ function buildAllDeadlineRows() {
     state: string; region: string; tag: string; tagType: 'F' | 'K' | 'E';
     category: string; severity: string; scope: string; status: string;
     deadline: string; daysRemaining: number; surveyDate: string;
-    surveyType: string; facilityRiskScore: number;
+    surveyType: string;
     description: string; resolutionSteps: string; preventionStrategies: string;
   }> = [];
 
@@ -59,7 +59,6 @@ function buildAllDeadlineRows() {
         daysRemaining: dayOffset,
         surveyDate: cit.surveyDate,
         surveyType: cit.surveyType,
-        facilityRiskScore: fac.riskScore,
         description: cit.description,
         resolutionSteps: cit.resolutionSteps,
         preventionStrategies: cit.preventionStrategies,
@@ -81,6 +80,7 @@ export default function CitationHistory() {
   const [severityFilter, setSeverityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
+  const [quickFilter, setQuickFilter] = useState<string | null>(null);
 
   const states = [...new Set(allRows.map((r) => r.state))].sort();
 
@@ -93,13 +93,39 @@ export default function CitationHistory() {
       if (severityFilter && r.severity !== severityFilter) return false;
       if (statusFilter && r.status !== statusFilter) return false;
       if (stateFilter && r.state !== stateFilter) return false;
+      // Quick filter chips
+      if (quickFilter === 'overdue' && r.daysRemaining >= 0) return false;
+      if (quickFilter === 'week' && (r.daysRemaining < 0 || r.daysRemaining > 7)) return false;
+      if (quickFilter === '30d' && (r.daysRemaining < 0 || r.daysRemaining > 30)) return false;
+      if (quickFilter === 'F' && r.tagType !== 'F') return false;
+      if (quickFilter === 'K' && r.tagType !== 'K') return false;
+      if (quickFilter === 'E' && r.tagType !== 'E') return false;
+      return true;
+    });
+  }, [search, tagFilter, severityFilter, statusFilter, stateFilter, quickFilter]);
+
+  // Counts based on allRows (before quick filter) but after text/dropdown filters
+  const baseFiltered = useMemo(() => {
+    return allRows.filter((r) => {
+      if (search && !r.facilityName.toLowerCase().includes(search.toLowerCase())
+        && !r.tag.toLowerCase().includes(search.toLowerCase())
+        && !r.category.toLowerCase().includes(search.toLowerCase())) return false;
+      if (tagFilter && r.tagType !== tagFilter) return false;
+      if (severityFilter && r.severity !== severityFilter) return false;
+      if (statusFilter && r.status !== statusFilter) return false;
+      if (stateFilter && r.state !== stateFilter) return false;
       return true;
     });
   }, [search, tagFilter, severityFilter, statusFilter, stateFilter]);
 
-  const overdueCount = filtered.filter((r) => r.daysRemaining < 0).length;
-  const dueWeek = filtered.filter((r) => r.daysRemaining >= 0 && r.daysRemaining <= 7).length;
-  const due30 = filtered.filter((r) => r.daysRemaining > 7 && r.daysRemaining <= 30).length;
+  const overdueCount = baseFiltered.filter((r) => r.daysRemaining < 0).length;
+  const dueWeek = baseFiltered.filter((r) => r.daysRemaining >= 0 && r.daysRemaining <= 7).length;
+  const due30 = baseFiltered.filter((r) => r.daysRemaining >= 0 && r.daysRemaining <= 30).length;
+  const fCount = baseFiltered.filter((r) => r.tagType === 'F').length;
+  const kCount = baseFiltered.filter((r) => r.tagType === 'K').length;
+  const eCount = baseFiltered.filter((r) => r.tagType === 'E').length;
+
+  const toggleQuick = (key: string) => setQuickFilter((prev) => prev === key ? null : key);
 
   const tagChip = (tag: string, type: 'F' | 'K' | 'E') => {
     const styles = {
@@ -203,17 +229,6 @@ export default function CitationHistory() {
     },
     { field: 'state', headerName: 'State', width: 60, align: 'center', headerAlign: 'center' },
     { field: 'region', headerName: 'Region', width: 100 },
-    {
-      field: 'facilityRiskScore', headerName: 'Risk', width: 80, type: 'number', align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => {
-        const v = p.value as number;
-        return <Chip label={v} size="small" sx={{
-          fontWeight: 700, fontSize: '0.7rem', minWidth: 36,
-          bgcolor: v >= 30 ? '#FECACA' : v >= 10 ? '#FED7AA' : '#BBF7D0',
-          color: v >= 30 ? '#991B1B' : v >= 10 ? '#9A3412' : '#166534',
-        }} />;
-      },
-    },
     { field: 'surveyDate', headerName: 'Survey Date', width: 105 },
     { field: 'surveyType', headerName: 'Survey Type', width: 140 },
   ];
@@ -225,37 +240,67 @@ export default function CitationHistory() {
         actions={<Button variant="outlined" startIcon={<FileDownloadIcon />} size="small">Export</Button>}
       />
 
-      {/* Summary chips */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-        <Chip label={`${filtered.length} total`} color="primary" />
-        {overdueCount > 0 && <Chip label={`${overdueCount} overdue`} sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />}
-        {dueWeek > 0 && <Chip label={`${dueWeek} due this week`} sx={{ bgcolor: '#FED7AA', color: '#9A3412', fontWeight: 700 }} />}
-        <Chip label={`${due30} due in 30d`} sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 600 }} />
-        <Divider orientation="vertical" flexItem />
-        <Chip label={`F: ${filtered.filter((r) => r.tagType === 'F').length}`} sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700 }} />
-        <Chip label={`K: ${filtered.filter((r) => r.tagType === 'K').length}`} sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
-        <Chip label={`E: ${filtered.filter((r) => r.tagType === 'E').length}`} sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700 }} />
-      </Box>
-
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 2, borderRadius: 3, border: '1px solid #E2E8F0' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <FilterListIcon color="action" fontSize="small" />
           <Typography variant="subtitle2">Filters</Typography>
+          <Chip label={`${filtered.length} total`} color="primary" size="small"
+            onClick={() => setQuickFilter(null)}
+            variant={quickFilter === null ? 'filled' : 'outlined'}
+            sx={{ cursor: 'pointer', ml: 1 }} />
         </Box>
+        {/* Quick filter chips */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Chip label={`${overdueCount} overdue`} size="small"
+            onClick={() => toggleQuick('overdue')}
+            sx={{ cursor: 'pointer', fontWeight: 700,
+              bgcolor: quickFilter === 'overdue' ? '#991B1B' : '#FEE2E2',
+              color: quickFilter === 'overdue' ? '#fff' : '#991B1B',
+              border: quickFilter === 'overdue' ? '2px solid #991B1B' : 'none',
+            }} />
+          <Chip label={`${dueWeek} due this week`} size="small"
+            onClick={() => toggleQuick('week')}
+            sx={{ cursor: 'pointer', fontWeight: 700,
+              bgcolor: quickFilter === 'week' ? '#9A3412' : '#FED7AA',
+              color: quickFilter === 'week' ? '#fff' : '#9A3412',
+              border: quickFilter === 'week' ? '2px solid #9A3412' : 'none',
+            }} />
+          <Chip label={`${due30} due in 30d`} size="small"
+            onClick={() => toggleQuick('30d')}
+            sx={{ cursor: 'pointer', fontWeight: 700,
+              bgcolor: quickFilter === '30d' ? '#854D0E' : '#FEF9C3',
+              color: quickFilter === '30d' ? '#fff' : '#854D0E',
+              border: quickFilter === '30d' ? '2px solid #854D0E' : 'none',
+            }} />
+          <Divider orientation="vertical" flexItem />
+          <Chip label={`F: ${fCount}`} size="small"
+            onClick={() => toggleQuick('F')}
+            sx={{ cursor: 'pointer', fontWeight: 700,
+              bgcolor: quickFilter === 'F' ? '#1E40AF' : '#DBEAFE',
+              color: quickFilter === 'F' ? '#fff' : '#1E40AF',
+              border: quickFilter === 'F' ? '2px solid #1E40AF' : 'none',
+            }} />
+          <Chip label={`K: ${kCount}`} size="small"
+            onClick={() => toggleQuick('K')}
+            sx={{ cursor: 'pointer', fontWeight: 700,
+              bgcolor: quickFilter === 'K' ? '#991B1B' : '#FEE2E2',
+              color: quickFilter === 'K' ? '#fff' : '#991B1B',
+              border: quickFilter === 'K' ? '2px solid #991B1B' : 'none',
+            }} />
+          <Chip label={`E: ${eCount}`} size="small"
+            onClick={() => toggleQuick('E')}
+            sx={{ cursor: 'pointer', fontWeight: 700,
+              bgcolor: quickFilter === 'E' ? '#854D0E' : '#FEF9C3',
+              color: quickFilter === 'E' ? '#fff' : '#854D0E',
+              border: quickFilter === 'E' ? '2px solid #854D0E' : 'none',
+            }} />
+        </Box>
+        {/* Dropdown filters */}
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
           <TextField size="small" placeholder="Search tag, facility, category..." value={search}
             onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 250 }}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
-          <FormControl size="small" sx={{ minWidth: 110 }}>
-            <InputLabel>Tag Type</InputLabel>
-            <Select value={tagFilter} label="Tag Type" onChange={(e) => setTagFilter(e.target.value)}>
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="F">F-Tags</MenuItem>
-              <MenuItem value="K">K-Tags</MenuItem>
-              <MenuItem value="E">E-Tags</MenuItem>
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 140 }}>
             <InputLabel>Severity</InputLabel>
             <Select value={severityFilter} label="Severity" onChange={(e) => setSeverityFilter(e.target.value)}>
@@ -282,7 +327,7 @@ export default function CitationHistory() {
               {states.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
             </Select>
           </FormControl>
-          <Button size="small" onClick={() => { setSearch(''); setTagFilter(''); setSeverityFilter(''); setStatusFilter(''); setStateFilter(''); }}>
+          <Button size="small" onClick={() => { setSearch(''); setTagFilter(''); setSeverityFilter(''); setStatusFilter(''); setStateFilter(''); setQuickFilter(null); }}>
             Reset
           </Button>
         </Box>

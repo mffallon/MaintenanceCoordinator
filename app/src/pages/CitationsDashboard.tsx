@@ -38,7 +38,7 @@ import SummaryCard from '../components/SummaryCard';
 import PageHeader from '../components/PageHeader';
 import { facilities } from '../data/facilities';
 import { citations } from '../data/citations';
-import { surveyTrends, severityTrends, categoryBreakdown } from '../data/trends';
+import { surveyTrends, severityTrends, categorySeverity } from '../data/trends';
 
 const COLORS = ['#1565C0', '#7B1FA2', '#D32F2F', '#ED6C02', '#2E7D32', '#0288D1', '#F57C00', '#5E35B1', '#00838F'];
 
@@ -65,7 +65,6 @@ function buildUpcomingDeadlines() {
     deadline: string;
     daysRemaining: number;
     surveyDate: string;
-    facilityRiskScore: number;
   }> = [];
 
   for (const fac of facilities) {
@@ -110,7 +109,6 @@ function buildUpcomingDeadlines() {
         deadline: deadline.toISOString().split('T')[0],
         daysRemaining,
         surveyDate: cit.surveyDate,
-        facilityRiskScore: fac.riskScore,
       });
     }
   }
@@ -452,6 +450,96 @@ function UpcomingSurveysTable() {
   );
 }
 
+function RecentSurveysTable() {
+  const navigate = useNavigate();
+  const recentFacilities = [...facilities]
+    .sort((a, b) => new Date(b.lastSurveyDate).getTime() - new Date(a.lastSurveyDate).getTime())
+    .slice(0, 10);
+
+  return (
+    <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <AssignmentIcon sx={{ color: '#0065BD' }} />
+          <Typography variant="h6">Recent Surveys</Typography>
+          <Chip label={`${recentFacilities.length} latest`} size="small" color="primary" />
+        </Box>
+      </Box>
+
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC' }}>Facility</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 60 }}>State</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>Region</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 130 }}>Survey Type</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 110 }}>Last Survey</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">Citations</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 70 }} align="center">K Tags</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 70 }} align="center">E Tags</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">State Tags</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">Def-Free</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {recentFacilities.map((fac) => (
+              <TableRow key={fac.id} hover
+                sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
+                onClick={() => navigate(`/facility/${fac.id}`)}
+              >
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
+                    {fac.name.replace('Life Care Center of ', 'LCC ')}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">{fac.city}</Typography>
+                </TableCell>
+                <TableCell align="center">
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{fac.state}</Typography>
+                </TableCell>
+                <TableCell><Typography variant="caption">{fac.region}</Typography></TableCell>
+                <TableCell><Typography variant="caption">{fac.surveyType}</Typography></TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fac.lastSurveyDate}</Typography>
+                </TableCell>
+                <TableCell align="center">
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{fac.totalCitations}</Typography>
+                </TableCell>
+                <TableCell align="center">
+                  {fac.kTags > 0
+                    ? <Chip label={fac.kTags} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 30 }} />
+                    : <Typography variant="caption" color="text.secondary">0</Typography>}
+                </TableCell>
+                <TableCell align="center">
+                  {fac.eTags > 0
+                    ? <Chip label={fac.eTags} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700, minWidth: 30 }} />
+                    : <Typography variant="caption" color="text.secondary">0</Typography>}
+                </TableCell>
+                <TableCell align="center">
+                  {fac.stateTags > 0
+                    ? <Chip label={fac.stateTags} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700, minWidth: 30 }} />
+                    : <Typography variant="caption" color="text.secondary">0</Typography>}
+                </TableCell>
+                <TableCell align="center">
+                  {fac.deficiencyFree
+                    ? <Chip label="★" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700 }} />
+                    : <Typography variant="caption" color="text.secondary">—</Typography>}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
+        <Button size="small" onClick={() => navigate('/surveys?tab=historical')}>
+          View all &rarr;
+        </Button>
+      </Box>
+    </Paper>
+  );
+}
+
 export default function CitationsDashboard() {
   const navigate = useNavigate();
 
@@ -460,7 +548,6 @@ export default function CitationsDashboard() {
   const [selectedState, setSelectedState] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [selectedSurveyType, setSelectedSurveyType] = useState('');
-  const [riskLevel, setRiskLevel] = useState('');
   const [deficiencyFreeOnly, setDeficiencyFreeOnly] = useState(false);
   const [docGapsOnly, setDocGapsOnly] = useState(false);
   const [pocDueSoon, setPocDueSoon] = useState(false);
@@ -474,15 +561,12 @@ export default function CitationsDashboard() {
       if (selectedState && f.state !== selectedState) return false;
       if (selectedRegion && f.region !== selectedRegion) return false;
       if (selectedSurveyType && f.surveyType !== selectedSurveyType) return false;
-      if (riskLevel === 'high' && f.riskScore < 30) return false;
-      if (riskLevel === 'medium' && (f.riskScore < 10 || f.riskScore >= 30)) return false;
-      if (riskLevel === 'low' && f.riskScore >= 10) return false;
       if (deficiencyFreeOnly && !f.deficiencyFree) return false;
       if (docGapsOnly && f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs === 0) return false;
       if (pocDueSoon && f.pocStatus !== 'overdue' && f.pocStatus !== 'on-track') return false;
       return true;
     });
-  }, [search, selectedState, selectedRegion, selectedSurveyType, riskLevel, deficiencyFreeOnly, docGapsOnly, pocDueSoon]);
+  }, [search, selectedState, selectedRegion, selectedSurveyType, deficiencyFreeOnly, docGapsOnly, pocDueSoon]);
 
   // Summary stats
   const inWindow = facilities.filter((f) => {
@@ -496,23 +580,16 @@ export default function CitationsDashboard() {
     return (now.getTime() - d.getTime()) < 90 * 24 * 60 * 60 * 1000;
   }).length;
   const openPocs = facilities.filter((f) => f.pocStatus === 'on-track' || f.pocStatus === 'overdue').length;
-  const highRisk = facilities.filter((f) => f.riskScore >= 30).length;
   const defFree = facilities.filter((f) => f.deficiencyFree).length;
   const avgCitations = (facilities.reduce((s, f) => s + f.totalCitations, 0) / facilities.length).toFixed(1);
   const topCategory = 'Quality of Life & Care';
 
   const resetFilters = () => {
     setSearch(''); setSelectedState(''); setSelectedRegion('');
-    setSelectedSurveyType(''); setRiskLevel('');
+    setSelectedSurveyType('');
     setDeficiencyFreeOnly(false); setDocGapsOnly(false); setPocDueSoon(false);
   };
 
-  const riskChip = (score: number) => {
-    if (score >= 30) return <Chip label="High" size="small" sx={{ bgcolor: '#FECACA', color: '#991B1B', fontWeight: 700 }} />;
-    if (score >= 10) return <Chip label="Medium" size="small" sx={{ bgcolor: '#FED7AA', color: '#9A3412', fontWeight: 700 }} />;
-    if (score > 0) return <Chip label="Low" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700 }} />;
-    return <Chip label="None" size="small" sx={{ bgcolor: '#E2E8F0', color: '#475569' }} />;
-  };
 
   const pocChip = (status: string | null) => {
     if (!status) return <Typography variant="caption" color="text.secondary">—</Typography>;
@@ -567,15 +644,6 @@ export default function CitationsDashboard() {
       renderCell: (p: GridRenderCellParams) => p.value > 0
         ? <Chip label={p.value} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700, minWidth: 36 }} />
         : <Typography variant="caption" color="text.secondary">0</Typography>,
-    },
-    {
-      field: 'riskScore', headerName: 'Risk', width: 100, align: 'center', headerAlign: 'center', type: 'number',
-      renderCell: (p: GridRenderCellParams) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>{p.value}</Typography>
-          {riskChip(p.value as number)}
-        </Box>
-      ),
     },
     {
       field: 'documentationGaps', headerName: 'Doc Gaps', width: 130, sortable: false,
@@ -657,20 +725,33 @@ export default function CitationsDashboard() {
           <SummaryCard title="Open POCs" value={openPocs} icon={<TaskAltIcon />} color="#7B1FA2" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }}>
-          <SummaryCard title="High-Risk" value={highRisk} icon={<ShieldIcon />} color="#D32F2F"
-            chip={highRisk > 0 ? { label: 'Critical', color: 'error' } : undefined} />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }}>
           <SummaryCard title="Avg Citations" value={avgCitations} subtitle="Per facility" icon={<TrendingUpIcon />} color="#F57C00"
             trend={{ value: '+4.1 vs national avg (9.5)', positive: false }} />
         </Grid>
       </Grid>
 
-      {/* Charts Row */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, md: 7 }}>
-          <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0' }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>Citation Severity Trend</Typography>
+      {/* Citations by Severity — 12 Months */}
+      <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="h6">Citations by Severity (12 Months)</Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {[
+              { label: 'Immediate Jeopardy', color: '#DC2626' },
+              { label: 'Actual Harm', color: '#EA580C' },
+              { label: 'Potential Harm', color: '#2563EB' },
+              { label: 'No Harm', color: '#94A3B8' },
+              { label: 'Total', color: '#0F172A' },
+            ].map((s) => (
+              <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: s.label === 'Total' ? '50%' : 1, bgcolor: s.color }} />
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#475569' }}>{s.label}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Typography variant="subtitle2" sx={{ mb: 0.5, color: 'text.secondary', fontSize: '0.75rem' }}>Trend</Typography>
             <MuiLineChart
               height={240}
               xAxis={[{
@@ -681,67 +762,34 @@ export default function CitationsDashboard() {
               }]}
               yAxis={[{ tickLabelStyle: { fontSize: 10 } }]}
               series={[
-                {
-                  data: severityTrends.map((d) => d['Immediate Jeopardy']),
-                  label: 'Immediate Jeopardy',
-                  area: true,
-                  stack: 'severity',
-                  color: '#DC2626',
-                  showMark: false,
-                },
-                {
-                  data: severityTrends.map((d) => d['Actual Harm']),
-                  label: 'Actual Harm',
-                  area: true,
-                  stack: 'severity',
-                  color: '#EA580C',
-                  showMark: false,
-                },
-                {
-                  data: severityTrends.map((d) => d['Potential Harm']),
-                  label: 'Potential Harm',
-                  area: true,
-                  stack: 'severity',
-                  color: '#2563EB',
-                  showMark: false,
-                },
-                {
-                  data: severityTrends.map((d) => d['No Harm']),
-                  label: 'No Harm',
-                  area: true,
-                  stack: 'severity',
-                  color: '#94A3B8',
-                  showMark: false,
-                },
-                {
-                  data: severityTrends.map((d) => d.total),
-                  label: 'Total',
-                  color: '#0F172A',
-                  showMark: true,
-                },
+                { data: severityTrends.map((d) => d['Immediate Jeopardy']), label: 'IJ', area: true, stack: 'severity', color: '#DC2626', showMark: false },
+                { data: severityTrends.map((d) => d['Actual Harm']), label: 'Actual Harm', area: true, stack: 'severity', color: '#EA580C', showMark: false },
+                { data: severityTrends.map((d) => d['Potential Harm']), label: 'Potential Harm', area: true, stack: 'severity', color: '#2563EB', showMark: false },
+                { data: severityTrends.map((d) => d['No Harm']), label: 'No Harm', area: true, stack: 'severity', color: '#94A3B8', showMark: false },
+                { data: severityTrends.map((d) => d.total), label: 'Total', color: '#0F172A', showMark: true },
               ]}
-              margin={{ left: 40, right: 10, top: 10, bottom: 50 }}
-              sx={{
-                '& .MuiAreaElement-root': { opacity: 0.7 },
-              }}
+              hideLegend
+              margin={{ left: 40, right: 10, top: 10, bottom: 30 }}
+              sx={{ '& .MuiAreaElement-root': { opacity: 0.7 } }}
             />
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12, md: 5 }}>
-          <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Top Categories</Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={categoryBreakdown.slice(0, 6)} layout="vertical" margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="category" type="category" width={140} tick={{ fontSize: 10 }} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Typography variant="subtitle2" sx={{ mb: 0.5, color: 'text.secondary', fontSize: '0.75rem' }}>By Category</Typography>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={categorySeverity} layout="vertical" margin={{ left: 10 }} barSize={20}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis dataKey="category" type="category" width={130} tick={{ fontSize: 9 }} />
                 <RTooltip />
-                <Bar dataKey="count" fill="#1565C0" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="ij" stackId="severity" fill="#DC2626" name="IJ" />
+                <Bar dataKey="actualHarm" stackId="severity" fill="#EA580C" name="Actual Harm" />
+                <Bar dataKey="potentialHarm" stackId="severity" fill="#2563EB" name="Potential Harm" />
+                <Bar dataKey="noHarm" stackId="severity" fill="#94A3B8" name="No Harm" radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </Paper>
+          </Grid>
         </Grid>
-      </Grid>
+      </Paper>
 
       {/* Upcoming Deadlines Table */}
       <UpcomingDeadlinesTable />
@@ -749,134 +797,8 @@ export default function CitationsDashboard() {
       {/* Upcoming Surveys Table */}
       <UpcomingSurveysTable />
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 2, borderRadius: 3, border: '1px solid #E2E8F0' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: showFilters ? 2 : 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterListIcon color="action" />
-            <Typography variant="h6" sx={{ fontSize: '0.95rem' }}>Filters</Typography>
-            {(selectedState || selectedRegion || selectedSurveyType || riskLevel || deficiencyFreeOnly || docGapsOnly || pocDueSoon) && (
-              <Chip label={`${filtered.length} of ${facilities.length}`} size="small" color="primary" />
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button size="small" startIcon={<RestartAltIcon />} onClick={resetFilters}>Reset</Button>
-            <Button size="small" onClick={() => setShowFilters(!showFilters)}>
-              {showFilters ? 'Collapse' : 'Expand'}
-            </Button>
-          </Box>
-        </Box>
-        {showFilters && (
-          <Grid container spacing={1.5} alignItems="center">
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField fullWidth size="small" placeholder="Search facility or city..."
-                value={search} onChange={(e) => setSearch(e.target.value)}
-                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
-            </Grid>
-            <Grid size={{ xs: 6, md: 1.5 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>State</InputLabel>
-                <Select value={selectedState} label="State" onChange={(e) => setSelectedState(e.target.value)}>
-                  <MenuItem value="">All</MenuItem>
-                  {states.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 6, md: 1.5 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Region</InputLabel>
-                <Select value={selectedRegion} label="Region" onChange={(e) => setSelectedRegion(e.target.value)}>
-                  <MenuItem value="">All</MenuItem>
-                  {regions.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 6, md: 2 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Survey Type</InputLabel>
-                <Select value={selectedSurveyType} label="Survey Type" onChange={(e) => setSelectedSurveyType(e.target.value)}>
-                  <MenuItem value="">All</MenuItem>
-                  {surveyTypes.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 6, md: 1.5 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Risk Level</InputLabel>
-                <Select value={riskLevel} label="Risk Level" onChange={(e) => setRiskLevel(e.target.value)}>
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="high">High (30+)</MenuItem>
-                  <MenuItem value="medium">Medium (10-29)</MenuItem>
-                  <MenuItem value="low">Low (&lt;10)</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 4, md: 1 }}>
-              <FormControlLabel control={<Switch size="small" checked={deficiencyFreeOnly} onChange={(e) => setDeficiencyFreeOnly(e.target.checked)} />}
-                label={<Typography variant="caption">Def-Free</Typography>} />
-            </Grid>
-            <Grid size={{ xs: 4, md: 1 }}>
-              <FormControlLabel control={<Switch size="small" checked={docGapsOnly} onChange={(e) => setDocGapsOnly(e.target.checked)} />}
-                label={<Typography variant="caption">Doc Gaps</Typography>} />
-            </Grid>
-            <Grid size={{ xs: 4, md: 1 }}>
-              <FormControlLabel control={<Switch size="small" checked={pocDueSoon} onChange={(e) => setPocDueSoon(e.target.checked)} />}
-                label={<Typography variant="caption">POC Due</Typography>} />
-            </Grid>
-          </Grid>
-        )}
-      </Paper>
-
-      {/* Main Table */}
-      <Paper sx={{ borderRadius: 3, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-        <DataGrid
-          rows={filtered}
-          columns={columns}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 25 } },
-            sorting: { sortModel: [{ field: 'riskScore', sort: 'desc' }] },
-          }}
-          pageSizeOptions={[10, 25, 50, 100]}
-          disableRowSelectionOnClick
-          onRowClick={(params) => navigate(`/facility/${params.row.id}`)}
-          getRowClassName={(params) => {
-            if (params.row.riskScore >= 30) return 'high-risk-row';
-            if (params.row.deficiencyFree) return 'def-free-row';
-            return '';
-          }}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: '#F8FAFC', borderBottom: '2px solid #E2E8F0' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700, fontSize: '0.8rem', color: '#475569' },
-            '& .MuiDataGrid-row': { cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } },
-            '& .high-risk-row': { bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } },
-            '& .def-free-row': { bgcolor: '#F0FDF4', '&:hover': { bgcolor: '#DCFCE7' } },
-            '& .MuiDataGrid-cell': { py: 1, borderBottom: '1px solid #F1F5F9' },
-          }}
-          autoHeight
-        />
-      </Paper>
-
-      {/* Row Actions Menu */}
-      <Menu anchorEl={rowMenuAnchor} open={Boolean(rowMenuAnchor)}
-        onClose={() => { setRowMenuAnchor(null); setRowMenuFacId(null); }}>
-        <MenuItem onClick={() => { navigate(`/facility/${rowMenuFacId}`); setRowMenuAnchor(null); }}>
-          <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>View Details</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => setRowMenuAnchor(null)}>
-          <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Upload Survey</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => setRowMenuAnchor(null)}>
-          <ListItemIcon><NotificationsActiveIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Notify Team</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => setRowMenuAnchor(null)}>
-          <ListItemIcon><AddTaskIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Create Tasks</ListItemText>
-        </MenuItem>
-      </Menu>
+      {/* Recent Surveys */}
+      <RecentSurveysTable />
     </Box>
   );
 }

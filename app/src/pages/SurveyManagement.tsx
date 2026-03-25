@@ -45,7 +45,6 @@ function buildSurveyRows() {
       totalCitations: fac.totalCitations,
       uploaded,
       nearing90Days: fac.nearing90Days,
-      riskScore: fac.riskScore,
     };
   }).sort((a, b) => a.daysUntilEnd - b.daysUntilEnd);
 }
@@ -160,17 +159,6 @@ export default function SurveyManagement() {
     },
     { field: 'totalSurveys', headerName: 'Surveys', width: 80, type: 'number', align: 'center', headerAlign: 'center' },
     { field: 'totalCitations', headerName: 'Citations', width: 90, type: 'number', align: 'center', headerAlign: 'center' },
-    {
-      field: 'riskScore', headerName: 'Risk', width: 80, type: 'number', align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => {
-        const v = p.value as number;
-        return <Chip label={v} size="small" sx={{
-          fontWeight: 700, minWidth: 36,
-          bgcolor: v >= 30 ? '#FECACA' : v >= 10 ? '#FED7AA' : '#BBF7D0',
-          color: v >= 30 ? '#991B1B' : v >= 10 ? '#9A3412' : '#166534',
-        }} />;
-      },
-    },
     { field: 'lastSurveyDate', headerName: 'Last Survey', width: 110 },
   ];
 

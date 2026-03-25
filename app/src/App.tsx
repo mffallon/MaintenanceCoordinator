@@ -6,19 +6,20 @@ import CitationsDashboard from './pages/CitationsDashboard';
 import FacilityDetail from './pages/FacilityDetail';
 import CitationHistory from './pages/CitationHistory';
 import SurveyManagement from './pages/SurveyManagement';
+import Facilities from './pages/Facilities';
 
 export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter basename="/tels-citations">
+      <BrowserRouter>
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<CitationsDashboard />} />
             <Route path="/citations" element={<CitationHistory />} />
             <Route path="/surveys" element={<SurveyManagement />} />
             <Route path="/facility/:id" element={<FacilityDetail />} />
-            <Route path="/facilities" element={<CitationsDashboard />} />
+            <Route path="/facilities" element={<Facilities />} />
             <Route path="/analytics" element={<CitationsDashboard />} />
           </Route>
         </Routes>
