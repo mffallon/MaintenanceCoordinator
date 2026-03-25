@@ -1,19 +1,27 @@
-# The Docker image that will be used to build your app
 image: node:22.14.0
 
-before_script:
-  # Functions that should be executed before the build script is run
-  - npm ci
+stages:
+  - build
+  - deploy
 
-create-pages:
+build:
   stage: build
   script:
-    # Specify the steps involved to build your app here
+    - cd app
+    - npm ci
     - npm run build
-  # Specifies that this is a Pages job
-  pages:
-    # Publish the contents of the "out" folder to the web using Pages
-    publish: out
-  # Trigger rules
+  artifacts:
+    paths:
+      - app/dist
+
+pages:
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp -r app/dist/* public/
+    - cp public/index.html public/404.html
+  artifacts:
+    paths:
+      - public
   rules:
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

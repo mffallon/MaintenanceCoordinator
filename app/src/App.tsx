@@ -11,7 +11,7 @@ export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
+      <BrowserRouter basename="/tels-citations">
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<CitationsDashboard />} />
