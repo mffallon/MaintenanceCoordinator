@@ -720,17 +720,6 @@ export default function CitationsDashboard() {
                   showMark: true,
                 },
               ]}
-              slotProps={{
-                legend: {
-                  direction: 'row' as const,
-                  position: { vertical: 'bottom' as const, horizontal: 'center' as const },
-                  padding: 0,
-                  itemMarkWidth: 10,
-                  itemMarkHeight: 10,
-                  labelStyle: { fontSize: 10 },
-                  itemGap: 12,
-                },
-              }}
               margin={{ left: 40, right: 10, top: 10, bottom: 50 }}
               sx={{
                 '& .MuiAreaElement-root': { opacity: 0.7 },
