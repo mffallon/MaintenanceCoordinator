@@ -20,7 +20,6 @@ export default function App() {
             <Route path="/surveys" element={<SurveyManagement />} />
             <Route path="/facility/:id" element={<FacilityDetail />} />
             <Route path="/facilities" element={<Facilities />} />
-            <Route path="/analytics" element={<CitationsDashboard />} />
           </Route>
         </Routes>
       </BrowserRouter>

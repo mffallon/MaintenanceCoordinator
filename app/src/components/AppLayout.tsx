@@ -8,7 +8,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import BusinessIcon from '@mui/icons-material/Business';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -29,7 +28,6 @@ const sideNavItems = [
   { label: 'Citation Deadlines', icon: <AssignmentIcon fontSize="small" />, path: '/citations' },
   { label: 'Surveys', icon: <CalendarTodayIcon fontSize="small" />, path: '/surveys' },
   { label: 'Facilities', icon: <BusinessIcon fontSize="small" />, path: '/facilities' },
-  { label: 'Analytics', icon: <AssessmentIcon fontSize="small" />, path: '/analytics' },
 ];
 
 // TELS logo as text (matches Figma: bold, dark)
