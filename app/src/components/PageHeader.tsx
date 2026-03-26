@@ -1,10 +1,7 @@
 import { ReactNode } from 'react';
-import {
-  Box, Typography, FormControl, InputLabel, Select, MenuItem,
-  Tabs, Tab, IconButton, Button,
-} from '@mui/material';
-import ClearIcon from '@mui/icons-material/Clear';
+import { Box, Typography, Tabs, Tab, Button } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { CommunityFilter } from './CommunityFilter';
 
 interface PageHeaderTab {
   label: string;
@@ -13,8 +10,6 @@ interface PageHeaderTab {
 
 interface Props {
   title: string;
-  community?: string;
-  onCommunityChange?: (value: string) => void;
   tabs?: PageHeaderTab[];
   activeTab?: number;
   onTabChange?: (value: number) => void;
@@ -25,20 +20,8 @@ interface Props {
   onBack?: () => void;
 }
 
-const communities = [
-  'All Communities',
-  'Northeast Region',
-  'Southeast Region',
-  'Midwest Region',
-  'West Region',
-  'Central Region',
-  'Southwest Region',
-];
-
 export default function PageHeader({
   title,
-  community = 'All Communities',
-  onCommunityChange,
   tabs,
   activeTab = 0,
   onTabChange,
@@ -62,28 +45,41 @@ export default function PageHeader({
         {/* Back link */}
         {backLabel && onBack && (
           <Button
+            variant="text"
             size="small"
-            startIcon={<ArrowBackIcon sx={{ fontSize: '16px !important' }} />}
+            startIcon={<ArrowBackIcon sx={{ fontSize: '14px !important' }} />}
             onClick={onBack}
-            sx={{ mb: 0.5, ml: -1, color: '#64748B', fontWeight: 500, fontSize: '0.8rem', '&:hover': { bgcolor: 'transparent', color: '#293036' } }}
+            sx={{ mb: 0.5, ml: -1, p: 0, minWidth: 'unset', color: '#8492a1', fontWeight: 400, fontSize: '0.8rem', bgcolor: 'transparent', '&:hover': { bgcolor: 'transparent', color: '#293036' } }}
           >
             {backLabel}
           </Button>
         )}
         {/* Title row */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-          <Typography
-            sx={{
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: 700,
-              fontSize: '24px',
-              color: '#000000',
-              letterSpacing: '-0.46px',
-              lineHeight: 1.333,
-            }}
-          >
-            {title}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
+            <Typography
+              sx={{
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 700,
+                fontSize: '24px',
+                color: '#000000',
+                letterSpacing: '-0.46px',
+                lineHeight: 1.333,
+              }}
+            >
+              {title}
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '0.8rem',
+                color: '#8492a1',
+                fontWeight: 400,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Jan 2024 – Mar 2026
+            </Typography>
+          </Box>
           {actions}
         </Box>
         {subtitle && (
@@ -92,36 +88,12 @@ export default function PageHeader({
           </Typography>
         )}
 
-        {/* Communities filter */}
-        {!hideCommunity && <FormControl variant="outlined" size="small" sx={{ minWidth: 260, mb: tabs ? 1.5 : 0 }}>
-          <InputLabel shrink sx={{ fontSize: '0.75rem' }}>Communities</InputLabel>
-          <Select
-            value={community}
-            label="Communities"
-            onChange={(e) => onCommunityChange?.(e.target.value)}
-            notched
-            endAdornment={
-              community !== 'All Communities' ? (
-                <IconButton
-                  size="small"
-                  onClick={(e) => { e.stopPropagation(); onCommunityChange?.('All Communities'); }}
-                  sx={{ mr: 2 }}
-                >
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              ) : undefined
-            }
-            sx={{
-              bgcolor: '#FFFFFF',
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#E0E4E7' },
-              fontSize: '0.875rem',
-            }}
-          >
-            {communities.map((c) => (
-              <MenuItem key={c} value={c}>{c}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>}
+        {/* Communities filter — hierarchical tree picker */}
+        {!hideCommunity && (
+          <Box sx={{ mb: tabs ? 1.5 : 0 }}>
+            <CommunityFilter />
+          </Box>
+        )}
       </Box>
 
       {/* Sub-tabs (Level 3) — only if tabs provided */}

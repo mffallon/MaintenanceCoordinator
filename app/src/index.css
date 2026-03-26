@@ -3,3 +3,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* DataGrid sort button: remove white background */
+.MuiDataGrid-sortButton {
+  background: transparent !important;
+}
+.MuiDataGrid-sortButton:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+}

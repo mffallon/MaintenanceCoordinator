@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Grid, Paper, Chip, Button, Divider, Card, CardContent,
   LinearProgress, IconButton, Tooltip, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow,
+  TableContainer, TableHead, TableRow, TableSortLabel, ToggleButtonGroup, ToggleButton,
+  Drawer,
 } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -15,9 +17,12 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import CloseIcon from '@mui/icons-material/Close';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { facilities } from '../data/facilities';
 import { citations } from '../data/citations';
 import PageHeader from '../components/PageHeader';
+import { fmtDate } from '../utils/formatDate';
 
 export default function FacilityDetail() {
   const { id } = useParams();
@@ -85,17 +90,17 @@ export default function FacilityDetail() {
         onBack={() => navigate(-1)}
         actions={
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" size="small" startIcon={<UploadFileIcon />}>Upload Survey</Button>
-            <Button variant="outlined" size="small" startIcon={<NotificationsActiveIcon />}>Notify</Button>
+            <Button variant="contained" size="small" startIcon={<UploadFileIcon />}>Upload Survey</Button>
+            <Button variant="contained" size="small" startIcon={<NotificationsActiveIcon />}>Notify</Button>
             <Button variant="contained" size="small" startIcon={<AddTaskIcon />}>Create Tasks</Button>
-            <Button variant="outlined" size="small" startIcon={<FileDownloadIcon />}>Export</Button>
+            <Button variant="contained" size="small" startIcon={<FileDownloadIcon />}>Export</Button>
           </Box>
         }
       />
 
       {/* Insights Panel */}
       <Paper sx={{
-        p: 2.5, mb: 3, borderRadius: 3,
+        p: 2.5, mb: 3, borderRadius: '8px',
         border: '1px solid #C084FC',
         background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%)',
       }}>
@@ -153,7 +158,7 @@ export default function FacilityDetail() {
       <Grid container spacing={3}>
         {/* Survey Summary */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', height: '100%' }}>
+          <Paper sx={{ p: 2.5, borderRadius: '8px', border: '1px solid #E2E8F0', height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <CalendarTodayIcon color="primary" fontSize="small" />
               <Typography variant="h6">Survey Summary</Typography>
@@ -161,8 +166,8 @@ export default function FacilityDetail() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {[
                 ['Survey Type', facility.surveyType],
-                ['Last Survey', facility.lastSurveyDate],
-                ['Survey Window', `${facility.surveyWindowStart} — ${facility.surveyWindowEnd}`],
+                ['Last Survey', fmtDate(facility.lastSurveyDate)],
+                ['Survey Window', `${fmtDate(facility.surveyWindowStart)} to ${fmtDate(facility.surveyWindowEnd)}`],
                 ['Total Surveys', facility.surveys.toString()],
                 ['Surveyor Region', facility.region],
               ].map(([label, value]) => (
@@ -174,7 +179,7 @@ export default function FacilityDetail() {
               {facility.pocDueDate && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2" color="text.secondary">POC Due Date</Typography>
-                  <Chip label={facility.pocDueDate} size="small"
+                  <Chip label={fmtDate(facility.pocDueDate)} size="small"
                     sx={{ bgcolor: facility.pocStatus === 'overdue' ? '#FEE2E2' : '#DBEAFE', fontWeight: 600 }} />
                 </Box>
               )}
@@ -184,7 +189,7 @@ export default function FacilityDetail() {
 
         {/* Citation Severity Breakdown */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', height: '100%' }}>
+          <Paper sx={{ p: 2.5, borderRadius: '8px', border: '1px solid #E2E8F0', height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <WarningAmberIcon color="warning" fontSize="small" />
               <Typography variant="h6">Citation Summary</Typography>
@@ -214,7 +219,7 @@ export default function FacilityDetail() {
 
         {/* TELS Gaps + POC */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', height: '100%' }}>
+          <Paper sx={{ p: 2.5, borderRadius: '8px', border: '1px solid #E2E8F0', height: '100%' }}>
             <Typography variant="h6" sx={{ mb: 2 }}>TELS Documentation Gaps</Typography>
             <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
               {gapChip(facility.documentationGaps.tasks > 0, `Tasks: ${facility.documentationGaps.tasks}`)}
@@ -231,7 +236,7 @@ export default function FacilityDetail() {
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2" color="text.secondary">Due Date</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{facility.pocDueDate}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{fmtDate(facility.pocDueDate)}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2" color="text.secondary">Status</Typography>
@@ -253,75 +258,385 @@ export default function FacilityDetail() {
         </Grid>
 
 
-        {/* Citations Table */}
-        <Grid size={{ xs: 12 }}>
-          <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AssignmentIcon color="primary" fontSize="small" />
-                <Typography variant="h6">Citations Detail</Typography>
-                <Chip label={facCitations.length} size="small" color="primary" />
-              </Box>
-              <Button variant="outlined" size="small" startIcon={<FileDownloadIcon />}>Export Citations</Button>
-            </Box>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#F8FAFC' }}>
-                    {['Tag', 'Category', 'Severity', 'Scope', 'Status', 'Survey Type', 'Survey Date', 'Doc Gaps', 'Resolution Steps'].map((h) => (
-                      <TableCell key={h} sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem' }}>{h}</TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {facCitations.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                        No citations recorded — Deficiency-Free
-                      </TableCell>
-                    </TableRow>
-                  ) : facCitations.map((c) => (
-                    <TableRow key={c.id} hover sx={{ '&:hover': { bgcolor: '#F0F7FF' } }}>
-                      <TableCell>
-                        <Chip label={c.tag} size="small" variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace' }} />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" sx={{ maxWidth: 200, display: 'block' }}>{c.category}</Typography>
-                      </TableCell>
-                      <TableCell>{severityChip(c.severity)}</TableCell>
-                      <TableCell><Typography variant="caption">{c.scope}</Typography></TableCell>
-                      <TableCell>
-                        <Chip label={c.status} size="small"
-                          sx={{
-                            fontWeight: 600,
-                            bgcolor: c.status === 'Corrected' ? '#BBF7D0' : c.status === 'Open' ? '#FEE2E2' : c.status === 'Has Plan' ? '#DBEAFE' : '#F1F5F9',
-                            color: c.status === 'Corrected' ? '#166534' : c.status === 'Open' ? '#991B1B' : c.status === 'Has Plan' ? '#1E40AF' : '#475569',
-                          }} />
-                      </TableCell>
-                      <TableCell><Typography variant="caption">{c.surveyType}</Typography></TableCell>
-                      <TableCell><Typography variant="caption">{c.surveyDate}</Typography></TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          {c.documentationGaps.tasks && <Chip label="T" size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', height: 20, width: 24, fontSize: '0.6rem' }} />}
-                          {c.documentationGaps.logs && <Chip label="L" size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', height: 20, width: 24, fontSize: '0.6rem' }} />}
-                          {c.documentationGaps.docs && <Chip label="D" size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', height: 20, width: 24, fontSize: '0.6rem' }} />}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip title={c.resolutionSteps} arrow>
-                          <Typography variant="caption" sx={{ maxWidth: 200, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {c.resolutionSteps}
-                          </Typography>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
+        {/* Citations Detail with View-by toggle */}
+        <CitationsDetailSection facCitations={facCitations} severityChip={severityChip} />
       </Grid>
     </Box>
+  );
+}
+
+/* ── Citations Detail sub-component with Status / Survey toggle ── */
+import type { Citation } from '../types';
+import type { ReactNode } from 'react';
+
+const COL_CONFIG: { label: string; field: SortField | null; width: number }[] = [
+  { label: 'Tag', field: 'tag', width: 90 },
+  { label: 'Category', field: 'category', width: 0 }, // flex
+  { label: 'Severity', field: 'severity', width: 145 },
+  { label: 'Scope', field: 'scope', width: 100 },
+  { label: 'Survey Type', field: 'surveyType', width: 130 },
+  { label: 'Survey Date', field: 'surveyDate', width: 110 },
+  { label: 'Doc Gaps', field: null, width: 160 },
+  { label: '', field: null, width: 40 }, // arrow column
+];
+
+const STATUS_COLS = COL_CONFIG;
+const SURVEY_COLS = COL_CONFIG.filter((c) => c.label !== 'Survey Type' && c.label !== 'Survey Date');
+
+function CitationRow({ c, severityChip, showSurvey = true, onClick }: { c: Citation; severityChip: (s: string) => ReactNode; showSurvey?: boolean; onClick?: () => void }) {
+  const cols = showSurvey ? STATUS_COLS : SURVEY_COLS;
+  const w = (label: string) => { const col = cols.find((x) => x.label === label); return col && col.width > 0 ? { width: col.width, minWidth: col.width } : {}; };
+  return (
+    <TableRow hover onClick={onClick} sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}>
+      <TableCell sx={w('Tag')}>
+        <Chip label={c.tag} size="small" variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace' }} />
+      </TableCell>
+      <TableCell sx={w('Category')}>
+        <Typography variant="caption" sx={{ display: 'block' }}>{c.category}</Typography>
+      </TableCell>
+      <TableCell sx={w('Severity')}>{severityChip(c.severity)}</TableCell>
+      <TableCell sx={w('Scope')}><Typography variant="caption">{c.scope}</Typography></TableCell>
+      {showSurvey && <TableCell sx={w('Survey Type')}><Typography variant="caption">{c.surveyType}</Typography></TableCell>}
+      {showSurvey && <TableCell sx={w('Survey Date')}><Typography variant="caption">{fmtDate(c.surveyDate)}</Typography></TableCell>}
+      <TableCell sx={w('Doc Gaps')}>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          {c.documentationGaps.tasks && <Chip label="Tasks" size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', height: 22, fontSize: '0.65rem' }} />}
+          {c.documentationGaps.logs && <Chip label="Logs" size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', height: 22, fontSize: '0.65rem' }} />}
+          {c.documentationGaps.docs && <Chip label="Docs" size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', height: 22, fontSize: '0.65rem' }} />}
+        </Box>
+      </TableCell>
+      <TableCell sx={{ width: 40, minWidth: 40, textAlign: 'center' }}>
+        <ChevronRightIcon sx={{ fontSize: 20, color: '#8492a1' }} />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+type SortField = 'tag' | 'category' | 'severity' | 'scope' | 'surveyType' | 'surveyDate' | 'status';
+type SortDir = 'asc' | 'desc';
+
+const SEVERITY_ORDER: Record<string, number> = { 'IJ': 0, 'Actual Harm': 1, 'Potential Harm': 2, 'No Harm': 3 };
+
+function sortCitations(cits: Citation[], field: SortField, dir: SortDir): Citation[] {
+  return [...cits].sort((a, b) => {
+    let cmp = 0;
+    if (field === 'severity') {
+      cmp = (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9);
+    } else {
+      const av = a[field] ?? '';
+      const bv = b[field] ?? '';
+      cmp = String(av).localeCompare(String(bv));
+    }
+    return dir === 'desc' ? -cmp : cmp;
+  });
+}
+
+function CitationsDetailSection({ facCitations, severityChip }: { facCitations: Citation[]; severityChip: (s: string) => ReactNode }) {
+  const [viewBy, setViewBy] = useState<'status' | 'survey' | 'none'>('status');
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const applySortToGroup = (cits: Citation[]) => sortField ? sortCitations(cits, sortField, sortDir) : cits;
+
+  // Group by status
+  const statusGroups = facCitations.reduce<Record<string, Citation[]>>((acc, c) => {
+    (acc[c.status] = acc[c.status] || []).push(c);
+    return acc;
+  }, {});
+  const statusOrder = ['Open', 'No Plan', 'Has Plan', 'Corrected', 'Past Non-Compliance'];
+
+  // Group by survey date + type
+  const surveyGroups = facCitations.reduce<Record<string, Citation[]>>((acc, c) => {
+    const key = `${c.surveyDate}|${c.surveyType}`;
+    (acc[key] = acc[key] || []).push(c);
+    return acc;
+  }, {});
+  const surveyKeys = Object.keys(surveyGroups).sort((a, b) => b.localeCompare(a)); // newest first
+
+  // Group by category
+  const categoryGroups = facCitations.reduce<Record<string, Citation[]>>((acc, c) => {
+    (acc[c.category] = acc[c.category] || []).push(c);
+    return acc;
+  }, {});
+  const categoryKeys = Object.keys(categoryGroups).sort((a, b) => categoryGroups[b].length - categoryGroups[a].length);
+
+  const statusChipColor = (status: string) => {
+    const m: Record<string, { bg: string; color: string }> = {
+      'Open': { bg: '#FEE2E2', color: '#991B1B' },
+      'No Plan': { bg: '#FEF3C7', color: '#92400E' },
+      'Has Plan': { bg: '#DBEAFE', color: '#1E40AF' },
+      'Corrected': { bg: '#BBF7D0', color: '#166534' },
+      'Past Non-Compliance': { bg: '#F1F5F9', color: '#475569' },
+    };
+    return m[status] || m['Corrected'];
+  };
+
+  return (
+    <Grid size={{ xs: 12 }}>
+      <Paper sx={{ p: 2.5, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AssignmentIcon color="primary" fontSize="small" />
+            <Typography variant="h6">Citations Detail</Typography>
+            <Chip label={facCitations.length} size="small" color="primary" />
+          </Box>
+          <Button size="small" startIcon={<FileDownloadIcon />}>Export Citations</Button>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#5c6874', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+            Group By
+          </Typography>
+          <ToggleButtonGroup
+            value={viewBy}
+            exclusive
+            onChange={(_, v) => v && setViewBy(v)}
+            size="small"
+            sx={{
+              '& .MuiToggleButton-root': {
+                textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                px: 2, py: 0.5, borderColor: '#E0E4E7',
+                '&.Mui-selected': { bgcolor: '#0065BD', color: '#fff', '&:hover': { bgcolor: '#004A8C' } },
+              },
+            }}
+          >
+            <ToggleButton value="status">Status</ToggleButton>
+            <ToggleButton value="survey">Survey</ToggleButton>
+            <ToggleButton value="none">None</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        {facCitations.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+            No citations recorded — Deficiency-Free
+          </Typography>
+        ) : viewBy === 'none' ? (
+          /* ── Flat table (no grouping) ── */
+          <TableContainer>
+            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#e0e4e7' }}>
+                  {STATUS_COLS.map((col) => (
+                        <TableCell key={col.label} sortDirection={sortField === col.field ? sortDir : false}
+                          sx={col.width > 0 ? { width: col.width, minWidth: col.width } : {}}>
+                          {col.field ? (
+                            <TableSortLabel active={sortField === col.field} direction={sortField === col.field ? sortDir : 'asc'}
+                              onClick={() => handleSort(col.field!)}>
+                              {col.label}
+                            </TableSortLabel>
+                          ) : col.label}
+                        </TableCell>
+                      ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {applySortToGroup(facCitations).map((c) => (
+                  <CitationRow key={c.id} c={c} severityChip={severityChip} showSurvey onClick={() => setSelectedCitation(c)} />
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : viewBy === 'status' ? (
+          /* ── View by Status ── */
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {statusOrder.filter((s) => statusGroups[s]?.length).map((status) => (
+              <Box key={status}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Chip
+                    label={status}
+                    size="small"
+                    sx={{ ...statusChipColor(status), fontWeight: 700 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {statusGroups[status].length} citation{statusGroups[status].length !== 1 ? 's' : ''}
+                  </Typography>
+                </Box>
+                <TableContainer>
+                  <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: '#e0e4e7' }}>
+                        {STATUS_COLS.map((col) => (
+                        <TableCell key={col.label} sortDirection={sortField === col.field ? sortDir : false}
+                          sx={col.width > 0 ? { width: col.width, minWidth: col.width } : {}}>
+                          {col.field ? (
+                            <TableSortLabel active={sortField === col.field} direction={sortField === col.field ? sortDir : 'asc'}
+                              onClick={() => handleSort(col.field!)}>
+                              {col.label}
+                            </TableSortLabel>
+                          ) : col.label}
+                        </TableCell>
+                      ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {applySortToGroup(statusGroups[status]).map((c) => (
+                        <CitationRow key={c.id} c={c} severityChip={severityChip} showSurvey onClick={() => setSelectedCitation(c)} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          /* ── View by Survey ── */
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {surveyKeys.map((key) => {
+              const [date, type] = key.split('|');
+              const cits = surveyGroups[key];
+              return (
+                <Box key={key}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <CalendarTodayIcon sx={{ fontSize: 16, color: '#5c6874' }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      {fmtDate(date)}
+                    </Typography>
+                    <Chip label={type} size="small" sx={{ bgcolor: '#EEF2FF', color: '#3730A3', fontWeight: 600 }} />
+                    <Typography variant="caption" color="text.secondary">
+                      {cits.length} citation{cits.length !== 1 ? 's' : ''}
+                    </Typography>
+                  </Box>
+                  <TableContainer>
+                    <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#e0e4e7' }}>
+                          {SURVEY_COLS.map((col) => (
+                            <TableCell key={col.label} sortDirection={sortField === col.field ? sortDir : false}
+                              sx={col.width > 0 ? { width: col.width, minWidth: col.width } : {}}>
+                              {col.field ? (
+                                <TableSortLabel active={sortField === col.field} direction={sortField === col.field ? sortDir : 'asc'}
+                                  onClick={() => handleSort(col.field!)}>
+                                  {col.label}
+                                </TableSortLabel>
+                              ) : col.label}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {applySortToGroup(cits).map((c) => (
+                          <CitationRow key={c.id} c={c} severityChip={severityChip} showSurvey={false} onClick={() => setSelectedCitation(c)} />
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Paper>
+
+      {/* Citation Detail Drawer */}
+      <Drawer
+        anchor="right"
+        open={!!selectedCitation}
+        onClose={() => setSelectedCitation(null)}
+        sx={{ zIndex: (t) => t.zIndex.drawer + 2 }}
+        PaperProps={{ sx: { width: 420, p: 0 } }}
+      >
+        {selectedCitation && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Header */}
+            <Box sx={{ p: 2.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                <Chip label={selectedCitation.tag} variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '1rem' }} />
+                <IconButton size="small" onClick={() => setSelectedCitation(null)}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#293036', mb: 0.5 }}>
+                {selectedCitation.description}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">{selectedCitation.category}</Typography>
+            </Box>
+
+            {/* Body */}
+            <Box sx={{ p: 2.5, flexGrow: 1, overflowY: 'auto' }}>
+              {/* Key fields */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
+                {[
+                  ['Severity', selectedCitation.severity],
+                  ['Scope', selectedCitation.scope],
+                  ['Status', selectedCitation.status],
+                  ['Survey Type', selectedCitation.surveyType],
+                  ['Survey Date', fmtDate(selectedCitation.surveyDate)],
+                ].map(([label, value]) => (
+                  <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">{label}</Typography>
+                    {label === 'Severity' ? severityChip(value) :
+                     label === 'Status' ? (
+                      <Chip label={value} size="small" sx={{
+                        fontWeight: 600,
+                        bgcolor: value === 'Corrected' ? '#BBF7D0' : value === 'Open' ? '#FEE2E2' : value === 'Has Plan' ? '#DBEAFE' : '#F1F5F9',
+                        color: value === 'Corrected' ? '#166534' : value === 'Open' ? '#991B1B' : value === 'Has Plan' ? '#1E40AF' : '#475569',
+                      }} />
+                     ) : (
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{value}</Typography>
+                     )}
+                  </Box>
+                ))}
+              </Box>
+
+              {/* Documentation Gaps */}
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Documentation Gaps</Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+                <Chip label={selectedCitation.documentationGaps.tasks ? 'Tasks — Missing' : 'Tasks — OK'}
+                  size="small" sx={{
+                    bgcolor: selectedCitation.documentationGaps.tasks ? '#FEE2E2' : '#DCFCE7',
+                    color: selectedCitation.documentationGaps.tasks ? '#991B1B' : '#166534',
+                    fontWeight: 600,
+                  }} />
+                <Chip label={selectedCitation.documentationGaps.logs ? 'Logs — Missing' : 'Logs — OK'}
+                  size="small" sx={{
+                    bgcolor: selectedCitation.documentationGaps.logs ? '#FEF9C3' : '#DCFCE7',
+                    color: selectedCitation.documentationGaps.logs ? '#854D0E' : '#166534',
+                    fontWeight: 600,
+                  }} />
+                <Chip label={selectedCitation.documentationGaps.docs ? 'Docs — Missing' : 'Docs — OK'}
+                  size="small" sx={{
+                    bgcolor: selectedCitation.documentationGaps.docs ? '#E0E7FF' : '#DCFCE7',
+                    color: selectedCitation.documentationGaps.docs ? '#3730A3' : '#166534',
+                    fontWeight: 600,
+                  }} />
+              </Box>
+
+              {/* Resolution Steps */}
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Resolution Steps</Typography>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: '8px', mb: 3 }}>
+                <Typography variant="body2" sx={{ color: '#293036', lineHeight: 1.6 }}>
+                  {selectedCitation.resolutionSteps}
+                </Typography>
+              </Paper>
+
+              {/* Prevention Strategies */}
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Prevention Strategies</Typography>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: '8px' }}>
+                <Typography variant="body2" sx={{ color: '#293036', lineHeight: 1.6 }}>
+                  {selectedCitation.preventionStrategies}
+                </Typography>
+              </Paper>
+            </Box>
+
+            {/* Footer actions */}
+            <Box sx={{ p: 2, borderTop: '1px solid #E2E8F0', display: 'flex', gap: 1 }}>
+              <Button size="small" startIcon={<CloseIcon />} variant="text" color="inherit" onClick={() => setSelectedCitation(null)}>Close</Button>
+              <Button size="small" startIcon={<AddTaskIcon />} sx={{ flex: 1 }}>Create Task</Button>
+            </Box>
+          </Box>
+        )}
+      </Drawer>
+    </Grid>
   );
 }

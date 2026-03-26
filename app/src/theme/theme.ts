@@ -24,12 +24,12 @@ export const theme = createTheme({
     body2: { color: '#64748B' },
     button: { fontWeight: 600 },
   },
-  shape: { borderRadius: 12 },
+  shape: { borderRadius: 8 },
   components: {
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 8,
           boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)',
           border: '1px solid #E2E8F0',
           '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
@@ -42,8 +42,37 @@ export const theme = createTheme({
       },
     },
     MuiButton: {
+      defaultProps: {
+        variant: 'contained',
+        color: 'inherit',
+        disableElevation: true,
+      },
       styleOverrides: {
-        root: { textTransform: 'none', fontWeight: 600, borderRadius: 8 },
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: 4,
+          letterSpacing: '-0.07px',
+        },
+        sizeMedium: {
+          height: 44,
+          fontSize: '1rem',
+          px: 2,
+        },
+        sizeSmall: {
+          height: 36,
+          fontSize: '0.875rem',
+        },
+        containedInherit: {
+          backgroundColor: '#e0e4e7',
+          color: 'rgba(0,0,0,0.87)',
+          '&:hover': { backgroundColor: '#cdd3d8' },
+        },
+        containedPrimary: {
+          backgroundColor: '#0065BD',
+          color: '#FFFFFF',
+          '&:hover': { backgroundColor: '#004A8C' },
+        },
       },
     },
     MuiAppBar: {
@@ -58,7 +87,84 @@ export const theme = createTheme({
     },
     MuiTableCell: {
       styleOverrides: {
-        head: { fontWeight: 600, fontSize: '0.875rem', color: '#293036' },
+        head: {
+          fontWeight: 400,
+          fontSize: '14px',
+          color: '#293036',
+          letterSpacing: '-0.084px',
+          lineHeight: '16px',
+          backgroundColor: '#e0e4e7',
+          padding: '6px 16px',
+        },
+      },
+    },
+    // DSX MUI design system: outlined inputs
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          borderRadius: 4,
+          fontSize: '1rem',
+          letterSpacing: '-0.07px',
+          color: '#293036',
+          minHeight: 44,
+          display: 'flex',
+          alignItems: 'center',
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#8492a1',
+          },
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#293036',
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#0065BD',
+            borderWidth: 2,
+          },
+        },
+        sizeSmall: {
+          minHeight: 44,
+          fontSize: '0.875rem',
+        },
+        input: {
+          display: 'flex',
+          alignItems: 'center',
+          padding: '10px 14px',
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          fontWeight: 600,
+          fontSize: '0.875rem',
+          color: '#293036',
+          '&.Mui-focused': {
+            color: '#0065BD',
+          },
+        },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        select: {
+          fontSize: '1rem',
+          letterSpacing: '-0.07px',
+          color: '#293036',
+          display: 'flex',
+          alignItems: 'center',
+          minHeight: 'unset',
+        },
+        icon: {
+          color: '#293036',
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 4,
+          },
+        },
       },
     },
   },

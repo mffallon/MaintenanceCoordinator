@@ -4,7 +4,7 @@ import {
   Box, Grid, Typography, TextField, Button, Chip, FormControl, InputLabel,
   Select, MenuItem, Switch, FormControlLabel, IconButton, Tooltip, Paper,
   Menu, ListItemIcon, ListItemText, Divider, InputAdornment,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination,
   LinearProgress,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
@@ -26,7 +26,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
@@ -36,9 +35,11 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import SummaryCard from '../components/SummaryCard';
 import PageHeader from '../components/PageHeader';
+import { useCommunityFilter } from '../components/CommunityFilter';
 import { facilities } from '../data/facilities';
 import { citations } from '../data/citations';
 import { surveyTrends, severityTrends, categorySeverity } from '../data/trends';
+import { fmtDate } from '../utils/formatDate';
 
 const COLORS = ['#1565C0', '#7B1FA2', '#D32F2F', '#ED6C02', '#2E7D32', '#0288D1', '#F57C00', '#5E35B1', '#00838F'];
 
@@ -127,8 +128,11 @@ const deadlineRows = buildUpcomingDeadlines();
 
 function UpcomingDeadlinesTable() {
   const navigate = useNavigate();
-  const [showAll, setShowAll] = useState(false);
-  const displayRows = showAll ? deadlineRows : deadlineRows.slice(0, 15);
+  const { passesFilter } = useCommunityFilter();
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 25;
+  const filteredDeadlineRows = useMemo(() => deadlineRows.filter((r) => passesFilter(r.facilityId)), [passesFilter]);
+  const displayRows = filteredDeadlineRows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
   const tagChip = (tag: string, type: 'F' | 'K' | 'E') => {
     const styles = {
@@ -187,45 +191,43 @@ function UpcomingDeadlinesTable() {
   };
 
   // Summary counts
-  const overdueCount = deadlineRows.filter((r) => r.daysRemaining < 0).length;
-  const within7 = deadlineRows.filter((r) => r.daysRemaining >= 0 && r.daysRemaining <= 7).length;
-  const within30 = deadlineRows.filter((r) => r.daysRemaining > 7 && r.daysRemaining <= 30).length;
-  const fTagCount = deadlineRows.filter((r) => r.tagType === 'F').length;
-  const kTagCount = deadlineRows.filter((r) => r.tagType === 'K').length;
-  const eTagCount = deadlineRows.filter((r) => r.tagType === 'E').length;
+  const overdueCount = filteredDeadlineRows.filter((r) => r.daysRemaining < 0).length;
+  const within7 = filteredDeadlineRows.filter((r) => r.daysRemaining >= 0 && r.daysRemaining <= 7).length;
+  const within30 = filteredDeadlineRows.filter((r) => r.daysRemaining > 7 && r.daysRemaining <= 30).length;
+  const fTagCount = filteredDeadlineRows.filter((r) => r.tagType === 'F').length;
+  const kTagCount = filteredDeadlineRows.filter((r) => r.tagType === 'K').length;
+  const eTagCount = filteredDeadlineRows.filter((r) => r.tagType === 'E').length;
 
   return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <AccessTimeIcon sx={{ color: '#DC2626' }} />
-          <Typography variant="h6">Upcoming Citation Deadlines</Typography>
-          <Chip label={`${deadlineRows.length} open`} size="small" color="primary" />
+          <Typography variant="h6">Active Citations</Typography>
+          <Chip label={`${filteredDeadlineRows.length} open`} size="small" color="primary" />
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {overdueCount > 0 && <Chip label={`${overdueCount} overdue`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />}
           {within7 > 0 && <Chip label={`${within7} due this week`} size="small" sx={{ bgcolor: '#FED7AA', color: '#9A3412', fontWeight: 700 }} />}
           <Chip label={`${within30} due in 30d`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 600 }} />
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-          <Chip label={`F: ${fTagCount}`} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700 }} />
-          <Chip label={`K: ${kTagCount}`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
-          <Chip label={`E: ${eTagCount}`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700 }} />
+          <Chip label={`F-Tags: ${fTagCount}`} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700 }} />
+          <Chip label={`K-Tags: ${kTagCount}`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
+          <Chip label={`E-Tags: ${eTagCount}`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700 }} />
         </Box>
       </Box>
 
-      <TableContainer sx={{ maxHeight: showAll ? 600 : 460 }}>
-        <Table size="small" stickyHeader>
+      <TableContainer>
+        <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }}>Deadline</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }}>Days Left</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }}>Tag</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC' }}>Category</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 110 }}>Severity</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC' }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 60 }}>State</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 95 }}>Survey Date</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 130 }}>Due</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }}>Tag</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Category</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Severity</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 95 }}>Survey Date</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -239,9 +241,15 @@ function UpcomingDeadlinesTable() {
                 onClick={() => navigate(`/facility/${row.facilityId}`)}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.deadline}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
+                    {row.facilityName.replace('Life Care Center of ', 'LCC ')}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.city}, {row.state}</Typography>
                 </TableCell>
-                <TableCell>{deadlineIndicator(row.daysRemaining)}</TableCell>
+                <TableCell>
+                  {deadlineIndicator(row.daysRemaining)}
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}>{fmtDate(row.deadline)}</Typography>
+                </TableCell>
                 <TableCell>{tagChip(row.tag, row.tagType)}</TableCell>
                 <TableCell>
                   <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>{row.category}</Typography>
@@ -249,15 +257,7 @@ function UpcomingDeadlinesTable() {
                 <TableCell>{severityChip(row.severity)}</TableCell>
                 <TableCell>{statusChip(row.status)}</TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
-                    {row.facilityName.replace('Life Care Center of ', 'LCC ')}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{row.state}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="caption">{row.surveyDate}</Typography>
+                  <Typography variant="caption">{fmtDate(row.surveyDate)}</Typography>
                 </TableCell>
               </TableRow>
             ))}
@@ -265,13 +265,22 @@ function UpcomingDeadlinesTable() {
         </Table>
       </TableContainer>
 
-      {deadlineRows.length > 15 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
-          <Button size="small" onClick={() => navigate('/citations')}>
-            View all &rarr;
-          </Button>
-        </Box>
+      {filteredDeadlineRows.length > rowsPerPage && (
+        <TablePagination
+          component="div"
+          count={filteredDeadlineRows.length}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[25]}
+          sx={{ borderTop: '1px solid #E2E8F0' }}
+        />
       )}
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
+        <Button variant="text" size="small" onClick={() => navigate('/citations')}>
+          View all &rarr;
+        </Button>
+      </Box>
     </Paper>
   );
 }
@@ -320,6 +329,8 @@ const surveyRows = buildUpcomingSurveys();
 
 function UpcomingSurveysTable() {
   const navigate = useNavigate();
+  const { passesFilter } = useCommunityFilter();
+  const filteredSurveyRows = useMemo(() => surveyRows.filter((r) => passesFilter(r.id)), [passesFilter]);
 
   const statusChip = (status: string) => {
     const map: Record<string, { bg: string; color: string }> = {
@@ -349,19 +360,19 @@ function UpcomingSurveysTable() {
     );
   };
 
-  const dueSoon = surveyRows.filter((r) => r.surveyStatus === 'Due Soon').length;
-  const inWindow = surveyRows.filter((r) => r.surveyStatus === 'In Window').length;
-  const upcoming = surveyRows.filter((r) => r.surveyStatus === 'Upcoming').length;
-  const passed = surveyRows.filter((r) => r.surveyStatus === 'Window Passed').length;
-  const displayRows = surveyRows.filter((r) => r.daysUntilEnd >= -30).slice(0, 15);
+  const dueSoon = filteredSurveyRows.filter((r) => r.surveyStatus === 'Due Soon').length;
+  const inWindow = filteredSurveyRows.filter((r) => r.surveyStatus === 'In Window').length;
+  const upcoming = filteredSurveyRows.filter((r) => r.surveyStatus === 'Upcoming').length;
+  const passed = filteredSurveyRows.filter((r) => r.surveyStatus === 'Window Passed').length;
+  const displayRows = filteredSurveyRows.filter((r) => r.daysUntilEnd >= -30).slice(0, 15);
 
   return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <CalendarTodayIcon sx={{ color: '#1565C0' }} />
           <Typography variant="h6">Upcoming Surveys</Typography>
-          <Chip label={`${surveyRows.length} facilities`} size="small" color="primary" />
+          <Chip label={`${filteredSurveyRows.length} facilities`} size="small" color="primary" />
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {dueSoon > 0 && <Chip label={`${dueSoon} due soon`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />}
@@ -375,16 +386,15 @@ function UpcomingSurveysTable() {
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC' }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 60 }}>State</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>Region</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 130 }}>Survey Type</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 110 }}>Window Start</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 110 }}>Window End</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>Days Left</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 110 }}>Survey Status</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }}>Uploaded</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>Last Survey</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Region</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 130 }}>Survey Type</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Window Start</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Window End</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Days Left</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Survey Status</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }}>Uploaded</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Last Survey</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -402,10 +412,7 @@ function UpcomingSurveysTable() {
                   <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
                     {row.name.replace('Life Care Center of ', 'LCC ')}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">{row.city}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{row.state}</Typography>
+                  <Typography variant="caption" color="text.secondary">{row.city}, {row.state}</Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="caption">{row.region}</Typography>
@@ -414,10 +421,10 @@ function UpcomingSurveysTable() {
                   <Typography variant="caption">{row.surveyType}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{row.windowStart}</Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{fmtDate(row.windowStart)}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.windowEnd}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(row.windowEnd)}</Typography>
                 </TableCell>
                 <TableCell>{windowIndicator(row.daysUntilEnd)}</TableCell>
                 <TableCell>{statusChip(row.surveyStatus)}</TableCell>
@@ -433,7 +440,7 @@ function UpcomingSurveysTable() {
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="caption">{row.lastSurveyDate}</Typography>
+                  <Typography variant="caption">{fmtDate(row.lastSurveyDate)}</Typography>
                 </TableCell>
               </TableRow>
             ))}
@@ -452,12 +459,14 @@ function UpcomingSurveysTable() {
 
 function RecentSurveysTable() {
   const navigate = useNavigate();
-  const recentFacilities = [...facilities]
+  const { passesFilter } = useCommunityFilter();
+  const recentFacilities = useMemo(() => [...facilities]
+    .filter((f) => passesFilter(f.id))
     .sort((a, b) => new Date(b.lastSurveyDate).getTime() - new Date(a.lastSurveyDate).getTime())
-    .slice(0, 10);
+    .slice(0, 10), [passesFilter]);
 
   return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <AssignmentIcon sx={{ color: '#0065BD' }} />
@@ -470,16 +479,16 @@ function RecentSurveysTable() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC' }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 60 }}>State</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>Region</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 130 }}>Survey Type</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 110 }}>Last Survey</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">Citations</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 70 }} align="center">K Tags</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 70 }} align="center">E Tags</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">State Tags</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">Def-Free</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 60 }}>State</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Region</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 130 }}>Survey Type</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Last Survey</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">Citations</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 70 }} align="center">K Tags</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 70 }} align="center">E Tags</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">State Tags</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">Def-Free</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -500,7 +509,7 @@ function RecentSurveysTable() {
                 <TableCell><Typography variant="caption">{fac.region}</Typography></TableCell>
                 <TableCell><Typography variant="caption">{fac.surveyType}</Typography></TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fac.lastSurveyDate}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(fac.lastSurveyDate)}</Typography>
                 </TableCell>
                 <TableCell align="center">
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{fac.totalCitations}</Typography>
@@ -542,21 +551,23 @@ function RecentSurveysTable() {
 
 function MissingDocumentationTable() {
   const navigate = useNavigate();
+  const { passesFilter } = useCommunityFilter();
 
   // Facilities with any documentation gaps, sorted by total gaps descending
-  const facilitiesWithGaps = facilities
+  const facilitiesWithGaps = useMemo(() => facilities
+    .filter((f) => passesFilter(f.id))
     .filter((f) => f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs > 0)
     .map((f) => ({
       ...f,
       totalGaps: f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs,
     }))
     .sort((a, b) => b.totalGaps - a.totalGaps)
-    .slice(0, 15);
+    .slice(0, 15), [passesFilter]);
 
-  const totalGapFacilities = facilities.filter((f) => f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs > 0).length;
+  const totalGapFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)).filter((f) => f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs > 0).length, [passesFilter]);
 
   return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <WarningAmberIcon sx={{ color: '#DC2626' }} />
@@ -569,15 +580,15 @@ function MissingDocumentationTable() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC' }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 60 }}>State</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>Region</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Tasks</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Logs</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Docs</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 90 }} align="center">Total Gaps</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 80 }} align="center">Citations</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem', bgcolor: '#F8FAFC', width: 100 }}>POC Status</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 60 }}>State</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Region</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Tasks</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Logs</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Docs</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Total Gaps</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">Citations</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>POC Status</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -638,6 +649,7 @@ function MissingDocumentationTable() {
 
 export default function CitationsDashboard() {
   const navigate = useNavigate();
+  const { passesFilter } = useCommunityFilter();
 
   // Filters
   const [search, setSearch] = useState('');
@@ -653,6 +665,7 @@ export default function CitationsDashboard() {
 
   const filtered = useMemo(() => {
     return facilities.filter((f) => {
+      if (!passesFilter(f.id)) return false;
       if (search && !f.name.toLowerCase().includes(search.toLowerCase()) && !f.city.toLowerCase().includes(search.toLowerCase())) return false;
       if (selectedState && f.state !== selectedState) return false;
       if (selectedRegion && f.region !== selectedRegion) return false;
@@ -662,22 +675,22 @@ export default function CitationsDashboard() {
       if (pocDueSoon && f.pocStatus !== 'overdue' && f.pocStatus !== 'on-track') return false;
       return true;
     });
-  }, [search, selectedState, selectedRegion, selectedSurveyType, deficiencyFreeOnly, docGapsOnly, pocDueSoon]);
+  }, [search, selectedState, selectedRegion, selectedSurveyType, deficiencyFreeOnly, docGapsOnly, pocDueSoon, passesFilter]);
 
-  // Summary stats
-  const inWindow = facilities.filter((f) => {
+  // Summary stats (filtered by community)
+  const communityFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)), [passesFilter]);
+  const inWindow = communityFacilities.filter((f) => {
     const end = new Date(f.surveyWindowEnd);
     return end >= new Date();
   }).length;
-  const nearing90 = facilities.filter((f) => f.nearing90Days).length;
-  const recentSurveys = facilities.filter((f) => {
-    const d = new Date(f.lastSurveyDate);
-    const now = new Date();
-    return (now.getTime() - d.getTime()) < 90 * 24 * 60 * 60 * 1000;
+  const nearing90 = communityFacilities.filter((f) => f.nearing90Days).length;
+  const docGapsNearingSurvey = communityFacilities.filter((f) => {
+    const gaps = f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs;
+    return gaps > 0 && f.nearing90Days;
   }).length;
-  const openPocs = facilities.filter((f) => f.pocStatus === 'on-track' || f.pocStatus === 'overdue').length;
-  const defFree = facilities.filter((f) => f.deficiencyFree).length;
-  const avgCitations = (facilities.reduce((s, f) => s + f.totalCitations, 0) / facilities.length).toFixed(1);
+  const openPocs = communityFacilities.filter((f) => f.pocStatus === 'on-track' || f.pocStatus === 'overdue').length;
+  const defFree = communityFacilities.filter((f) => f.deficiencyFree).length;
+  const avgCitations = communityFacilities.length > 0 ? (communityFacilities.reduce((s, f) => s + f.totalCitations, 0) / communityFacilities.length).toFixed(1) : '0';
   const topCategory = 'Quality of Life & Care';
 
   const resetFilters = () => {
@@ -749,9 +762,9 @@ export default function CitationsDashboard() {
         if (total === 0) return <Chip label="None" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534' }} />;
         return (
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            {g.tasks > 0 && <Chip label={`T:${g.tasks}`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', height: 20, fontSize: '0.65rem' }} />}
-            {g.logs > 0 && <Chip label={`L:${g.logs}`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', height: 20, fontSize: '0.65rem' }} />}
-            {g.docs > 0 && <Chip label={`D:${g.docs}`} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', height: 20, fontSize: '0.65rem' }} />}
+            {g.tasks > 0 && <Chip label={`Tasks: ${g.tasks}`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', height: 22, fontSize: '0.65rem' }} />}
+            {g.logs > 0 && <Chip label={`Logs: ${g.logs}`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', height: 22, fontSize: '0.65rem' }} />}
+            {g.docs > 0 && <Chip label={`Docs: ${g.docs}`} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', height: 22, fontSize: '0.65rem' }} />}
           </Box>
         );
       },
@@ -799,35 +812,33 @@ export default function CitationsDashboard() {
         title="Citations Dashboard"
         actions={
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" startIcon={<BookmarkIcon />} size="small">Saved Views</Button>
-            <Button variant="outlined" startIcon={<FileDownloadIcon />} size="small">Export</Button>
+            <Button variant="contained" startIcon={<FileDownloadIcon />} size="small">Export</Button>
           </Box>
         }
       />
 
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }}>
-          <SummaryCard title="In Survey Window" value={inWindow} icon={<BusinessIcon />} color="#1565C0" />
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <SummaryCard title="Open Gaps with Survey Approaching" value={docGapsNearingSurvey} icon={<WarningAmberIcon />} color="#D32F2F"
+            subtitle="Facilities with documentation gaps and survey window closing within 90 days"
+            chip={docGapsNearingSurvey > 0 ? { label: 'Action Needed', color: 'error' } : undefined}
+            action={{ label: 'Review', onClick: () => navigate('/surveys?filter=gaps') }} />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }}>
-          <SummaryCard title="Nearing 90 Days" value={nearing90} icon={<WarningAmberIcon />} color="#ED6C02"
-            chip={nearing90 > 5 ? { label: 'Action Needed', color: 'warning' } : undefined} />
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <SummaryCard title="Open Plans of Correction" value={openPocs} subtitle="Active POCs requiring completion" icon={<TaskAltIcon />} color="#7B1FA2" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }}>
-          <SummaryCard title="Recent Surveys" value={recentSurveys} subtitle="Last 90 days" icon={<AssignmentIcon />} color="#0288D1" />
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <SummaryCard title="Within Survey Window" value={inWindow} subtitle="Facilities currently in CMS survey window" icon={<BusinessIcon />} color="#1565C0" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }}>
-          <SummaryCard title="Open POCs" value={openPocs} icon={<TaskAltIcon />} color="#7B1FA2" />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }}>
-          <SummaryCard title="Avg Citations" value={avgCitations} subtitle="Per facility" icon={<TrendingUpIcon />} color="#F57C00"
-            trend={{ value: '+4.1 vs national avg (9.5)', positive: false }} />
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <SummaryCard title="Avg Citations per Facility" value={avgCitations} subtitle="+4.1 above avg · National avg: 9.5" icon={<TrendingUpIcon />} color="#F57C00"
+            action={{ label: 'Facilities', onClick: () => navigate('/facilities') }} />
         </Grid>
       </Grid>
 
       {/* Citations by Severity — 12 Months */}
-      <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+      <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="h6">Citations by Severity (12 Months)</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
@@ -894,7 +905,7 @@ export default function CitationsDashboard() {
       <UpcomingSurveysTable />
 
       {/* Recent Surveys */}
-      <RecentSurveysTable />
+      {/* Recent Surveys removed */}
 
       {/* Missing Documentation */}
       <MissingDocumentationTable />

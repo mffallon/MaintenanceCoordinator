@@ -1,6 +1,5 @@
 import type { Facility } from '../types';
 
-const regions = ['Northeast', 'Southeast', 'Midwest', 'West', 'Central', 'Southwest'];
 const surveyTypes = ['CMS Life Safety', 'CMS Health', 'State Fire Marshal', 'Joint Commission'];
 
 function regionForState(state: string): string {
@@ -12,7 +11,7 @@ function regionForState(state: string): string {
     VA: 'Southeast', GA: 'Southeast', KY: 'Southeast', AL: 'Southeast',
     NV: 'West', UT: 'West', WY: 'West', OK: 'Central',
   };
-  return map[state] || regions[Math.floor(Math.random() * regions.length)];
+  return map[state] || 'Other';
 }
 
 // Real data from LifeCareCenters Excel
@@ -87,7 +86,7 @@ function formatISO(d: string): string {
 
 const now = new Date();
 
-export const facilities: Facility[] = rawFacilities.map((r, i) => {
+const allFacilities: Facility[] = rawFacilities.map((r, i) => {
   const endDate = parseDate(r.windowEnd);
   const daysUntilEnd = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   const nearing90 = daysUntilEnd >= 0 && daysUntilEnd <= 90;
@@ -143,4 +142,55 @@ export const facilities: Facility[] = rawFacilities.map((r, i) => {
         : 'not-started',
     benchmarkVsPeers: +(r.totalCitations / Math.max(r.surveys, 1) - 9.5).toFixed(1),
   };
+});
+
+// Shift 2 facilities per oversized region to have upcoming survey windows
+const oversizedRegions = new Set<string>();
+const regionCountsCheck: Record<string, number> = {};
+for (const f of allFacilities) {
+  regionCountsCheck[f.region] = (regionCountsCheck[f.region] || 0) + 1;
+}
+for (const [r, c] of Object.entries(regionCountsCheck)) {
+  if (c > 5) oversizedRegions.add(r);
+}
+// For oversized regions, shift some window dates into the future
+let shifted = 0;
+const shiftedRegions: Record<string, number> = {};
+for (const f of allFacilities) {
+  if (oversizedRegions.has(f.region)) {
+    const alreadyShifted = shiftedRegions[f.region] || 0;
+    if (alreadyShifted < 2 && new Date(f.surveyWindowEnd) < now) {
+      // Shift window to upcoming (30-90 days from now)
+      const offset = 30 + alreadyShifted * 30;
+      const newEnd = new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
+      const newStart = new Date(newEnd.getTime() - 270 * 24 * 60 * 60 * 1000);
+      f.surveyWindowEnd = newEnd.toISOString().split('T')[0];
+      f.surveyWindowStart = newStart.toISOString().split('T')[0];
+      f.nearing90Days = offset <= 90;
+      f.lastSurveyDate = f.surveyWindowEnd;
+      shiftedRegions[f.region] = alreadyShifted + 1;
+    }
+  }
+}
+
+// Now cap each region at 5, prioritizing facilities with upcoming windows
+const sortedFacilities = [...allFacilities].sort((a, b) => {
+  // Same region: put upcoming surveys first
+  if (a.region === b.region) {
+    const aEnd = new Date(a.surveyWindowEnd).getTime();
+    const bEnd = new Date(b.surveyWindowEnd).getTime();
+    const aUpcoming = aEnd >= now.getTime() ? 0 : 1;
+    const bUpcoming = bEnd >= now.getTime() ? 0 : 1;
+    if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming;
+    return bEnd - aEnd; // More recent first
+  }
+  return 0;
+});
+
+const regionCounts: Record<string, number> = {};
+export const facilities: Facility[] = sortedFacilities.filter((f) => {
+  const count = regionCounts[f.region] || 0;
+  if (count >= 5) return false;
+  regionCounts[f.region] = count + 1;
+  return true;
 });

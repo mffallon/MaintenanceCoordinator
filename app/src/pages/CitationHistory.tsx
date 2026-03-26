@@ -12,6 +12,8 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import { facilities } from '../data/facilities';
 import { citations } from '../data/citations';
 import PageHeader from '../components/PageHeader';
+import { useCommunityFilter } from '../components/CommunityFilter';
+import { fmtDate } from '../utils/formatDate';
 
 // Build the same deadline-enriched rows used on the dashboard
 function buildAllDeadlineRows() {
@@ -75,6 +77,7 @@ const allRows = buildAllDeadlineRows();
 
 export default function CitationHistory() {
   const navigate = useNavigate();
+  const { passesFilter } = useCommunityFilter();
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
@@ -82,10 +85,11 @@ export default function CitationHistory() {
   const [stateFilter, setStateFilter] = useState('');
   const [quickFilter, setQuickFilter] = useState<string | null>(null);
 
-  const states = [...new Set(allRows.map((r) => r.state))].sort();
+  const communityRows = useMemo(() => allRows.filter((r) => passesFilter(r.facilityId)), [passesFilter]);
+  const states = [...new Set(communityRows.map((r) => r.state))].sort();
 
   const filtered = useMemo(() => {
-    return allRows.filter((r) => {
+    return communityRows.filter((r) => {
       if (search && !r.facilityName.toLowerCase().includes(search.toLowerCase())
         && !r.tag.toLowerCase().includes(search.toLowerCase())
         && !r.category.toLowerCase().includes(search.toLowerCase())) return false;
@@ -102,11 +106,11 @@ export default function CitationHistory() {
       if (quickFilter === 'E' && r.tagType !== 'E') return false;
       return true;
     });
-  }, [search, tagFilter, severityFilter, statusFilter, stateFilter, quickFilter]);
+  }, [communityRows, search, tagFilter, severityFilter, statusFilter, stateFilter, quickFilter]);
 
-  // Counts based on allRows (before quick filter) but after text/dropdown filters
+  // Counts based on communityRows (before quick filter) but after text/dropdown filters
   const baseFiltered = useMemo(() => {
-    return allRows.filter((r) => {
+    return communityRows.filter((r) => {
       if (search && !r.facilityName.toLowerCase().includes(search.toLowerCase())
         && !r.tag.toLowerCase().includes(search.toLowerCase())
         && !r.category.toLowerCase().includes(search.toLowerCase())) return false;
@@ -116,7 +120,7 @@ export default function CitationHistory() {
       if (stateFilter && r.state !== stateFilter) return false;
       return true;
     });
-  }, [search, tagFilter, severityFilter, statusFilter, stateFilter]);
+  }, [communityRows, search, tagFilter, severityFilter, statusFilter, stateFilter]);
 
   const overdueCount = baseFiltered.filter((r) => r.daysRemaining < 0).length;
   const dueWeek = baseFiltered.filter((r) => r.daysRemaining >= 0 && r.daysRemaining <= 7).length;
@@ -140,7 +144,7 @@ export default function CitationHistory() {
     {
       field: 'deadline', headerName: 'Deadline', width: 110,
       renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{p.value}</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
       ),
     },
     {
@@ -229,7 +233,11 @@ export default function CitationHistory() {
     },
     { field: 'state', headerName: 'State', width: 60, align: 'center', headerAlign: 'center' },
     { field: 'region', headerName: 'Region', width: 100 },
-    { field: 'surveyDate', headerName: 'Survey Date', width: 105 },
+    { field: 'surveyDate', headerName: 'Survey Date', width: 105,
+      renderCell: (p: GridRenderCellParams) => (
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
+      ),
+    },
     { field: 'surveyType', headerName: 'Survey Type', width: 140 },
   ];
 
@@ -237,11 +245,11 @@ export default function CitationHistory() {
     <Box>
       <PageHeader
         title="Citation Deadlines"
-        actions={<Button variant="outlined" startIcon={<FileDownloadIcon />} size="small">Export</Button>}
       />
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 2, borderRadius: 3, border: '1px solid #E2E8F0' }}>
+      {/* Filters + Table in one section */}
+      <Paper sx={{ borderRadius: '8px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+        <Box sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <FilterListIcon color="action" fontSize="small" />
           <Typography variant="subtitle2">Filters</Typography>
@@ -249,6 +257,8 @@ export default function CitationHistory() {
             onClick={() => setQuickFilter(null)}
             variant={quickFilter === null ? 'filled' : 'outlined'}
             sx={{ cursor: 'pointer', ml: 1 }} />
+          <Box sx={{ flexGrow: 1 }} />
+          <Button size="small" startIcon={<FileDownloadIcon />}>Export</Button>
         </Box>
         {/* Quick filter chips */}
         <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -274,21 +284,21 @@ export default function CitationHistory() {
               border: quickFilter === '30d' ? '2px solid #854D0E' : 'none',
             }} />
           <Divider orientation="vertical" flexItem />
-          <Chip label={`F: ${fCount}`} size="small"
+          <Chip label={`F-Tags: ${fCount}`} size="small"
             onClick={() => toggleQuick('F')}
             sx={{ cursor: 'pointer', fontWeight: 700,
               bgcolor: quickFilter === 'F' ? '#1E40AF' : '#DBEAFE',
               color: quickFilter === 'F' ? '#fff' : '#1E40AF',
               border: quickFilter === 'F' ? '2px solid #1E40AF' : 'none',
             }} />
-          <Chip label={`K: ${kCount}`} size="small"
+          <Chip label={`K-Tags: ${kCount}`} size="small"
             onClick={() => toggleQuick('K')}
             sx={{ cursor: 'pointer', fontWeight: 700,
               bgcolor: quickFilter === 'K' ? '#991B1B' : '#FEE2E2',
               color: quickFilter === 'K' ? '#fff' : '#991B1B',
               border: quickFilter === 'K' ? '2px solid #991B1B' : 'none',
             }} />
-          <Chip label={`E: ${eCount}`} size="small"
+          <Chip label={`E-Tags: ${eCount}`} size="small"
             onClick={() => toggleQuick('E')}
             sx={{ cursor: 'pointer', fontWeight: 700,
               bgcolor: quickFilter === 'E' ? '#854D0E' : '#FEF9C3',
@@ -331,10 +341,7 @@ export default function CitationHistory() {
             Reset
           </Button>
         </Box>
-      </Paper>
-
-      {/* Table */}
-      <Paper sx={{ borderRadius: 3, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+        </Box>
         <DataGrid
           rows={filtered}
           columns={columns}
@@ -344,6 +351,7 @@ export default function CitationHistory() {
           }}
           pageSizeOptions={[10, 25, 50, 100]}
           disableRowSelectionOnClick
+          disableColumnMenu
           onRowClick={(params) => navigate(`/facility/${params.row.facilityId}`)}
           getRowClassName={(params) => {
             if (params.row.daysRemaining < 0) return 'overdue-row';
@@ -352,8 +360,10 @@ export default function CitationHistory() {
           }}
           sx={{
             border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: '#F8FAFC', borderBottom: '2px solid #E2E8F0' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700, fontSize: '0.8rem', color: '#475569' },
+            '& .MuiDataGrid-columnHeaders': { bgcolor: '#e0e4e7', borderBottom: 'none' },
+            '& .MuiDataGrid-columnHeader': { bgcolor: '#e0e4e7' },
+            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 400, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px', lineHeight: '16px' },
+            '& .MuiDataGrid-columnSeparator': { display: 'none' },
             '& .MuiDataGrid-row': { cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } },
             '& .overdue-row': { bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } },
             '& .due-soon-row': { bgcolor: '#FFFBEB', '&:hover': { bgcolor: '#FEF3C7' } },

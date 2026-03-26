@@ -5,8 +5,8 @@ import {
   ListItemIcon, ListItemText, IconButton, Divider,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
+import ContentPasteSearchIcon from '@mui/icons-material/ContentPasteSearch';
 import BusinessIcon from '@mui/icons-material/Business';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
@@ -25,9 +25,9 @@ const topTabs = [
 // Side nav items (Level 2) — flat list
 const sideNavItems = [
   { label: 'Dashboard', icon: <DashboardIcon fontSize="small" />, path: '/' },
-  { label: 'Deadlines', icon: <AssignmentIcon fontSize="small" />, path: '/citations' },
-  { label: 'Surveys', icon: <CalendarTodayIcon fontSize="small" />, path: '/surveys' },
-  { label: 'Facilities', icon: <BusinessIcon fontSize="small" />, path: '/facilities' },
+  { label: 'Citations', icon: <AssignmentLateIcon fontSize="small" />, path: '/citations' },
+  { label: 'Survey Management', icon: <ContentPasteSearchIcon fontSize="small" />, path: '/surveys' },
+  { label: 'Facility Summaries', icon: <BusinessIcon fontSize="small" />, path: '/facilities' },
 ];
 
 // TELS logo as text (matches Figma: bold, dark)
@@ -99,7 +99,7 @@ export default function AppLayout() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%' }}>
             {topTabs.map((tab) => {
               const isActive = tab.label === 'Citations' && isOnCitations;
-              const hasDrop = tab.label === 'Citations';
+              const hasDrop = false; // no dropdowns in prototype
               return (
                 <Box
                   key={tab.label}
