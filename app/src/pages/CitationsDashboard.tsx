@@ -907,8 +907,6 @@ export default function CitationsDashboard() {
       {/* Recent Surveys */}
       {/* Recent Surveys removed */}
 
-      {/* Missing Documentation */}
-      <MissingDocumentationTable />
     </Box>
   );
 }
