@@ -61,6 +61,7 @@ function buildUpcomingDeadlines() {
     region: string;
     tag: string;
     tagType: 'F' | 'K' | 'E';
+    description: string;
     category: string;
     severity: string;
     scope: string;
@@ -68,6 +69,9 @@ function buildUpcomingDeadlines() {
     deadline: string;
     daysRemaining: number;
     surveyDate: string;
+    surveyType: string;
+    resolutionSteps: string;
+    preventionStrategies: string;
   }> = [];
 
   for (const fac of facilities) {
@@ -105,6 +109,7 @@ function buildUpcomingDeadlines() {
         region: fac.region,
         tag: cit.tag,
         tagType,
+        description: cit.description,
         category: cit.category,
         severity: cit.severity,
         scope: cit.scope,
@@ -112,6 +117,9 @@ function buildUpcomingDeadlines() {
         deadline: deadline.toISOString().split('T')[0],
         daysRemaining,
         surveyDate: cit.surveyDate,
+        surveyType: cit.surveyType,
+        resolutionSteps: cit.resolutionSteps,
+        preventionStrategies: cit.preventionStrategies,
       });
     }
   }
