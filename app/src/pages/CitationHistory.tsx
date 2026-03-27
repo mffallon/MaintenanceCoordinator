@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, Paper, Chip, Button, FormControl, InputLabel, Select,
   MenuItem, TextField, InputAdornment, IconButton, Divider,
@@ -9,6 +9,7 @@ import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import CloseIcon from '@mui/icons-material/Close';
 import { facilities } from '../data/facilities';
 import { citations } from '../data/citations';
 import PageHeader from '../components/PageHeader';
@@ -77,11 +78,14 @@ const allRows = buildAllDeadlineRows();
 
 export default function CitationHistory() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { passesFilter } = useCommunityFilter();
+  const initialStatusParam = searchParams.get('status') || '';
+  const initialStatus = initialStatusParam === 'open' ? 'open' : initialStatusParam;
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [stateFilter, setStateFilter] = useState('');
   const [quickFilter, setQuickFilter] = useState<string | null>(null);
 
@@ -95,7 +99,10 @@ export default function CitationHistory() {
         && !r.category.toLowerCase().includes(search.toLowerCase())) return false;
       if (tagFilter && r.tagType !== tagFilter) return false;
       if (severityFilter && r.severity !== severityFilter) return false;
-      if (statusFilter && r.status !== statusFilter) return false;
+      if (statusFilter) {
+        if (statusFilter === 'open') { if (r.status !== 'Open' && r.status !== 'No Plan') return false; }
+        else if (r.status !== statusFilter) return false;
+      }
       if (stateFilter && r.state !== stateFilter) return false;
       // Quick filter chips
       if (quickFilter === 'overdue' && r.daysRemaining >= 0) return false;
@@ -116,7 +123,10 @@ export default function CitationHistory() {
         && !r.category.toLowerCase().includes(search.toLowerCase())) return false;
       if (tagFilter && r.tagType !== tagFilter) return false;
       if (severityFilter && r.severity !== severityFilter) return false;
-      if (statusFilter && r.status !== statusFilter) return false;
+      if (statusFilter) {
+        if (statusFilter === 'open') { if (r.status !== 'Open' && r.status !== 'No Plan') return false; }
+        else if (r.status !== statusFilter) return false;
+      }
       if (stateFilter && r.state !== stateFilter) return false;
       return true;
     });
@@ -142,27 +152,41 @@ export default function CitationHistory() {
 
   const columns: GridColDef[] = [
     {
-      field: 'deadline', headerName: 'Deadline', width: 110,
+      field: 'facilityName', headerName: 'Facility', flex: 1, minWidth: 170,
       renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
+        <Box>
+          <Typography variant="body2" sx={{
+            fontWeight: 600, color: 'primary.main', cursor: 'pointer', fontSize: '0.8rem',
+            '&:hover': { textDecoration: 'underline' },
+          }} onClick={(e) => { e.stopPropagation(); navigate(`/facility/${p.row.facilityId}`); }}>
+            {(p.value as string).replace('Life Care Center of ', 'LCC ')}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">{p.row.city}, {p.row.state}</Typography>
+        </Box>
       ),
     },
     {
-      field: 'daysRemaining', headerName: 'Days Left', width: 120, type: 'number',
+      field: 'deadline', headerName: 'Due', width: 130,
+      sortComparator: (_a: string, _b: string, paramA: any, paramB: any) => {
+        return (paramA.api.getRow(paramA.id)?.daysRemaining ?? 0) - (paramB.api.getRow(paramB.id)?.daysRemaining ?? 0);
+      },
       renderCell: (p: GridRenderCellParams) => {
-        const d = p.value as number;
+        const d = p.row.daysRemaining as number;
         let color = '#16A34A'; let bg = '#DCFCE7'; let label = `${d}d`;
         if (d < 0) { color = '#991B1B'; bg = '#FEE2E2'; label = `${Math.abs(d)}d overdue`; }
         else if (d <= 7) { color = '#991B1B'; bg = '#FEE2E2'; }
         else if (d <= 14) { color = '#9A3412'; bg = '#FED7AA'; }
         else if (d <= 30) { color = '#854D0E'; bg = '#FEF9C3'; }
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-            <Box sx={{
-              width: 8, height: 8, borderRadius: '50%',
-              bgcolor: d < 0 ? '#DC2626' : d <= 7 ? '#DC2626' : d <= 14 ? '#EA580C' : d <= 30 ? '#CA8A04' : '#16A34A',
-            }} />
-            <Chip label={label} size="small" sx={{ bgcolor: bg, color, fontWeight: 700, fontSize: '0.75rem', height: 24 }} />
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+              <Box sx={{
+                width: 6, height: 6, borderRadius: '50%',
+                bgcolor: d < 0 ? '#DC2626' : d <= 7 ? '#DC2626' : d <= 14 ? '#EA580C' : d <= 30 ? '#CA8A04' : '#16A34A',
+              }} />
+              <Chip label={label} size="small" sx={{ bgcolor: bg, color, fontWeight: 700, fontSize: '0.65rem', height: 20 }} />
+            </Box>
+            <Typography variant="caption" sx={{ color: '#5c6874', fontSize: '0.75rem' }}>{fmtDate(p.value as string)}</Typography>
           </Box>
         );
       },
@@ -171,26 +195,9 @@ export default function CitationHistory() {
       field: 'tag', headerName: 'Tag', width: 90,
       renderCell: (p: GridRenderCellParams) => tagChip(p.value as string, p.row.tagType),
     },
+    { field: 'category', headerName: 'Category', flex: 0.8, minWidth: 140 },
     {
-      field: 'tagType', headerName: 'Type', width: 75,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="caption" sx={{
-          fontWeight: 700,
-          color: p.value === 'F' ? '#1E40AF' : p.value === 'K' ? '#991B1B' : '#854D0E',
-        }}>
-          {p.value}-Tag
-        </Typography>
-      ),
-    },
-    { field: 'category', headerName: 'Category', flex: 1, minWidth: 180 },
-    {
-      field: 'description', headerName: 'Description', flex: 1.5, minWidth: 220,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="caption" sx={{ whiteSpace: 'normal', lineHeight: 1.3 }}>{p.value}</Typography>
-      ),
-    },
-    {
-      field: 'severity', headerName: 'Severity', width: 130,
+      field: 'severity', headerName: 'Severity', width: 120,
       renderCell: (p: GridRenderCellParams) => {
         const map: Record<string, { bg: string; color: string }> = {
           'IJ': { bg: '#FEE2E2', color: '#991B1B' },
@@ -199,12 +206,11 @@ export default function CitationHistory() {
           'No Harm': { bg: '#E2E8F0', color: '#475569' },
         };
         const s = map[p.value as string] || map['No Harm'];
-        return <Chip label={p.value} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />;
+        return <Chip label={p.value} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: '0.7rem' }} />;
       },
     },
-    { field: 'scope', headerName: 'Scope', width: 100 },
     {
-      field: 'status', headerName: 'Status', width: 110,
+      field: 'status', headerName: 'Status', width: 100,
       renderCell: (p: GridRenderCellParams) => {
         const map: Record<string, { bg: string; color: string }> = {
           'Open': { bg: '#FEE2E2', color: '#991B1B' },
@@ -214,31 +220,14 @@ export default function CitationHistory() {
           'Past Non-Compliance': { bg: '#F1F5F9', color: '#475569' },
         };
         const s = map[p.value as string] || { bg: '#F1F5F9', color: '#475569' };
-        return <Chip label={p.value} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />;
+        return <Chip label={p.value} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: '0.7rem' }} />;
       },
     },
-    {
-      field: 'facilityName', headerName: 'Facility', width: 200,
-      renderCell: (p: GridRenderCellParams) => (
-        <Box>
-          <Typography variant="body2" sx={{
-            fontWeight: 600, color: 'primary.main', cursor: 'pointer',
-            '&:hover': { textDecoration: 'underline' },
-          }} onClick={(e) => { e.stopPropagation(); navigate(`/facility/${p.row.facilityId}`); }}>
-            {p.value}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">{p.row.city}, {p.row.state}</Typography>
-        </Box>
-      ),
-    },
-    { field: 'state', headerName: 'State', width: 60, align: 'center', headerAlign: 'center' },
-    { field: 'region', headerName: 'Region', width: 100 },
-    { field: 'surveyDate', headerName: 'Survey Date', width: 105,
+    { field: 'surveyDate', headerName: 'Survey Date', width: 100,
       renderCell: (p: GridRenderCellParams) => (
         <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
       ),
     },
-    { field: 'surveyType', headerName: 'Survey Type', width: 140 },
   ];
 
   return (
@@ -253,15 +242,53 @@ export default function CitationHistory() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <FilterListIcon color="action" fontSize="small" />
           <Typography variant="subtitle2">Filters</Typography>
-          <Chip label={`${filtered.length} total`} color="primary" size="small"
-            onClick={() => setQuickFilter(null)}
-            variant={quickFilter === null ? 'filled' : 'outlined'}
-            sx={{ cursor: 'pointer', ml: 1 }} />
           <Box sx={{ flexGrow: 1 }} />
           <Button size="small" startIcon={<FileDownloadIcon />}>Export</Button>
         </Box>
-        {/* Quick filter chips */}
-        <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Dropdown filters */}
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 1.5 }}>
+          <TextField size="small" placeholder="Search tag, facility, category..." value={search}
+            onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 250 }}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Severity</InputLabel>
+            <Select value={severityFilter} label="Severity" onChange={(e) => setSeverityFilter(e.target.value)}>
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="IJ">Immediate Jeopardy</MenuItem>
+              <MenuItem value="Actual Harm">Actual Harm</MenuItem>
+              <MenuItem value="Potential Harm">Potential Harm</MenuItem>
+              <MenuItem value="No Harm">No Harm</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Status</InputLabel>
+            <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="open">Open & No Plan</MenuItem>
+              <MenuItem value="Open">Open</MenuItem>
+              <MenuItem value="Has Plan">Has Plan</MenuItem>
+              <MenuItem value="No Plan">No Plan</MenuItem>
+              <MenuItem value="Corrected">Corrected</MenuItem>
+              <MenuItem value="Past Non-Compliance">Past Non-Compliance</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 90 }}>
+            <InputLabel>State</InputLabel>
+            <Select value={stateFilter} label="State" onChange={(e) => setStateFilter(e.target.value)}>
+              <MenuItem value="">All</MenuItem>
+              {states.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <Button variant="text" startIcon={<CloseIcon />} sx={{ height: 44 }}
+            onClick={() => { setSearch(''); setTagFilter(''); setSeverityFilter(''); setStatusFilter(''); setStateFilter(''); setQuickFilter(null); }}>
+            Reset
+          </Button>
+        </Box>
+        {/* Table title + quick filter chips */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#293036' }}>
+            {filtered.length} citations
+          </Typography>
           <Chip label={`${overdueCount} overdue`} size="small"
             onClick={() => toggleQuick('overdue')}
             sx={{ cursor: 'pointer', fontWeight: 700,
@@ -306,48 +333,14 @@ export default function CitationHistory() {
               border: quickFilter === 'E' ? '2px solid #854D0E' : 'none',
             }} />
         </Box>
-        {/* Dropdown filters */}
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-          <TextField size="small" placeholder="Search tag, facility, category..." value={search}
-            onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 250 }}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel>Severity</InputLabel>
-            <Select value={severityFilter} label="Severity" onChange={(e) => setSeverityFilter(e.target.value)}>
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="IJ">Immediate Jeopardy</MenuItem>
-              <MenuItem value="Actual Harm">Actual Harm</MenuItem>
-              <MenuItem value="Potential Harm">Potential Harm</MenuItem>
-              <MenuItem value="No Harm">No Harm</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Status</InputLabel>
-            <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="Open">Open</MenuItem>
-              <MenuItem value="Has Plan">Has Plan</MenuItem>
-              <MenuItem value="No Plan">No Plan</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 90 }}>
-            <InputLabel>State</InputLabel>
-            <Select value={stateFilter} label="State" onChange={(e) => setStateFilter(e.target.value)}>
-              <MenuItem value="">All</MenuItem>
-              {states.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <Button size="small" onClick={() => { setSearch(''); setTagFilter(''); setSeverityFilter(''); setStatusFilter(''); setStateFilter(''); setQuickFilter(null); }}>
-            Reset
-          </Button>
-        </Box>
         </Box>
         <DataGrid
           rows={filtered}
           columns={columns}
+          rowHeight={60}
           initialState={{
             pagination: { paginationModel: { pageSize: 25 } },
-            sorting: { sortModel: [{ field: 'daysRemaining', sort: 'asc' }] },
+            sorting: { sortModel: [{ field: 'deadline', sort: 'asc' }] },
           }}
           pageSizeOptions={[10, 25, 50, 100]}
           disableRowSelectionOnClick
@@ -367,7 +360,13 @@ export default function CitationHistory() {
             '& .MuiDataGrid-row': { cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } },
             '& .overdue-row': { bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } },
             '& .due-soon-row': { bgcolor: '#FFFBEB', '&:hover': { bgcolor: '#FEF3C7' } },
-            '& .MuiDataGrid-cell': { py: 1, borderBottom: '1px solid #F1F5F9' },
+            '& .MuiDataGrid-cell': {
+              py: 1,
+              borderBottom: '1px solid #F1F5F9',
+              display: 'flex',
+              alignItems: 'center',
+              lineHeight: '1.4',
+            },
           }}
           autoHeight
         />

@@ -28,8 +28,7 @@ function buildSurveyRows() {
 
     let surveyStatus: string;
     if (daysUntilEnd < 0) surveyStatus = 'Window Passed';
-    else if (daysUntilEnd <= 30) surveyStatus = 'Due Soon';
-    else if (daysUntilStart <= 0) surveyStatus = 'In Window';
+    else if (daysUntilStart <= 0 || daysUntilEnd <= 30) surveyStatus = 'In Window';
     else surveyStatus = 'Upcoming';
 
     const uploaded = fac.surveys > 2 && fac.totalCitations > 0;
@@ -62,18 +61,23 @@ export default function SurveyManagement() {
   const { passesFilter } = useCommunityFilter();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') === 'historical' ? 1 : 0;
-  const initialGapsFilter = searchParams.get('filter') === 'gaps';
+  const initialFilter = searchParams.get('filter');
+  const initialSort = searchParams.get('sort');
+  const initialGapsFilter = initialFilter === 'gaps';
+  const initialInWindowFilter = initialFilter === 'inWindow' || initialFilter === 'inwindow' || initialFilter === 'active';
   const [tab, setTab] = useState(initialTab);
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialInWindowFilter ? 'In Window' : '');
   const [gapsOnly, setGapsOnly] = useState(initialGapsFilter);
   const [sortModel, setSortModel] = useState(
-    initialGapsFilter
-      ? [{ field: 'uploaded' as const, sort: 'asc' as const }]
-      : [{ field: 'lastSurveyDate' as const, sort: 'desc' as const }]
+    initialSort === 'daysLeft'
+      ? [{ field: 'daysUntilEnd' as const, sort: 'asc' as const }]
+      : initialGapsFilter
+        ? [{ field: 'uploaded' as const, sort: 'asc' as const }]
+        : [{ field: 'lastSurveyDate' as const, sort: 'desc' as const }]
   );
   const [viewMenuAnchor, setViewMenuAnchor] = useState<null | HTMLElement>(null);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set(['_showRegion', 'windowStart']));
@@ -108,7 +112,6 @@ export default function SurveyManagement() {
   const statusChip = (status: string) => {
     const map: Record<string, { bg: string; color: string }> = {
       'Window Passed': { bg: '#F1F5F9', color: '#64748B' },
-      'Due Soon': { bg: '#FEE2E2', color: '#991B1B' },
       'In Window': { bg: '#FEF3C7', color: '#92400E' },
       'Upcoming': { bg: '#DBEAFE', color: '#1E40AF' },
     };
@@ -187,7 +190,6 @@ export default function SurveyManagement() {
   // Summary counts
   const upcomingCount = communityRows.filter((r) => r.surveyStatus !== 'Window Passed').length;
   const historicalCount = communityRows.filter((r) => r.surveyStatus === 'Window Passed').length;
-  const dueSoon = tabFiltered.filter((r) => r.surveyStatus === 'Due Soon').length;
   const inWindow = tabFiltered.filter((r) => r.surveyStatus === 'In Window').length;
 
   return (
@@ -230,7 +232,6 @@ export default function SurveyManagement() {
                 <InputLabel>Status</InputLabel>
                 <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
                   <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Due Soon">Due Soon</MenuItem>
                   <MenuItem value="In Window">In Window</MenuItem>
                   <MenuItem value="Upcoming">Upcoming</MenuItem>
                 </Select>
@@ -300,7 +301,7 @@ export default function SurveyManagement() {
           disableColumnMenu
           onRowClick={(params) => navigate(`/facility/${params.row.id}`)}
           getRowClassName={(params) => {
-            if (params.row.surveyStatus === 'Due Soon') return 'due-soon-row';
+            if (params.row.surveyStatus === 'In Window' && params.row.daysUntilEnd <= 30) return 'due-soon-row';
             if (params.row.surveyStatus === 'In Window') return 'in-window-row';
             return '';
           }}

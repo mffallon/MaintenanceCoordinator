@@ -297,8 +297,7 @@ function buildUpcomingSurveys() {
 
       let surveyStatus: string;
       if (daysUntilEnd < 0) surveyStatus = 'Window Passed';
-      else if (daysUntilEnd <= 30) surveyStatus = 'Due Soon';
-      else if (daysUntilStart <= 0) surveyStatus = 'In Window';
+      else if (daysUntilStart <= 0 || daysUntilEnd <= 30) surveyStatus = 'In Window';
       else surveyStatus = 'Upcoming';
 
       // Mock whether survey has been uploaded
@@ -335,7 +334,6 @@ function UpcomingSurveysTable() {
   const statusChip = (status: string) => {
     const map: Record<string, { bg: string; color: string }> = {
       'Window Passed': { bg: '#F1F5F9', color: '#64748B' },
-      'Due Soon': { bg: '#FEE2E2', color: '#991B1B' },
       'In Window': { bg: '#FEF3C7', color: '#92400E' },
       'Upcoming': { bg: '#DBEAFE', color: '#1E40AF' },
     };
@@ -360,7 +358,6 @@ function UpcomingSurveysTable() {
     );
   };
 
-  const dueSoon = filteredSurveyRows.filter((r) => r.surveyStatus === 'Due Soon').length;
   const inWindow = filteredSurveyRows.filter((r) => r.surveyStatus === 'In Window').length;
   const upcoming = filteredSurveyRows.filter((r) => r.surveyStatus === 'Upcoming').length;
   const passed = filteredSurveyRows.filter((r) => r.surveyStatus === 'Window Passed').length;
@@ -375,7 +372,6 @@ function UpcomingSurveysTable() {
           <Chip label={`${filteredSurveyRows.length} facilities`} size="small" color="primary" />
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          {dueSoon > 0 && <Chip label={`${dueSoon} due soon`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />}
           <Chip label={`${inWindow} in window`} size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />
           <Chip label={`${upcoming} upcoming`} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 600 }} />
           <Chip label={`${passed} passed`} size="small" sx={{ bgcolor: '#F1F5F9', color: '#64748B', fontWeight: 600 }} />
@@ -402,9 +398,9 @@ function UpcomingSurveysTable() {
               <TableRow key={row.id} hover
                 sx={{
                   cursor: 'pointer',
-                  bgcolor: row.surveyStatus === 'Due Soon' ? '#FEF2F2'
+                  bgcolor: (row.surveyStatus === 'In Window' && row.daysUntilEnd <= 30) ? '#FEF2F2'
                     : row.surveyStatus === 'In Window' ? '#FFFBEB' : 'transparent',
-                  '&:hover': { bgcolor: row.surveyStatus === 'Due Soon' ? '#FEE2E2' : '#F0F7FF' },
+                  '&:hover': { bgcolor: (row.surveyStatus === 'In Window' && row.daysUntilEnd <= 30) ? '#FEE2E2' : '#F0F7FF' },
                 }}
                 onClick={() => navigate(`/facility/${row.id}`)}
               >
@@ -679,18 +675,21 @@ export default function CitationsDashboard() {
 
   // Summary stats (filtered by community)
   const communityFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)), [passesFilter]);
-  const inWindow = communityFacilities.filter((f) => {
-    const end = new Date(f.surveyWindowEnd);
-    return end >= new Date();
-  }).length;
+  const communitySurveyRows = useMemo(() => buildUpcomingSurveys().filter((r) => passesFilter(r.id)), [passesFilter]);
+  const cardInWindow = communitySurveyRows.filter((r) => r.surveyStatus === 'In Window').length;
   const nearing90 = communityFacilities.filter((f) => f.nearing90Days).length;
   const docGapsNearingSurvey = communityFacilities.filter((f) => {
     const gaps = f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs;
     return gaps > 0 && f.nearing90Days;
   }).length;
-  const openPocs = communityFacilities.filter((f) => f.pocStatus === 'on-track' || f.pocStatus === 'overdue').length;
+  const openCitationCount = citations.filter((c) => {
+    const fac = communityFacilities.find((f) => f.id === c.facilityId);
+    return fac && (c.status === 'Open' || c.status === 'No Plan');
+  }).length;
   const defFree = communityFacilities.filter((f) => f.deficiencyFree).length;
-  const avgCitations = communityFacilities.length > 0 ? (communityFacilities.reduce((s, f) => s + f.totalCitations, 0) / communityFacilities.length).toFixed(1) : '0';
+  const avgCitationsNum = communityFacilities.length > 0 ? communityFacilities.reduce((s, f) => s + f.totalCitations, 0) / communityFacilities.length : 0;
+  const avgCitations = avgCitationsNum.toFixed(1);
+  const avgDiff = (avgCitationsNum - 9.5).toFixed(1);
   const topCategory = 'Quality of Life & Care';
 
   const resetFilters = () => {
@@ -826,13 +825,15 @@ export default function CitationsDashboard() {
             action={{ label: 'Review', onClick: () => navigate('/surveys?filter=gaps') }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Open Plans of Correction" value={openPocs} subtitle="Active POCs requiring completion" icon={<TaskAltIcon />} color="#7B1FA2" />
+          <SummaryCard title="Open Plans of Correction" value={openCitationCount} subtitle="Citations requiring action" icon={<TaskAltIcon />} color="#7B1FA2"
+            action={{ label: 'View', onClick: () => navigate('/citations?status=open') }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Within Survey Window" value={inWindow} subtitle="Facilities currently in CMS survey window" icon={<BusinessIcon />} color="#1565C0" />
+          <SummaryCard title="Within Survey Window" value={cardInWindow} subtitle="Facilities currently in CMS survey window" icon={<BusinessIcon />} color="#1565C0"
+            action={{ label: 'Review', onClick: () => navigate('/surveys?filter=inWindow&sort=daysLeft') }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Avg Citations per Facility" value={avgCitations} subtitle="+4.1 above avg · National avg: 9.5" icon={<TrendingUpIcon />} color="#F57C00"
+          <SummaryCard title="Avg Citations per Facility" value={avgCitations} subtitle={`+${avgDiff} above avg · National avg: 9.5`} icon={<TrendingUpIcon />} color="#F57C00"
             action={{ label: 'Facilities', onClick: () => navigate('/facilities') }} />
         </Grid>
       </Grid>
