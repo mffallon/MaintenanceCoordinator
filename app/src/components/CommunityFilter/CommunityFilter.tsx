@@ -13,8 +13,9 @@ import { useCommunityFilter } from './CommunityContext';
 
 // ─── Display label logic ────────────────────────────────────────
 function getDisplayLabel(checked: Set<string> | null, tree: TreeNode): string {
-  if (checked === null || checked.size === ALL_LEAF_IDS.length) return 'All Communities';
+  if (!checked || checked.size === ALL_LEAF_IDS.length) return 'All Communities';
   if (checked.size === 0) return 'None selected';
+  const checkedSet = checked;
 
   // Check top-level groups first
   const fullySelected: string[] = [];
@@ -22,7 +23,7 @@ function getDisplayLabel(checked: Set<string> | null, tree: TreeNode): string {
 
   function checkGroup(node: TreeNode): boolean {
     const leaves = getLeafIds(node);
-    if (leaves.every((l) => checked.has(l))) {
+    if (leaves.every((l) => checkedSet.has(l))) {
       fullySelected.push(node.label);
       accountedFor += leaves.length;
       return true;
@@ -42,21 +43,21 @@ function getDisplayLabel(checked: Set<string> | null, tree: TreeNode): string {
     }
   }
 
-  const remainder = checked.size - accountedFor;
+  const remainder = checkedSet.size - accountedFor;
 
   if (fullySelected.length === 0) {
     // Just leaf selections
-    if (checked.size === 1) {
+    if (checkedSet.size === 1) {
       // Find label
-      const id = [...checked][0];
+      const id = [...checkedSet][0];
       const find = (n: TreeNode): string | null => {
         if (n.id === id) return n.label;
         if (n.children) for (const c of n.children) { const r = find(c); if (r) return r; }
         return null;
       };
-      return find(tree) || `${checked.size} items selected`;
+      return find(tree) || `${checkedSet.size} items selected`;
     }
-    return `${checked.size} items selected`;
+    return `${checkedSet.size} items selected`;
   }
 
   if (remainder === 0) return fullySelected.join(', ');
