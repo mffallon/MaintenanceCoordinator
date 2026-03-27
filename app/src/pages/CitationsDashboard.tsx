@@ -33,7 +33,9 @@ import AddTaskIcon from '@mui/icons-material/AddTask';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SummaryCard from '../components/SummaryCard';
+import CitationDetailDrawer from '../components/CitationDetailDrawer';
 import PageHeader from '../components/PageHeader';
 import { useCommunityFilter } from '../components/CommunityFilter';
 import { facilities } from '../data/facilities';
@@ -130,9 +132,22 @@ function UpcomingDeadlinesTable() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
   const [page, setPage] = useState(0);
+  const [selectedRow, setSelectedRow] = useState<typeof deadlineRows[0] | null>(null);
   const rowsPerPage = 25;
   const filteredDeadlineRows = useMemo(() => deadlineRows.filter((r) => passesFilter(r.facilityId)), [passesFilter]);
   const displayRows = filteredDeadlineRows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+  // Build a Citation-compatible object for the drawer
+  const selectedCitation = selectedRow ? {
+    id: selectedRow.id, facilityId: selectedRow.facilityId,
+    tag: selectedRow.tag, description: selectedRow.description,
+    category: selectedRow.category, severity: selectedRow.severity as any,
+    scope: selectedRow.scope as any, status: selectedRow.status as any,
+    surveyDate: selectedRow.surveyDate, surveyType: selectedRow.surveyType,
+    documentationGaps: { tasks: false, logs: false, docs: false },
+    resolutionSteps: selectedRow.resolutionSteps,
+    preventionStrategies: selectedRow.preventionStrategies,
+  } : null;
 
   const tagChip = (tag: string, type: 'F' | 'K' | 'E') => {
     const styles = {
@@ -228,6 +243,7 @@ function UpcomingDeadlinesTable() {
               <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Severity</TableCell>
               <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }}>Status</TableCell>
               <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 95 }}>Survey Date</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 0, width: 32 }} />
             </TableRow>
           </TableHead>
           <TableBody>
@@ -238,10 +254,13 @@ function UpcomingDeadlinesTable() {
                   bgcolor: row.daysRemaining < 0 ? '#FEF2F2' : row.daysRemaining <= 7 ? '#FFFBEB' : 'transparent',
                   '&:hover': { bgcolor: row.daysRemaining < 0 ? '#FEE2E2' : '#F0F7FF' },
                 }}
-                onClick={() => navigate(`/facility/${row.facilityId}`)}
+                onClick={() => setSelectedRow(row)}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
+                  <Typography variant="body2" sx={{
+                    fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', cursor: 'pointer',
+                    '&:hover': { textDecoration: 'underline' },
+                  }} onClick={(e) => { e.stopPropagation(); navigate(`/facility/${row.facilityId}`); }}>
                     {row.facilityName.replace('Life Care Center of ', 'LCC ')}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.city}, {row.state}</Typography>
@@ -257,7 +276,15 @@ function UpcomingDeadlinesTable() {
                 <TableCell>{severityChip(row.severity)}</TableCell>
                 <TableCell>{statusChip(row.status)}</TableCell>
                 <TableCell>
-                  <Typography variant="caption">{fmtDate(row.surveyDate)}</Typography>
+                  <Typography variant="caption" sx={{
+                    color: 'primary.main', cursor: 'pointer',
+                    '&:hover': { textDecoration: 'underline' },
+                  }} onClick={(e) => { e.stopPropagation(); navigate(`/facility/${row.facilityId}`); }}>
+                    {fmtDate(row.surveyDate)}
+                  </Typography>
+                </TableCell>
+                <TableCell sx={{ px: 0 }}>
+                  <ChevronRightIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
                 </TableCell>
               </TableRow>
             ))}
@@ -281,6 +308,14 @@ function UpcomingDeadlinesTable() {
           View all &rarr;
         </Button>
       </Box>
+
+      <CitationDetailDrawer
+        citation={selectedCitation}
+        onClose={() => setSelectedRow(null)}
+        facilityName={selectedRow?.facilityName}
+        facilityCity={selectedRow?.city}
+        facilityState={selectedRow?.state}
+      />
     </Paper>
   );
 }

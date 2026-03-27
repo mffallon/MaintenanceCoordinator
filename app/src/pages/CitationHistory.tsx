@@ -233,7 +233,7 @@ export default function CitationHistory() {
   return (
     <Box>
       <PageHeader
-        title="Citation Deadlines"
+        title="Citations"
       />
 
       {/* Filters + Table in one section */}
