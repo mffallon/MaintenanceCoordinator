@@ -7,13 +7,9 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination,
   LinearProgress,
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer,
-} from 'recharts';
-import { LineChart as MuiLineChart } from '@mui/x-charts/LineChart';
+import { BarChart } from '@mui/x-charts';
+import { LineChart as MuiLineChart } from '@mui/x-charts';
 import BusinessIcon from '@mui/icons-material/Business';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -35,656 +31,258 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SummaryCard from '../components/SummaryCard';
-import CitationDetailDrawer from '../components/CitationDetailDrawer';
 import PageHeader from '../components/PageHeader';
+import PageFilters from '../components/PageFilters';
 import { useCommunityFilter } from '../components/CommunityFilter';
-import { facilities } from '../data/facilities';
-import { citations } from '../data/citations';
-import { surveyTrends, severityTrends, categorySeverity } from '../data/trends';
+import { facilities, citations, surveys, regions as avirRegions } from '../data/avir-data';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import type { AvirFacility, AvirSurvey } from '../data/avir-data';
 import { fmtDate } from '../utils/formatDate';
+import { makeDateFilter } from '../utils/dateFilter';
 
-const COLORS = ['#1565C0', '#7B1FA2', '#D32F2F', '#ED6C02', '#2E7D32', '#0288D1', '#F57C00', '#5E35B1', '#00838F'];
-
-const states = [...new Set(facilities.map((f) => f.state))].sort();
-const regions = [...new Set(facilities.map((f) => f.region))].sort();
-const surveyTypes = ['CMS Life Safety', 'CMS Health', 'State Fire Marshal', 'Joint Commission'];
-
-// Build upcoming deadline rows: open/has-plan citations grouped by facility, with POC due dates
-function buildUpcomingDeadlines() {
-  const now = new Date();
-  const rows: Array<{
-    id: string;
-    facilityId: string;
-    facilityName: string;
-    city: string;
-    state: string;
-    region: string;
-    tag: string;
-    tagType: 'F' | 'K' | 'E';
-    description: string;
-    category: string;
-    severity: string;
-    scope: string;
-    status: string;
-    deadline: string;
-    daysRemaining: number;
-    surveyDate: string;
-    surveyType: string;
-    resolutionSteps: string;
-    preventionStrategies: string;
-  }> = [];
-
-  for (const fac of facilities) {
-    if (!fac.pocDueDate && fac.totalCitations === 0) continue;
-
-    const facCitations = citations.filter(
-      (c) => c.facilityId === fac.id && (c.status === 'Open' || c.status === 'Has Plan' || c.status === 'No Plan')
-    );
-
-    for (const cit of facCitations) {
-      // Spread deadlines around "now" so we get a realistic mix of overdue, due-soon, and upcoming
-      // Use a seeded offset based on citation index to keep it deterministic
-      const citIdx = rows.length;
-      const spreadDays = [
-        -14, -10, -7, -5, -3, -1,          // overdue
-        0, 1, 2, 3, 4, 5,                   // due this week
-        7, 9, 11, 14, 18, 21,               // due in 2-3 weeks
-        25, 30, 35, 40, 45, 50, 55, 60,     // due in 1-2 months
-        70, 80, 90, 100, 110, 120,           // further out
-      ];
-      const dayOffset = spreadDays[citIdx % spreadDays.length]
-        + Math.floor(citIdx / spreadDays.length) * 5; // shift later rounds further out
-
-      const deadline = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
-      const daysRemaining = dayOffset;
-
-      const tagType: 'F' | 'K' | 'E' = cit.tag.startsWith('K') ? 'K' : cit.tag.startsWith('E') ? 'E' : 'F';
-
-      rows.push({
-        id: cit.id,
-        facilityId: fac.id,
-        facilityName: fac.name,
-        city: fac.city,
-        state: fac.state,
-        region: fac.region,
-        tag: cit.tag,
-        tagType,
-        description: cit.description,
-        category: cit.category,
-        severity: cit.severity,
-        scope: cit.scope,
-        status: cit.status,
-        deadline: deadline.toISOString().split('T')[0],
-        daysRemaining,
-        surveyDate: cit.surveyDate,
-        surveyType: cit.surveyType,
-        resolutionSteps: cit.resolutionSteps,
-        preventionStrategies: cit.preventionStrategies,
-      });
+// Build survey trend data grouped by month (accepts filtered surveys)
+function buildSurveyTrends(filteredSurveys: AvirSurvey[]) {
+  const monthMap = new Map<string, { month: string; kTags: number; nTags: number; eTags: number; total: number; surveys: number }>();
+  for (const s of filteredSurveys) {
+    if (!s.date) continue;
+    const d = new Date(s.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    if (!monthMap.has(key)) {
+      monthMap.set(key, { month: label, kTags: 0, nTags: 0, eTags: 0, total: 0, surveys: 0 });
     }
+    const m = monthMap.get(key)!;
+    m.kTags += s.kTags;
+    m.nTags += s.nTags;
+    m.eTags += s.eTags;
+    m.total += s.total;
+    m.surveys += 1;
   }
-
-  // Sort by soonest deadline first, then by tag type priority (F > K > E)
-  const tagPriority = { F: 0, K: 1, E: 2 };
-  rows.sort((a, b) => {
-    if (a.daysRemaining !== b.daysRemaining) return a.daysRemaining - b.daysRemaining;
-    return tagPriority[a.tagType] - tagPriority[b.tagType];
-  });
-
-  return rows;
+  return [...monthMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
 }
 
-const deadlineRows = buildUpcomingDeadlines();
+// Build tag type breakdown by region for bar chart (accepts filtered facilities)
+function buildRegionBreakdown(filteredFacilities: AvirFacility[]) {
+  const regionMap = new Map<string, { region: string; kTags: number; nTags: number; eTags: number }>();
+  for (const fac of filteredFacilities) {
+    if (!regionMap.has(fac.region)) {
+      regionMap.set(fac.region, { region: fac.region, kTags: 0, nTags: 0, eTags: 0 });
+    }
+    const r = regionMap.get(fac.region)!;
+    r.kTags += fac.totalKTags;
+    r.nTags += fac.totalNTags;
+    r.eTags += fac.totalETags;
+  }
+  return [...regionMap.values()].sort((a, b) => (b.kTags + b.nTags + b.eTags) - (a.kTags + a.nTags + a.eTags));
+}
 
-function UpcomingDeadlinesTable() {
+// Upcoming survey window data (mirrors SurveyManagement overrides)
+const TODAY_DASH = new Date('2026-04-05');
+const UPCOMING_OVERRIDES: Record<number, string> = {
+  0: '2025-01-18',
+  1: '2025-02-05',
+  2: '2025-02-22',
+  3: '2025-03-10',
+  4: '2025-03-28',
+};
+function deriveUpcomingAlerts(facilityId: string): number {
+  const facCitations = citations.filter((c) => c.facilityId === facilityId);
+  const openCits = facCitations.filter((c) => c.status === 'Open' || c.status === 'Pending');
+  const tasks = openCits.length;
+  const seed = facilityId.length % 5;
+  const total = facCitations.length;
+  const logs = total > 10 ? seed + 2 : total > 0 ? seed : 0;
+  const docs = total > 15 ? 3 : total > 5 ? 1 : 0;
+  return tasks + logs + docs;
+}
+
+const upcomingSurveyRows = facilities
+  .filter((f) => f.lastSurveyDate)
+  .map((f, i) => {
+    const overriddenDate = UPCOMING_OVERRIDES[i];
+    const last = new Date(overriddenDate ?? f.lastSurveyDate);
+    const windowEnd = new Date(last);
+    windowEnd.setMonth(windowEnd.getMonth() + 15);
+    const windowEndISO = windowEnd.toISOString().split('T')[0];
+    const days = Math.round((windowEnd.getTime() - TODAY_DASH.getTime()) / (1000 * 60 * 60 * 24));
+    const status = days < 0 ? 'Overdue' : days <= 30 ? 'Due Soon' : days <= 90 ? 'Upcoming' : 'On Track';
+    const alerts = deriveUpcomingAlerts(f.id);
+    const prevCitations = citations.filter((c) => c.facilityId === f.id).length;
+    const lastSurvey = surveys.filter((s) => s.facilityId === f.id).sort((a, b) => b.date.localeCompare(a.date))[0];
+    const lastSurveyor = lastSurvey?.surveyor || '—';
+    return { id: f.id, name: f.name, region: f.region, windowEnd: windowEndISO, daysUntilDue: days, status, alerts, prevCitations, lastSurveyor };
+  })
+  .filter((r) => r.daysUntilDue >= 0 && r.daysUntilDue <= 90)
+  .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+
+function UpcomingSurveysPanel() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
-  const [page, setPage] = useState(0);
-  const [selectedRow, setSelectedRow] = useState<typeof deadlineRows[0] | null>(null);
-  const rowsPerPage = 25;
-  const filteredDeadlineRows = useMemo(() => deadlineRows.filter((r) => passesFilter(r.facilityId)), [passesFilter]);
-  const displayRows = filteredDeadlineRows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+  const rows = upcomingSurveyRows.filter((r) => passesFilter(r.id));
+  if (rows.length === 0) return null;
 
-  // Build a Citation-compatible object for the drawer
-  const selectedCitation = selectedRow ? {
-    id: selectedRow.id, facilityId: selectedRow.facilityId,
-    tag: selectedRow.tag, description: selectedRow.description,
-    category: selectedRow.category, severity: selectedRow.severity as any,
-    scope: selectedRow.scope as any, status: selectedRow.status as any,
-    surveyDate: selectedRow.surveyDate, surveyType: selectedRow.surveyType,
-    documentationGaps: { tasks: false, logs: false, docs: false },
-    resolutionSteps: selectedRow.resolutionSteps,
-    preventionStrategies: selectedRow.preventionStrategies,
-  } : null;
-
-  const tagChip = (tag: string, type: 'F' | 'K' | 'E') => {
-    const styles = {
-      F: { bgcolor: '#DBEAFE', color: '#1E40AF', border: '1.5px solid #93C5FD' },
-      K: { bgcolor: '#FEE2E2', color: '#991B1B', border: '1.5px solid #FCA5A5' },
-      E: { bgcolor: '#FEF9C3', color: '#854D0E', border: '1.5px solid #FDE047' },
-    };
-    return (
-      <Chip label={tag} size="small"
-        sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.8rem', ...styles[type] }} />
-    );
+  const statusColors: Record<string, { color: string; bg: string; border: string }> = {
+    'Overdue':  { color: '#991B1B', bg: '#FEE2E2', border: '#FECACA' },
+    'Due Soon': { color: '#92400E', bg: '#FEF3C7', border: '#FDE68A' },
+    'Upcoming': { color: '#1E40AF', bg: '#DBEAFE', border: '#BFDBFE' },
   };
-
-  const severityChip = (sev: string) => {
-    const map: Record<string, { bg: string; color: string }> = {
-      'IJ': { bg: '#FEE2E2', color: '#991B1B' },
-      'Actual Harm': { bg: '#FED7AA', color: '#9A3412' },
-      'Potential Harm': { bg: '#FEF9C3', color: '#854D0E' },
-      'No Harm': { bg: '#E2E8F0', color: '#475569' },
-    };
-    const s = map[sev] || map['No Harm'];
-    return <Chip label={sev} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: '0.7rem' }} />;
-  };
-
-  const deadlineIndicator = (days: number) => {
-    let color = '#16A34A';
-    let bg = '#DCFCE7';
-    let label = `${days}d`;
-    if (days < 0) { color = '#991B1B'; bg = '#FEE2E2'; label = `${Math.abs(days)}d overdue`; }
-    else if (days <= 7) { color = '#991B1B'; bg = '#FEE2E2'; }
-    else if (days <= 14) { color = '#9A3412'; bg = '#FED7AA'; }
-    else if (days <= 30) { color = '#854D0E'; bg = '#FEF9C3'; }
-
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-        <Box sx={{
-          width: 8, height: 8, borderRadius: '50%',
-          bgcolor: days < 0 ? '#DC2626' : days <= 7 ? '#DC2626' : days <= 14 ? '#EA580C' : days <= 30 ? '#CA8A04' : '#16A34A',
-          animation: days <= 7 ? 'pulse 2s infinite' : 'none',
-          '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
-        }} />
-        <Chip label={label} size="small"
-          sx={{ bgcolor: bg, color, fontWeight: 700, fontSize: '0.75rem', height: 24 }} />
-      </Box>
-    );
-  };
-
-  const statusChip = (status: string) => {
-    const map: Record<string, { bg: string; color: string }> = {
-      'Open': { bg: '#FEE2E2', color: '#991B1B' },
-      'Has Plan': { bg: '#DBEAFE', color: '#1E40AF' },
-      'No Plan': { bg: '#FEF3C7', color: '#92400E' },
-    };
-    const s = map[status] || { bg: '#F1F5F9', color: '#475569' };
-    return <Chip label={status} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: '0.7rem' }} />;
-  };
-
-  // Summary counts
-  const overdueCount = filteredDeadlineRows.filter((r) => r.daysRemaining < 0).length;
-  const within7 = filteredDeadlineRows.filter((r) => r.daysRemaining >= 0 && r.daysRemaining <= 7).length;
-  const within30 = filteredDeadlineRows.filter((r) => r.daysRemaining > 7 && r.daysRemaining <= 30).length;
-  const fTagCount = filteredDeadlineRows.filter((r) => r.tagType === 'F').length;
-  const kTagCount = filteredDeadlineRows.filter((r) => r.tagType === 'K').length;
-  const eTagCount = filteredDeadlineRows.filter((r) => r.tagType === 'E').length;
 
   return (
     <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <AccessTimeIcon sx={{ color: '#DC2626' }} />
-          <Typography variant="h6">Active Citations</Typography>
-          <Chip label={`${filteredDeadlineRows.length} open`} size="small" color="primary" />
+          <EventNoteIcon sx={{ color: '#0065BD' }} />
+          <Typography variant="h6">Upcoming Surveys — Next 90 Days</Typography>
+          <Chip label={`${rows.length} communities`} size="small" color="primary" />
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          {overdueCount > 0 && <Chip label={`${overdueCount} overdue`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />}
-          {within7 > 0 && <Chip label={`${within7} due this week`} size="small" sx={{ bgcolor: '#FED7AA', color: '#9A3412', fontWeight: 700 }} />}
-          <Chip label={`${within30} due in 30d`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 600 }} />
-          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-          <Chip label={`F-Tags: ${fTagCount}`} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700 }} />
-          <Chip label={`K-Tags: ${kTagCount}`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
-          <Chip label={`E-Tags: ${eTagCount}`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700 }} />
-        </Box>
+        <Button variant="text" size="small" onClick={() => navigate('/surveys')}>View all →</Button>
       </Box>
-
       <TableContainer>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 130 }}>Due</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }}>Tag</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Category</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Severity</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 95 }}>Survey Date</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 0, width: 32 }} />
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 160 }}>Window Closes</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 140 }}>Surveyor</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 110 }} align="right">Prev. Citations</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 90 }} align="right">Alerts</TableCell>
+              <TableCell sx={{ bgcolor: '#e0e4e7', width: 32, px: 0 }} />
             </TableRow>
           </TableHead>
           <TableBody>
-            {displayRows.map((row) => (
-              <TableRow key={row.id} hover
-                sx={{
-                  cursor: 'pointer',
-                  bgcolor: row.daysRemaining < 0 ? '#FEF2F2' : row.daysRemaining <= 7 ? '#FFFBEB' : 'transparent',
-                  '&:hover': { bgcolor: row.daysRemaining < 0 ? '#FEE2E2' : '#F0F7FF' },
-                }}
-                onClick={() => setSelectedRow(row)}
-              >
-                <TableCell>
-                  <Typography variant="body2" sx={{
-                    fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', cursor: 'pointer',
-                    '&:hover': { textDecoration: 'underline' },
-                  }} onClick={(e) => { e.stopPropagation(); navigate(`/facility/${row.facilityId}`); }}>
-                    {row.facilityName.replace('Life Care Center of ', 'LCC ')}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.city}, {row.state}</Typography>
-                </TableCell>
-                <TableCell>
-                  {deadlineIndicator(row.daysRemaining)}
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}>{fmtDate(row.deadline)}</Typography>
-                </TableCell>
-                <TableCell>{tagChip(row.tag, row.tagType)}</TableCell>
-                <TableCell>
-                  <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>{row.category}</Typography>
-                </TableCell>
-                <TableCell>{severityChip(row.severity)}</TableCell>
-                <TableCell>{statusChip(row.status)}</TableCell>
-                <TableCell>
-                  <Typography variant="caption" sx={{
-                    color: 'primary.main', cursor: 'pointer',
-                    '&:hover': { textDecoration: 'underline' },
-                  }} onClick={(e) => { e.stopPropagation(); navigate(`/facility/${row.facilityId}`); }}>
-                    {fmtDate(row.surveyDate)}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ px: 0 }}>
-                  <ChevronRightIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-                </TableCell>
-              </TableRow>
-            ))}
+            {rows.map((r) => {
+              const sc = statusColors[r.status] || statusColors['Upcoming'];
+              return (
+                <TableRow key={r.id} hover sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
+                  onClick={() => navigate(`/surveys/${r.id}`)}>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{fmtDate(r.windowEnd)}</Typography>
+                    {r.daysUntilDue <= 30
+                      ? <Chip label={`${r.daysUntilDue} days away`} size="small" sx={{ mt: 0.25, fontWeight: 700, fontSize: '0.68rem', bgcolor: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, height: 18 }} />
+                      : <Typography variant="caption" sx={{ color: '#64748B' }}>{r.daysUntilDue} days away</Typography>
+                    }
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>
+                      {r.name.replace('Avir at ', '')}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748B' }}>{r.region}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption">{r.lastSurveyor}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{r.prevCitations}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {r.alerts > 0
+                      ? <Chip label={r.alerts} size="small" sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: '#FEE2E2', color: '#991B1B', minWidth: 32 }} />
+                      : <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+                    }
+                  </TableCell>
+                  <TableCell sx={{ px: 0 }}>
+                    <ChevronRightIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
-
-      {filteredDeadlineRows.length > rowsPerPage && (
-        <TablePagination
-          component="div"
-          count={filteredDeadlineRows.length}
-          page={page}
-          onPageChange={(_, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          rowsPerPageOptions={[25]}
-          sx={{ borderTop: '1px solid #E2E8F0' }}
-        />
-      )}
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
-        <Button variant="text" size="small" onClick={() => navigate('/citations')}>
-          View all &rarr;
-        </Button>
-      </Box>
-
-      <CitationDetailDrawer
-        citation={selectedCitation}
-        onClose={() => setSelectedRow(null)}
-        facilityName={selectedRow?.facilityName}
-        facilityCity={selectedRow?.city}
-        facilityState={selectedRow?.state}
-      />
     </Paper>
   );
 }
 
-// Build upcoming survey rows sorted by soonest window end
-function buildUpcomingSurveys() {
-  const now = new Date();
-  return facilities
-    .map((fac) => {
-      const windowEnd = new Date(fac.surveyWindowEnd);
-      const windowStart = new Date(fac.surveyWindowStart);
-      const daysUntilEnd = Math.ceil((windowEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      const daysUntilStart = Math.ceil((windowStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+const DASH_TODAY = '2026-04-05';
+const THIRTY_DAY_CUTOFF = (() => {
+  const d = new Date(DASH_TODAY);
+  d.setDate(d.getDate() - 30);
+  return d.toISOString().split('T')[0];
+})();
 
-      let surveyStatus: string;
-      if (daysUntilEnd < 0) surveyStatus = 'Window Passed';
-      else if (daysUntilStart <= 0 || daysUntilEnd <= 30) surveyStatus = 'In Window';
-      else surveyStatus = 'Upcoming';
-
-      // Mock whether survey has been uploaded
-      const uploaded = fac.surveys > 2 && fac.totalCitations > 0;
-
-      return {
-        id: fac.id,
-        name: fac.name,
-        city: fac.city,
-        state: fac.state,
-        region: fac.region,
-        surveyType: fac.surveyType,
-        windowStart: fac.surveyWindowStart,
-        windowEnd: fac.surveyWindowEnd,
-        daysUntilEnd,
-        surveyStatus,
-        lastSurveyDate: fac.lastSurveyDate,
-        totalSurveys: fac.surveys,
-        totalCitations: fac.totalCitations,
-        uploaded,
-        nearing90Days: fac.nearing90Days,
-      };
-    })
-    .sort((a, b) => a.daysUntilEnd - b.daysUntilEnd);
-}
-
-const surveyRows = buildUpcomingSurveys();
-
-function UpcomingSurveysTable() {
+function RecentlyCompletedSurveys() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
-  const filteredSurveyRows = useMemo(() => surveyRows.filter((r) => passesFilter(r.id)), [passesFilter]);
 
-  const statusChip = (status: string) => {
-    const map: Record<string, { bg: string; color: string }> = {
-      'Window Passed': { bg: '#F1F5F9', color: '#64748B' },
-      'In Window': { bg: '#FEF3C7', color: '#92400E' },
-      'Upcoming': { bg: '#DBEAFE', color: '#1E40AF' },
-    };
-    const s = map[status] || { bg: '#F1F5F9', color: '#475569' };
-    return <Chip label={status} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 700, fontSize: '0.75rem' }} />;
-  };
-
-  const windowIndicator = (days: number) => {
-    let color = '#16A34A'; let bg = '#DCFCE7'; let label = `${days}d`;
-    if (days < 0) { color = '#64748B'; bg = '#F1F5F9'; label = 'Passed'; }
-    else if (days <= 30) { color = '#991B1B'; bg = '#FEE2E2'; }
-    else if (days <= 60) { color = '#9A3412'; bg = '#FED7AA'; }
-    else if (days <= 90) { color = '#854D0E'; bg = '#FEF9C3'; }
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-        <Box sx={{
-          width: 8, height: 8, borderRadius: '50%',
-          bgcolor: days < 0 ? '#94A3B8' : days <= 30 ? '#DC2626' : days <= 60 ? '#EA580C' : days <= 90 ? '#CA8A04' : '#16A34A',
-        }} />
-        <Chip label={label} size="small" sx={{ bgcolor: bg, color, fontWeight: 700, fontSize: '0.75rem', height: 24 }} />
-      </Box>
-    );
-  };
-
-  const inWindow = filteredSurveyRows.filter((r) => r.surveyStatus === 'In Window').length;
-  const upcoming = filteredSurveyRows.filter((r) => r.surveyStatus === 'Upcoming').length;
-  const passed = filteredSurveyRows.filter((r) => r.surveyStatus === 'Window Passed').length;
-  const displayRows = filteredSurveyRows.filter((r) => r.daysUntilEnd >= -30).slice(0, 15);
-
-  return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <CalendarTodayIcon sx={{ color: '#1565C0' }} />
-          <Typography variant="h6">Upcoming Surveys</Typography>
-          <Chip label={`${filteredSurveyRows.length} facilities`} size="small" color="primary" />
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Chip label={`${inWindow} in window`} size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />
-          <Chip label={`${upcoming} upcoming`} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 600 }} />
-          <Chip label={`${passed} passed`} size="small" sx={{ bgcolor: '#F1F5F9', color: '#64748B', fontWeight: 600 }} />
-        </Box>
-      </Box>
-
-      <TableContainer sx={{ maxHeight: 460 }}>
-        <Table size="small" stickyHeader>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Region</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 130 }}>Survey Type</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Window Start</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Window End</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Days Left</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Survey Status</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }}>Uploaded</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Last Survey</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {displayRows.map((row) => (
-              <TableRow key={row.id} hover
-                sx={{
-                  cursor: 'pointer',
-                  bgcolor: (row.surveyStatus === 'In Window' && row.daysUntilEnd <= 30) ? '#FEF2F2'
-                    : row.surveyStatus === 'In Window' ? '#FFFBEB' : 'transparent',
-                  '&:hover': { bgcolor: (row.surveyStatus === 'In Window' && row.daysUntilEnd <= 30) ? '#FEE2E2' : '#F0F7FF' },
-                }}
-                onClick={() => navigate(`/facility/${row.id}`)}
-              >
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
-                    {row.name.replace('Life Care Center of ', 'LCC ')}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">{row.city}, {row.state}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="caption">{row.region}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="caption">{row.surveyType}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{fmtDate(row.windowStart)}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(row.windowEnd)}</Typography>
-                </TableCell>
-                <TableCell>{windowIndicator(row.daysUntilEnd)}</TableCell>
-                <TableCell>{statusChip(row.surveyStatus)}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={row.uploaded ? 'Yes' : 'No'}
-                    size="small"
-                    sx={{
-                      bgcolor: row.uploaded ? '#DCFCE7' : '#FEF3C7',
-                      color: row.uploaded ? '#166534' : '#92400E',
-                      fontWeight: 600, fontSize: '0.7rem',
-                    }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Typography variant="caption">{fmtDate(row.lastSurveyDate)}</Typography>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
-        <Button size="small" onClick={() => navigate('/surveys?tab=upcoming')}>
-          View all &rarr;
-        </Button>
-      </Box>
-    </Paper>
-  );
-}
-
-function RecentSurveysTable() {
-  const navigate = useNavigate();
-  const { passesFilter } = useCommunityFilter();
-  const recentFacilities = useMemo(() => [...facilities]
-    .filter((f) => passesFilter(f.id))
-    .sort((a, b) => new Date(b.lastSurveyDate).getTime() - new Date(a.lastSurveyDate).getTime())
-    .slice(0, 10), [passesFilter]);
+  const recentSurveys = useMemo(() => {
+    return surveys
+      .filter((s) => passesFilter(s.facilityId) && s.date >= THIRTY_DAY_CUTOFF)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [passesFilter]);
 
   return (
     <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <AssignmentIcon sx={{ color: '#0065BD' }} />
-          <Typography variant="h6">Recent Surveys</Typography>
-          <Chip label={`${recentFacilities.length} latest`} size="small" color="primary" />
+          <Typography variant="h6">Recently Completed Surveys</Typography>
+          <Chip label="Last 30 days" size="small" color="primary" />
         </Box>
+        <Button variant="text" size="small" onClick={() => navigate('/citations-remix')} sx={{ fontWeight: 600, fontSize: '0.8rem' }}>View all →</Button>
       </Box>
 
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 60 }}>State</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Region</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 130 }}>Survey Type</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 110 }}>Last Survey</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">Citations</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 70 }} align="center">K Tags</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 70 }} align="center">E Tags</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">State Tags</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">Def-Free</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {recentFacilities.map((fac) => (
-              <TableRow key={fac.id} hover
-                sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
-                onClick={() => navigate(`/facility/${fac.id}`)}
-              >
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
-                    {fac.name.replace('Life Care Center of ', 'LCC ')}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">{fac.city}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{fac.state}</Typography>
-                </TableCell>
-                <TableCell><Typography variant="caption">{fac.region}</Typography></TableCell>
-                <TableCell><Typography variant="caption">{fac.surveyType}</Typography></TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(fac.lastSurveyDate)}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{fac.totalCitations}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  {fac.kTags > 0
-                    ? <Chip label={fac.kTags} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 30 }} />
-                    : <Typography variant="caption" color="text.secondary">0</Typography>}
-                </TableCell>
-                <TableCell align="center">
-                  {fac.eTags > 0
-                    ? <Chip label={fac.eTags} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700, minWidth: 30 }} />
-                    : <Typography variant="caption" color="text.secondary">0</Typography>}
-                </TableCell>
-                <TableCell align="center">
-                  {fac.stateTags > 0
-                    ? <Chip label={fac.stateTags} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700, minWidth: 30 }} />
-                    : <Typography variant="caption" color="text.secondary">0</Typography>}
-                </TableCell>
-                <TableCell align="center">
-                  {fac.deficiencyFree
-                    ? <Chip label="★" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700 }} />
-                    : <Typography variant="caption" color="text.secondary">—</Typography>}
-                </TableCell>
+      {recentSurveys.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+          No surveys completed in the last 30 days
+        </Typography>
+      ) : (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 110 }}>Survey Date</TableCell>
+                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
+                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 140 }}>Surveyor</TableCell>
+                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 70 }} align="right">K</TableCell>
+                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 70 }} align="right">N</TableCell>
+                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 70 }} align="right">E</TableCell>
+                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">Total</TableCell>
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 32, px: 0 }} />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
-        <Button size="small" onClick={() => navigate('/surveys?tab=historical')}>
-          View all &rarr;
-        </Button>
-      </Box>
+            </TableHead>
+            <TableBody>
+              {recentSurveys.map((srv) => (
+                <TableRow key={srv.id} hover
+                  sx={{ cursor: 'pointer', '&:hover': { bgcolor: srv.total === 0 ? '#DCFCE7' : '#F0F7FF' }, bgcolor: srv.total === 0 ? '#F0FDF4' : 'inherit' }}
+                  onClick={() => navigate(`/facility/${srv.facilityId}`)}>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(srv.date)}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{srv.facility.replace('Avir at ', '')}</Typography>
+                    <Typography variant="caption" sx={{ color: '#64748B' }}>{srv.region}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption">{srv.surveyor || '—'}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: srv.kTags > 0 ? '#DC2626' : '#94A3B8', fontSize: '0.8rem' }}>{srv.kTags || '—'}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: srv.nTags > 0 ? '#2563EB' : '#94A3B8', fontSize: '0.8rem' }}>{srv.nTags || '—'}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: srv.eTags > 0 ? '#D97706' : '#94A3B8', fontSize: '0.8rem' }}>{srv.eTags || '—'}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {srv.total === 0
+                      ? <Chip label="Def-Free" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700, fontSize: '0.65rem' }} />
+                      : <Typography variant="body2" sx={{ fontWeight: 700 }}>{srv.total}</Typography>}
+                  </TableCell>
+                  <TableCell sx={{ px: 0 }}>
+                    <ChevronRightIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Paper>
   );
 }
 
-function MissingDocumentationTable() {
-  const navigate = useNavigate();
-  const { passesFilter } = useCommunityFilter();
 
-  // Facilities with any documentation gaps, sorted by total gaps descending
-  const facilitiesWithGaps = useMemo(() => facilities
-    .filter((f) => passesFilter(f.id))
-    .filter((f) => f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs > 0)
-    .map((f) => ({
-      ...f,
-      totalGaps: f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs,
-    }))
-    .sort((a, b) => b.totalGaps - a.totalGaps)
-    .slice(0, 15), [passesFilter]);
-
-  const totalGapFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)).filter((f) => f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs > 0).length, [passesFilter]);
-
-  return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <WarningAmberIcon sx={{ color: '#DC2626' }} />
-          <Typography variant="h6">Missing Documentation</Typography>
-          <Chip label={`${totalGapFacilities} facilities`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
-        </Box>
-      </Box>
-
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2 }}>Facility</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 60 }}>State</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>Region</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Tasks</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Logs</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Docs</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 90 }} align="center">Total Gaps</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 80 }} align="center">Citations</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '6px', px: 2, width: 100 }}>POC Status</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {facilitiesWithGaps.map((fac) => (
-              <TableRow key={fac.id} hover
-                sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
-                onClick={() => navigate(`/facility/${fac.id}`)}
-              >
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem' }}>
-                    {fac.name.replace('Life Care Center of ', 'LCC ')}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">{fac.city}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{fac.state}</Typography>
-                </TableCell>
-                <TableCell><Typography variant="caption">{fac.region}</Typography></TableCell>
-                <TableCell align="center">
-                  {fac.documentationGaps.tasks > 0
-                    ? <Chip label={fac.documentationGaps.tasks} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 30 }} />
-                    : <Typography variant="caption" color="text.secondary">0</Typography>}
-                </TableCell>
-                <TableCell align="center">
-                  {fac.documentationGaps.logs > 0
-                    ? <Chip label={fac.documentationGaps.logs} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700, minWidth: 30 }} />
-                    : <Typography variant="caption" color="text.secondary">0</Typography>}
-                </TableCell>
-                <TableCell align="center">
-                  {fac.documentationGaps.docs > 0
-                    ? <Chip label={fac.documentationGaps.docs} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700, minWidth: 30 }} />
-                    : <Typography variant="caption" color="text.secondary">0</Typography>}
-                </TableCell>
-                <TableCell align="center">
-                  <Chip label={fac.totalGaps} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 36 }} />
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{fac.totalCitations}</Typography>
-                </TableCell>
-                <TableCell>
-                  {fac.pocStatus ? (
-                    <Chip label={fac.pocStatus === 'on-track' ? 'On Track' : fac.pocStatus === 'overdue' ? 'Overdue' : fac.pocStatus === 'completed' ? 'Completed' : 'Not Started'} size="small"
-                      sx={{
-                        fontWeight: 600,
-                        bgcolor: fac.pocStatus === 'overdue' ? '#FEE2E2' : fac.pocStatus === 'on-track' ? '#DBEAFE' : fac.pocStatus === 'completed' ? '#BBF7D0' : '#F1F5F9',
-                        color: fac.pocStatus === 'overdue' ? '#991B1B' : fac.pocStatus === 'on-track' ? '#1E40AF' : fac.pocStatus === 'completed' ? '#166534' : '#64748B',
-                      }} />
-                  ) : <Typography variant="caption" color="text.secondary">—</Typography>}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Paper>
-  );
-}
 
 export default function CitationsDashboard() {
   const navigate = useNavigate();
@@ -692,12 +290,7 @@ export default function CitationsDashboard() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [selectedState, setSelectedState] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
-  const [selectedSurveyType, setSelectedSurveyType] = useState('');
-  const [deficiencyFreeOnly, setDeficiencyFreeOnly] = useState(false);
-  const [docGapsOnly, setDocGapsOnly] = useState(false);
-  const [pocDueSoon, setPocDueSoon] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [rowMenuAnchor, setRowMenuAnchor] = useState<null | HTMLElement>(null);
   const [rowMenuFacId, setRowMenuFacId] = useState<string | null>(null);
@@ -705,137 +298,93 @@ export default function CitationsDashboard() {
   const filtered = useMemo(() => {
     return facilities.filter((f) => {
       if (!passesFilter(f.id)) return false;
-      if (search && !f.name.toLowerCase().includes(search.toLowerCase()) && !f.city.toLowerCase().includes(search.toLowerCase())) return false;
-      if (selectedState && f.state !== selectedState) return false;
+      if (search && !f.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (selectedRegion && f.region !== selectedRegion) return false;
-      if (selectedSurveyType && f.surveyType !== selectedSurveyType) return false;
-      if (deficiencyFreeOnly && !f.deficiencyFree) return false;
-      if (docGapsOnly && f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs === 0) return false;
-      if (pocDueSoon && f.pocStatus !== 'overdue' && f.pocStatus !== 'on-track') return false;
       return true;
     });
-  }, [search, selectedState, selectedRegion, selectedSurveyType, deficiencyFreeOnly, docGapsOnly, pocDueSoon, passesFilter]);
+  }, [search, selectedRegion, passesFilter]);
+
+  // Community filtered base datasets
+  const communityFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)), [passesFilter]);
+  const communitySurveys = useMemo(() => surveys.filter((s) => passesFilter(s.facilityId)), [passesFilter]);
+  const communityCitations = useMemo(() => citations.filter((c) => passesFilter(c.facilityId)), [passesFilter]);
 
   // Summary stats (filtered by community)
-  const communityFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)), [passesFilter]);
-  const communitySurveyRows = useMemo(() => buildUpcomingSurveys().filter((r) => passesFilter(r.id)), [passesFilter]);
-  const cardInWindow = communitySurveyRows.filter((r) => r.surveyStatus === 'In Window').length;
-  const nearing90 = communityFacilities.filter((f) => f.nearing90Days).length;
-  const docGapsNearingSurvey = communityFacilities.filter((f) => {
-    const gaps = f.documentationGaps.tasks + f.documentationGaps.logs + f.documentationGaps.docs;
-    return gaps > 0 && f.nearing90Days;
-  }).length;
-  const openCitationCount = citations.filter((c) => {
-    const fac = communityFacilities.find((f) => f.id === c.facilityId);
-    return fac && (c.status === 'Open' || c.status === 'No Plan');
-  }).length;
-  const defFree = communityFacilities.filter((f) => f.deficiencyFree).length;
+  const filteredStats = useMemo(() => ({
+    totalFacilities: communityFacilities.length,
+    surveyedFacilities: communityFacilities.filter((f) => f.surveyed).length,
+    totalSurveys: communitySurveys.length,
+    totalCitations: communityCitations.length,
+    totalKTags: communityCitations.filter((c) => c.tagType === 'K').length,
+    totalNTags: communityCitations.filter((c) => c.tagType === 'N').length,
+    totalETags: communityCitations.filter((c) => c.tagType === 'E').length,
+    deficiencyFree: communitySurveys.filter((s) => s.total === 0 && !s.isPending).length,
+  }), [communityFacilities, communitySurveys, communityCitations]);
+
   const avgCitationsNum = communityFacilities.length > 0 ? communityFacilities.reduce((s, f) => s + f.totalCitations, 0) / communityFacilities.length : 0;
   const avgCitations = avgCitationsNum.toFixed(1);
-  const avgDiff = (avgCitationsNum - 9.5).toFixed(1);
-  const topCategory = 'Quality of Life & Care';
+
+  // Chart data — trend always shows last 12 months regardless of date filter
+  const last12MonthsCutoff = useMemo(() => {
+    const d = new Date('2026-04-05');
+    d.setMonth(d.getMonth() - 12);
+    return d.toISOString().split('T')[0];
+  }, []);
+  const surveys12m = useMemo(
+    () => surveys.filter((s) => passesFilter(s.facilityId) && s.date >= last12MonthsCutoff),
+    [passesFilter, last12MonthsCutoff],
+  );
+  const surveyTrendData = useMemo(() => buildSurveyTrends(surveys12m), [surveys12m]);
+  const regionBreakdown = useMemo(() => buildRegionBreakdown(communityFacilities), [communityFacilities]);
 
   const resetFilters = () => {
-    setSearch(''); setSelectedState(''); setSelectedRegion('');
-    setSelectedSurveyType('');
-    setDeficiencyFreeOnly(false); setDocGapsOnly(false); setPocDueSoon(false);
-  };
-
-
-  const pocChip = (status: string | null) => {
-    if (!status) return <Typography variant="caption" color="text.secondary">—</Typography>;
-    const map: Record<string, { bg: string; color: string; label: string }> = {
-      'on-track': { bg: '#DBEAFE', color: '#1E40AF', label: 'On Track' },
-      'overdue': { bg: '#FECACA', color: '#991B1B', label: 'Overdue' },
-      'completed': { bg: '#BBF7D0', color: '#166534', label: 'Completed' },
-      'not-started': { bg: '#F1F5F9', color: '#64748B', label: 'Not Started' },
-    };
-    const s = map[status] || map['not-started'];
-    return <Chip label={s.label} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />;
+    setSearch(''); setSelectedRegion('');
   };
 
   const columns: GridColDef[] = [
     {
-      field: 'name', headerName: 'Facility', flex: 2, minWidth: 220,
+      field: 'name', headerName: 'Community', flex: 2, minWidth: 220,
       renderCell: (p: GridRenderCellParams) => (
         <Box>
           <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
             onClick={() => navigate(`/facility/${p.row.id}`)}>
             {p.value}
           </Typography>
-          <Typography variant="caption" color="text.secondary">{p.row.city}, {p.row.state}</Typography>
+          <Typography variant="caption" color="text.secondary">{p.row.region}, {p.row.state}</Typography>
         </Box>
       ),
     },
-    { field: 'state', headerName: 'State', width: 70, align: 'center', headerAlign: 'center' },
     { field: 'region', headerName: 'Region', width: 110 },
-    { field: 'surveyType', headerName: 'Survey Type', width: 140 },
-    { field: 'lastSurveyDate', headerName: 'Last Survey', width: 110 },
-    {
-      field: 'nearing90Days', headerName: '90-Day', width: 80, align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => p.value
-        ? <Chip label="Yes" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />
-        : <Typography variant="caption" color="text.secondary">No</Typography>,
+    { field: 'lastSurveyDate', headerName: 'Last Survey', width: 110,
+      renderCell: (p: GridRenderCellParams) => (
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{p.value ? fmtDate(p.value as string) : '—'}</Typography>
+      ),
     },
+    { field: 'surveyCount', headerName: 'Surveys', width: 80, align: 'center', headerAlign: 'center', type: 'number' },
     { field: 'totalCitations', headerName: 'Citations', width: 90, align: 'center', headerAlign: 'center', type: 'number' },
     {
-      field: 'kTags', headerName: 'K Tags', width: 80, align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => p.value > 0
+      field: 'totalKTags', headerName: 'K Tags', width: 80, align: 'center', headerAlign: 'center',
+      renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
         ? <Chip label={p.value} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 36 }} />
         : <Typography variant="caption" color="text.secondary">0</Typography>,
     },
     {
-      field: 'eTags', headerName: 'E Tags', width: 80, align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => p.value > 0
+      field: 'totalNTags', headerName: 'N Tags', width: 80, align: 'center', headerAlign: 'center',
+      renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
+        ? <Chip label={p.value} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700, minWidth: 36 }} />
+        : <Typography variant="caption" color="text.secondary">0</Typography>,
+    },
+    {
+      field: 'totalETags', headerName: 'E Tags', width: 80, align: 'center', headerAlign: 'center',
+      renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
         ? <Chip label={p.value} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700, minWidth: 36 }} />
         : <Typography variant="caption" color="text.secondary">0</Typography>,
     },
     {
-      field: 'stateTags', headerName: 'State Tags', width: 90, align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => p.value > 0
-        ? <Chip label={p.value} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700, minWidth: 36 }} />
-        : <Typography variant="caption" color="text.secondary">0</Typography>,
-    },
-    {
-      field: 'documentationGaps', headerName: 'Doc Gaps', width: 130, sortable: false,
-      renderCell: (p: GridRenderCellParams) => {
-        const g = p.value as { tasks: number; logs: number; docs: number };
-        const total = g.tasks + g.logs + g.docs;
-        if (total === 0) return <Chip label="None" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534' }} />;
-        return (
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            {g.tasks > 0 && <Chip label={`Tasks: ${g.tasks}`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', height: 22, fontSize: '0.65rem' }} />}
-            {g.logs > 0 && <Chip label={`Logs: ${g.logs}`} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', height: 22, fontSize: '0.65rem' }} />}
-            {g.docs > 0 && <Chip label={`Docs: ${g.docs}`} size="small" sx={{ bgcolor: '#E0E7FF', color: '#3730A3', height: 22, fontSize: '0.65rem' }} />}
-          </Box>
-        );
-      },
-    },
-    {
-      field: 'pocStatus', headerName: 'POC Status', width: 120, align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {pocChip(p.value as string)}
-          {p.row.pocCount > 0 && <Typography variant="caption" color="text.secondary">{p.row.pocCount} POCs</Typography>}
-        </Box>
-      ),
-    },
-    {
-      field: 'deficiencyFree', headerName: 'Def-Free', width: 80, align: 'center', headerAlign: 'center',
+      field: 'hasWaiver', headerName: 'Waiver', width: 80, align: 'center', headerAlign: 'center',
       renderCell: (p: GridRenderCellParams) => p.value
-        ? <Chip label="★" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700 }} />
-        : <Typography variant="caption" color="text.secondary">—</Typography>,
-    },
-    {
-      field: 'benchmarkVsPeers', headerName: 'vs Peers', width: 100, type: 'number', align: 'center', headerAlign: 'center',
-      renderCell: (p: GridRenderCellParams) => {
-        const v = p.value as number;
-        return (
-          <Typography variant="body2" sx={{ fontWeight: 600, color: v > 0 ? 'error.main' : v < 0 ? 'success.main' : 'text.secondary' }}>
-            {v > 0 ? '+' : ''}{v}
-          </Typography>
-        );
-      },
+        ? <Chip label="Yes" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />
+        : <Typography variant="caption" color="text.secondary">No</Typography>,
     },
     {
       field: 'actions', headerName: '', width: 50, sortable: false, filterable: false,
@@ -847,109 +396,43 @@ export default function CitationsDashboard() {
     },
   ];
 
-  // Survey window distribution for small chart
   return (
     <Box>
       <PageHeader
         title="Citations Dashboard"
         actions={
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="contained" startIcon={<FileDownloadIcon />} size="small">Export</Button>
-          </Box>
+          <Button variant="contained" color="primary" startIcon={<UploadFileIcon />} size="small">Upload Survey</Button>
         }
       />
+      <PageFilters />
 
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Open Gaps with Survey Approaching" value={docGapsNearingSurvey} icon={<WarningAmberIcon />} color="#D32F2F"
-            subtitle="Facilities with documentation gaps and survey window closing within 90 days"
-            chip={docGapsNearingSurvey > 0 ? { label: 'Action Needed', color: 'error' } : undefined}
-            action={{ label: 'Review', onClick: () => navigate('/surveys?filter=gaps') }} />
+          <SummaryCard title="Survey Windows Approaching" value={upcomingSurveyRows.filter((r) => passesFilter(r.id)).length} icon={<EventNoteIcon />} color="#B45309"
+            subtitle="Within 90 days"
+            action={{ label: 'View', onClick: () => navigate('/surveys') }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Open Plans of Correction" value={openCitationCount} subtitle="Citations requiring action" icon={<TaskAltIcon />} color="#7B1FA2"
-            action={{ label: 'View', onClick: () => navigate('/citations?status=open') }} />
+          <SummaryCard title="Overdue POCs" value={communityCitations.filter((c) => c.status === 'Open' && Math.round((TODAY_DASH.getTime() - new Date(c.date).getTime()) / 86400000) > 60).length} subtitle={`Of ${communityCitations.filter((c) => c.status === 'Open' || c.status === 'Pending').length} open POCs`} icon={<TaskAltIcon />} color="#7B1FA2"
+            action={{ label: 'View', onClick: () => navigate('/poc') }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Within Survey Window" value={cardInWindow} subtitle="Facilities currently in CMS survey window" icon={<BusinessIcon />} color="#1565C0"
-            action={{ label: 'Review', onClick: () => navigate('/surveys?filter=inWindow&sort=daysLeft') }} />
+          <SummaryCard title="Deficiency-Free Surveys" value={filteredStats.deficiencyFree} subtitle={`Out of ${filteredStats.totalSurveys} total surveys`} icon={<ShieldIcon />} color="#2E7D32"
+            action={{ label: 'Review', onClick: () => navigate('/surveys') }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Avg Citations per Facility" value={avgCitations} subtitle={`+${avgDiff} above avg · National avg: 9.5`} icon={<TrendingUpIcon />} color="#F57C00"
-            action={{ label: 'Facilities', onClick: () => navigate('/facilities') }} />
+          <SummaryCard title="Avg Citations per Survey" value={avgCitations} subtitle={`Across ${communityFacilities.length} communities`} icon={<TrendingUpIcon />} color="#F57C00"
+            action={{ label: 'Communities', onClick: () => navigate('/facilities') }} />
         </Grid>
       </Grid>
 
-      {/* Citations by Severity — 12 Months */}
-      <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Typography variant="h6">Citations by Severity (12 Months)</Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            {[
-              { label: 'Immediate Jeopardy', color: '#DC2626' },
-              { label: 'Actual Harm', color: '#EA580C' },
-              { label: 'Potential Harm', color: '#2563EB' },
-              { label: 'No Harm', color: '#94A3B8' },
-              { label: 'Total', color: '#0F172A' },
-            ].map((s) => (
-              <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 10, height: 10, borderRadius: s.label === 'Total' ? '50%' : 1, bgcolor: s.color }} />
-                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#475569' }}>{s.label}</Typography>
-              </Box>
-            ))}
-          </Box>
-        </Box>
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="subtitle2" sx={{ mb: 0.5, color: 'text.secondary', fontSize: '0.75rem' }}>Trend</Typography>
-            <MuiLineChart
-              height={240}
-              xAxis={[{
-                data: severityTrends.map((_, i) => i),
-                scaleType: 'point',
-                valueFormatter: (v: number) => severityTrends[v]?.month ?? '',
-                tickLabelStyle: { fontSize: 10 },
-              }]}
-              yAxis={[{ tickLabelStyle: { fontSize: 10 } }]}
-              series={[
-                { data: severityTrends.map((d) => d['Immediate Jeopardy']), label: 'IJ', area: true, stack: 'severity', color: '#DC2626', showMark: false },
-                { data: severityTrends.map((d) => d['Actual Harm']), label: 'Actual Harm', area: true, stack: 'severity', color: '#EA580C', showMark: false },
-                { data: severityTrends.map((d) => d['Potential Harm']), label: 'Potential Harm', area: true, stack: 'severity', color: '#2563EB', showMark: false },
-                { data: severityTrends.map((d) => d['No Harm']), label: 'No Harm', area: true, stack: 'severity', color: '#94A3B8', showMark: false },
-                { data: severityTrends.map((d) => d.total), label: 'Total', color: '#0F172A', showMark: true },
-              ]}
-              hideLegend
-              margin={{ left: 40, right: 10, top: 10, bottom: 30 }}
-              sx={{ '& .MuiAreaElement-root': { opacity: 0.7 } }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="subtitle2" sx={{ mb: 0.5, color: 'text.secondary', fontSize: '0.75rem' }}>By Category</Typography>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={categorySeverity} layout="vertical" margin={{ left: 10 }} barSize={20}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis dataKey="category" type="category" width={130} tick={{ fontSize: 9 }} />
-                <RTooltip />
-                <Bar dataKey="ij" stackId="severity" fill="#DC2626" name="IJ" />
-                <Bar dataKey="actualHarm" stackId="severity" fill="#EA580C" name="Actual Harm" />
-                <Bar dataKey="potentialHarm" stackId="severity" fill="#2563EB" name="Potential Harm" />
-                <Bar dataKey="noHarm" stackId="severity" fill="#94A3B8" name="No Harm" radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Grid>
-        </Grid>
-      </Paper>
+      {/* Upcoming Surveys */}
+      <UpcomingSurveysPanel />
 
-      {/* Upcoming Deadlines Table */}
-      <UpcomingDeadlinesTable />
+      {/* Recently Completed Surveys */}
+      <RecentlyCompletedSurveys />
 
-      {/* Upcoming Surveys Table */}
-      <UpcomingSurveysTable />
-
-      {/* Recent Surveys */}
-      {/* Recent Surveys removed */}
 
     </Box>
   );

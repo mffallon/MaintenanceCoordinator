@@ -125,7 +125,7 @@ export default function CitationDetailDrawer({ citation, onClose, facilityName, 
         {/* Footer actions */}
         <Box sx={{ p: 2, borderTop: '1px solid #E2E8F0', display: 'flex', gap: 1 }}>
           <Button size="small" startIcon={<CloseIcon />} variant="text" color="inherit" onClick={onClose}>Close</Button>
-          <Button size="small" startIcon={<AddTaskIcon />} sx={{ flex: 1 }}>Create Task</Button>
+          <Button size="small" variant="contained" color="primary" startIcon={<AddTaskIcon />} sx={{ flex: 1 }}>Create task</Button>
         </Box>
       </Box>
     </Drawer>

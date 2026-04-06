@@ -1,320 +1,231 @@
-import { useState, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Chip, Button, Tabs, Tab, FormControl, InputLabel,
-  Select, MenuItem, TextField, InputAdornment, Divider, IconButton,
-  Menu, FormControlLabel, Switch,
+  Box, Typography, Paper, Chip, TextField, InputAdornment,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import CloseIcon from '@mui/icons-material/Close';
-import { facilities } from '../data/facilities';
 import PageHeader from '../components/PageHeader';
+import PageFilters from '../components/PageFilters';
 import { useCommunityFilter } from '../components/CommunityFilter';
+import { facilities, citations } from '../data/avir-data';
+import { effectiveLastSurveyDate } from '../utils/surveyWindowOverrides';
 import { fmtDate } from '../utils/formatDate';
+import { makeDateFilter } from '../utils/dateFilter';
 
-const surveyTypes = ['CMS Life Safety', 'CMS Health', 'State Fire Marshal', 'Joint Commission'];
+const TODAY = new Date('2026-04-05');
 
-function buildSurveyRows() {
-  const now = new Date();
-  return facilities.map((fac) => {
-    const windowEnd = new Date(fac.surveyWindowEnd);
-    const windowStart = new Date(fac.surveyWindowStart);
-    const daysUntilEnd = Math.ceil((windowEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    const daysUntilStart = Math.ceil((windowStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    let surveyStatus: string;
-    if (daysUntilEnd < 0) surveyStatus = 'Window Passed';
-    else if (daysUntilStart <= 0 || daysUntilEnd <= 30) surveyStatus = 'In Window';
-    else surveyStatus = 'Upcoming';
-
-    const uploaded = fac.surveys > 2 && fac.totalCitations > 0;
-
-    return {
-      id: fac.id,
-      name: fac.name,
-      city: fac.city,
-      state: fac.state,
-      region: fac.region,
-      surveyType: fac.surveyType,
-      windowStart: fac.surveyWindowStart,
-      windowEnd: fac.surveyWindowEnd,
-      daysUntilEnd,
-      surveyStatus,
-      lastSurveyDate: fac.lastSurveyDate,
-      totalSurveys: fac.surveys,
-      totalCitations: fac.totalCitations,
-      uploaded,
-      nearing90Days: fac.nearing90Days,
-      hasDocGaps: fac.documentationGaps.tasks + fac.documentationGaps.logs + fac.documentationGaps.docs > 0,
-    };
-  }).sort((a, b) => a.daysUntilEnd - b.daysUntilEnd);
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
 }
 
-const allSurveyRows = buildSurveyRows();
+function toISO(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+function daysUntil(dateStr: string): number {
+  return Math.round((new Date(dateStr).getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+
+// Derive documentation gaps from citation data (mirrors SurveyPrepDetail logic)
+function deriveAlerts(totalCitations: number, facilityId: string): number {
+  const facCitations = citations.filter((c) => c.facilityId === facilityId);
+  const openCits = facCitations.filter((c) => c.status === 'Open' || c.status === 'Pending');
+  const tasks = openCits.length;
+  const seed = facilityId.length % 5;
+  const logs = totalCitations > 10 ? seed + 2 : totalCitations > 0 ? seed : 0;
+  const docs = totalCitations > 15 ? 3 : totalCitations > 5 ? 1 : 0;
+  return tasks + logs + docs;
+}
+
+// Build upcoming survey rows from facility last survey dates
+// Standard SNF survey cycle: window opens ~9 months after last survey, closes ~15 months after
+function buildUpcomingRows() {
+  return facilities
+    .filter((f) => f.lastSurveyDate)
+    .map((f) => {
+      const lastSurveyDate = effectiveLastSurveyDate(f.id, f.lastSurveyDate);
+      const last = new Date(lastSurveyDate);
+      const windowStart = toISO(addMonths(last, 9));
+      const windowEnd = toISO(addMonths(last, 15));
+      const days = daysUntil(windowEnd);
+      const status =
+        days < 0 ? 'Overdue' :
+        days <= 30 ? 'Due Soon' :
+        days <= 90 ? 'Upcoming' : 'On Track';
+      return {
+        id: f.id,
+        facilityId: f.id,
+        name: f.name,
+        region: f.region,
+        lastSurveyDate,
+        windowStart,
+        windowEnd,
+        daysUntilDue: days,
+        status,
+        totalCitations: f.totalCitations,
+        alerts: deriveAlerts(f.totalCitations, f.id),
+      };
+    })
+    .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+}
+
+const allUpcomingRows = buildUpcomingRows();
+
+const statusChip = (status: string) => {
+  const styles: Record<string, { bg: string; color: string }> = {
+    'Overdue':  { bg: '#FEE2E2', color: '#991B1B' },
+    'Due Soon': { bg: '#FEF3C7', color: '#92400E' },
+    'Upcoming': { bg: '#DBEAFE', color: '#1E40AF' },
+    'On Track': { bg: '#F0FDF4', color: '#166534' },
+  };
+  const s = styles[status] || styles['On Track'];
+  return <Chip label={status} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: '0.7rem' }} />;
+};
 
 export default function SurveyManagement() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'historical' ? 1 : 0;
-  const initialFilter = searchParams.get('filter');
-  const initialSort = searchParams.get('sort');
-  const initialGapsFilter = initialFilter === 'gaps';
-  const initialInWindowFilter = initialFilter === 'inWindow' || initialFilter === 'inwindow' || initialFilter === 'active';
-  const [tab, setTab] = useState(initialTab);
   const [search, setSearch] = useState('');
-  const [stateFilter, setStateFilter] = useState('');
-  const [regionFilter, setRegionFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState(initialInWindowFilter ? 'In Window' : '');
-  const [gapsOnly, setGapsOnly] = useState(initialGapsFilter);
-  const [sortModel, setSortModel] = useState(
-    initialSort === 'daysLeft'
-      ? [{ field: 'daysUntilEnd' as const, sort: 'asc' as const }]
-      : initialGapsFilter
-        ? [{ field: 'uploaded' as const, sort: 'asc' as const }]
-        : [{ field: 'lastSurveyDate' as const, sort: 'desc' as const }]
-  );
-  const [viewMenuAnchor, setViewMenuAnchor] = useState<null | HTMLElement>(null);
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set(['_showRegion', 'windowStart']));
+  const [dateRange, setDateRange] = useState('all');
 
-  const communityRows = useMemo(() => allSurveyRows.filter((r) => passesFilter(r.id)), [passesFilter]);
-  const states = [...new Set(communityRows.map((r) => r.state))].sort();
-  const regions = [...new Set(communityRows.map((r) => r.region))].sort();
-
-  // Tab 0 = Upcoming (not passed), Tab 1 = Historical (passed)
-  const tabFiltered = useMemo(() => {
-    const base = tab === 0
-      ? communityRows.filter((r) => r.surveyStatus !== 'Window Passed')
-      : communityRows.filter((r) => r.surveyStatus === 'Window Passed');
-
-    return base.filter((r) => {
-      if (search && !r.name.toLowerCase().includes(search.toLowerCase())
-        && !r.city.toLowerCase().includes(search.toLowerCase())) return false;
-      if (stateFilter && r.state !== stateFilter) return false;
-      if (regionFilter && r.region !== regionFilter) return false;
-      if (typeFilter && r.surveyType !== typeFilter) return false;
-      if (statusFilter && r.surveyStatus !== statusFilter) return false;
-      if (gapsOnly && !r.hasDocGaps) return false;
+  const rows = useMemo(() => {
+    return allUpcomingRows.filter((r) => {
+      if (!passesFilter(r.facilityId)) return false;
+      if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [communityRows, tab, search, stateFilter, regionFilter, typeFilter, statusFilter, gapsOnly]);
+  }, [passesFilter, search]);
 
-  const handleTabChange = (_: React.SyntheticEvent, v: number) => {
-    setTab(v);
-    setSearchParams({ tab: v === 1 ? 'historical' : 'upcoming' });
-  };
-
-  const statusChip = (status: string) => {
-    const map: Record<string, { bg: string; color: string }> = {
-      'Window Passed': { bg: '#F1F5F9', color: '#64748B' },
-      'In Window': { bg: '#FEF3C7', color: '#92400E' },
-      'Upcoming': { bg: '#DBEAFE', color: '#1E40AF' },
-    };
-    const s = map[status] || { bg: '#F1F5F9', color: '#475569' };
-    return <Chip label={status} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 700 }} />;
-  };
+  const overdueCount  = rows.filter((r) => r.status === 'Overdue').length;
+  const dueSoonCount  = rows.filter((r) => r.status === 'Due Soon').length;
+  const upcomingCount = rows.filter((r) => r.status === 'Upcoming').length;
 
   const columns: GridColDef[] = [
     {
-      field: 'name', headerName: 'Facility', flex: 1, minWidth: 150,
-      renderCell: (p: GridRenderCellParams) => (
-        <Box>
-          <Typography variant="body2" sx={{
-            fontWeight: 600, color: 'primary.main', cursor: 'pointer', fontSize: '0.8rem',
-            '&:hover': { textDecoration: 'underline' },
-          }} onClick={(e) => { e.stopPropagation(); navigate(`/facility/${p.row.id}`); }}>
-            {(p.value as string).replace('Life Care Center of ', 'LCC ')}
-          </Typography>
-          {!hiddenCols.has('_showRegion') && <Typography variant="caption" sx={{ color: '#8492a1', fontSize: '0.7rem' }}>{p.row.region}</Typography>}
-          <Typography variant="caption" color="text.secondary">{p.row.city}, {p.row.state}</Typography>
-        </Box>
-      ),
-    },
-    { field: 'surveyType', headerName: 'Type', flex: 0.7, minWidth: 100 },
-    { field: 'windowStart', headerName: 'Start', flex: 0.6, minWidth: 90,
+      field: 'windowStart', headerName: 'Window Opens', width: 130,
       renderCell: (p: GridRenderCellParams) => (
         <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
       ),
     },
-    { field: 'windowEnd', headerName: 'Window End', flex: 0.6, minWidth: 90,
+    {
+      field: 'windowEnd', headerName: 'Window Closes', width: 130,
       renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{fmtDate(p.value as string)}</Typography>
       ),
     },
     {
-      field: 'daysUntilEnd', headerName: 'Days', flex: 0.4, minWidth: 65,
+      field: 'name', headerName: 'Community', flex: 1, minWidth: 200,
+      renderCell: (p: GridRenderCellParams) => (
+        <Box sx={{ lineHeight: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', lineHeight: 1.2 }}>
+            {(p.value as string).replace('Avir at ', '')}
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#5c6874', fontSize: '0.68rem', lineHeight: 1 }}>{p.row.region}</Typography>
+        </Box>
+      ),
+    },
+    {
+      field: 'daysUntilDue', headerName: 'Days Until Due', width: 130, type: 'number', align: 'right', headerAlign: 'right',
       renderCell: (p: GridRenderCellParams) => {
-        const days = p.value as number;
-        let color = '#16A34A'; let bg = '#DCFCE7'; let label = `${days}d`;
-        if (days < 0) { color = '#64748B'; bg = '#F1F5F9'; label = 'Passed'; }
-        else if (days <= 30) { color = '#991B1B'; bg = '#FEE2E2'; }
-        else if (days <= 60) { color = '#9A3412'; bg = '#FED7AA'; }
-        else if (days <= 90) { color = '#854D0E'; bg = '#FEF9C3'; }
+        const d = p.value as number;
+        const color = d < 0 ? '#991B1B' : d <= 30 ? '#92400E' : d <= 90 ? '#1E40AF' : '#166534';
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-            <Box sx={{ width: 8, height: 8, borderRadius: '50%',
-              bgcolor: days < 0 ? '#94A3B8' : days <= 30 ? '#DC2626' : days <= 60 ? '#EA580C' : days <= 90 ? '#CA8A04' : '#16A34A',
-            }} />
-            <Chip label={label} size="small" sx={{ bgcolor: bg, color, fontWeight: 700, fontSize: '0.75rem', height: 24 }} />
-          </Box>
+          <Typography variant="body2" sx={{ fontWeight: 700, color, fontSize: '0.85rem' }}>
+            {d < 0 ? `${Math.abs(d)} overdue` : `${d} days`}
+          </Typography>
         );
       },
     },
     {
-      field: 'surveyStatus', headerName: 'Status', flex: 0.6, minWidth: 85,
-      renderCell: (p: GridRenderCellParams) => statusChip(p.value as string),
-    },
-    {
-      field: 'uploaded', headerName: 'Uploaded', flex: 0.5, minWidth: 75, align: 'center', headerAlign: 'center',
+      field: 'totalCitations', headerName: 'Prior Citations', width: 120, type: 'number', align: 'right', headerAlign: 'right',
       renderCell: (p: GridRenderCellParams) => (
-        <Chip label={p.value ? 'Yes' : 'No'} size="small" sx={{
-          bgcolor: p.value ? '#DCFCE7' : '#FEF3C7',
-          color: p.value ? '#166534' : '#92400E',
-          fontWeight: 600,
-        }} />
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>{p.value as number}</Typography>
       ),
     },
     {
-      field: 'lastSurveyDate', headerName: 'Last Survey', flex: 0.6, minWidth: 90,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
-      ),
+      field: 'alerts', headerName: 'Alerts', width: 90, type: 'number', align: 'right', headerAlign: 'right',
+      renderCell: (p: GridRenderCellParams) => {
+        const count = p.value as number;
+        if (count === 0) return <Typography variant="body2" sx={{ color: '#16A34A', fontWeight: 600 }}>—</Typography>;
+        return (
+          <Typography variant="body2" sx={{ fontWeight: 700, color: '#DC2626' }}>{count}</Typography>
+        );
+      },
     },
   ];
 
-  // Summary counts
-  const upcomingCount = communityRows.filter((r) => r.surveyStatus !== 'Window Passed').length;
-  const historicalCount = communityRows.filter((r) => r.surveyStatus === 'Window Passed').length;
-  const inWindow = tabFiltered.filter((r) => r.surveyStatus === 'In Window').length;
-
   return (
     <Box>
-      <PageHeader
-        title="Survey Management"
-        tabs={[
-          { label: 'Upcoming', value: 0 },
-          { label: 'History', value: 1 },
-        ]}
-        activeTab={tab}
-        onTabChange={(v) => { setTab(v); setSearchParams({ tab: v === 1 ? 'historical' : 'upcoming' }); }}
-        actions={<></>}
-      />
+      <PageHeader title="Survey Planning" />
+      <PageFilters dateRange={dateRange} onDateRangeChange={setDateRange} />
+
+      {/* Summary callouts */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        {[
+          { label: 'Overdue',  count: overdueCount,  bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' },
+          { label: 'Due Soon', count: dueSoonCount,  bg: '#FEF3C7', color: '#92400E', border: '#FDE68A' },
+          { label: 'Upcoming', count: upcomingCount, bg: '#DBEAFE', color: '#1E40AF', border: '#BFDBFE' },
+        ].map((t) => (
+          <Paper key={t.label} sx={{ p: 2, flex: 1, borderRadius: 3, border: `1px solid ${t.border}`, bgcolor: t.bg }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: t.color }}>{t.label}</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.color, my: 0.5 }}>{t.count}</Typography>
+            <Typography variant="caption" sx={{ color: t.color, opacity: 0.75 }}>
+              {t.label === 'Overdue' ? 'Window has passed' :
+               t.label === 'Due Soon' ? 'Due within 30 days' :
+               t.label === 'Upcoming' ? 'Due within 90 days' : 'More than 90 days out'}
+            </Typography>
+          </Paper>
+        ))}
+      </Box>
 
       {/* Table */}
-      <Paper sx={{ borderRadius: '8px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-        {/* Filters + View Options + Export in section header */}
-        <Box sx={{ px: 2, pt: 2, pb: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            <TextField size="small" placeholder="Search facility..." value={search}
-              onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 200 }}
-              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
-            <FormControl size="small" sx={{ minWidth: 90 }}>
-              <InputLabel>State</InputLabel>
-              <Select value={stateFilter} label="State" onChange={(e) => setStateFilter(e.target.value)}>
-                <MenuItem value="">All</MenuItem>
-                {states.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-              </Select>
-            </FormControl>
-<FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel>Survey Type</InputLabel>
-              <Select value={typeFilter} label="Survey Type" onChange={(e) => setTypeFilter(e.target.value)}>
-                <MenuItem value="">All</MenuItem>
-                {surveyTypes.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-              </Select>
-            </FormControl>
-            {tab === 0 && (
-              <FormControl size="small" sx={{ minWidth: 110 }}>
-                <InputLabel>Status</InputLabel>
-                <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="In Window">In Window</MenuItem>
-                  <MenuItem value="Upcoming">Upcoming</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-            {gapsOnly && (
-              <Chip label="Doc Gaps Only" onDelete={() => setGapsOnly(false)} size="small"
-                sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
-            )}
-            <Button variant="text" startIcon={<CloseIcon />} sx={{ height: 44 }} onClick={() => {
-              setSearch(''); setStateFilter(''); setRegionFilter('');
-              setTypeFilter(''); setStatusFilter(''); setGapsOnly(false);
-            }}>Reset</Button>
-            <Box sx={{ flexGrow: 1 }} />
-            <Button variant="text" size="small" startIcon={<ViewColumnIcon />}
-              onClick={(e) => setViewMenuAnchor(e.currentTarget)}>
-              View Options
-            </Button>
-            <Button size="small" startIcon={<FileDownloadIcon />}>Export</Button>
-          </Box>
+      <Paper sx={{ px: 2, py: 1.5, borderRadius: '12px 12px 0 0', border: '1px solid #E0E4E7', borderBottom: 'none', bgcolor: '#FAFBFC' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {rows.length} communities
+          </Typography>
+          <TextField
+            size="small" placeholder="Search community..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            sx={{ ml: 'auto', width: 220 }}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+          />
         </Box>
-        <Menu anchorEl={viewMenuAnchor} open={Boolean(viewMenuAnchor)}
-          onClose={() => setViewMenuAnchor(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
-          <Box sx={{ px: 2, py: 0.5, minWidth: 200 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: '#5c6874', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Toggle Columns
-            </Typography>
-          </Box>
-          <MenuItem sx={{ py: 0.25 }}>
-            <FormControlLabel
-              control={<Switch size="small" checked={!hiddenCols.has('_showRegion')}
-                onChange={() => {
-                  const next = new Set(hiddenCols);
-                  next.has('_showRegion') ? next.delete('_showRegion') : next.add('_showRegion');
-                  setHiddenCols(next);
-                }} />}
-              label={<Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Region (in Facility)</Typography>}
-            />
-          </MenuItem>
-          {columns.filter(c => c.field !== 'name').map((col) => (
-            <MenuItem key={col.field} sx={{ py: 0.25 }}>
-              <FormControlLabel
-                control={<Switch size="small" checked={!hiddenCols.has(col.field)}
-                  onChange={() => {
-                    const next = new Set(hiddenCols);
-                    next.has(col.field) ? next.delete(col.field) : next.add(col.field);
-                    setHiddenCols(next);
-                  }} />}
-                label={<Typography variant="body2" sx={{ fontSize: '0.85rem' }}>{col.headerName}</Typography>}
-              />
-            </MenuItem>
-          ))}
-        </Menu>
+      </Paper>
+      <Paper sx={{ borderRadius: '0 0 12px 12px', border: '1px solid #E0E4E7', overflow: 'hidden' }}>
         <DataGrid
-          rows={tabFiltered}
-          columns={columns.filter((c) => !hiddenCols.has(c.field))}
-          getRowHeight={() => 'auto' as const}
-          sortModel={sortModel}
-          onSortModelChange={(m) => setSortModel(m as typeof sortModel)}
+          rows={rows}
+          columns={columns}
+          rowHeight={48}
+          disableColumnMenu
+          disableRowSelectionOnClick
+          pageSizeOptions={[25, 50]}
           initialState={{
             pagination: { paginationModel: { pageSize: 25 } },
+            sorting: { sortModel: [{ field: 'daysUntilDue', sort: 'asc' }] },
           }}
-          pageSizeOptions={[10, 25, 50, 100]}
-          disableRowSelectionOnClick
-          disableColumnMenu
-          onRowClick={(params) => navigate(`/facility/${params.row.id}`)}
+          onRowClick={(params) => navigate(`/surveys/${params.row.facilityId}`)}
           getRowClassName={(params) => {
-            if (params.row.surveyStatus === 'In Window' && params.row.daysUntilEnd <= 30) return 'due-soon-row';
-            if (params.row.surveyStatus === 'In Window') return 'in-window-row';
+            const s = params.row.status;
+            if (s === 'Overdue') return 'row-overdue';
+            if (s === 'Due Soon') return 'row-due-soon';
             return '';
           }}
           sx={{
             border: 'none',
             '& .MuiDataGrid-columnHeaders': { bgcolor: '#e0e4e7', borderBottom: 'none' },
             '& .MuiDataGrid-columnHeader': { bgcolor: '#e0e4e7' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 400, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px', lineHeight: '16px' },
+            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 400, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px' },
             '& .MuiDataGrid-columnSeparator': { display: 'none' },
             '& .MuiDataGrid-row': { cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } },
-            '& .due-soon-row': { bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } },
-            '& .in-window-row': { bgcolor: '#FFFBEB', '&:hover': { bgcolor: '#FEF3C7' } },
-            '& .MuiDataGrid-cell': { py: 0.5, borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center' },
+            '& .MuiDataGrid-cell': { borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center' },
+            '& .row-overdue': { bgcolor: '#FFF5F5', '&:hover': { bgcolor: '#FEE2E2' } },
+            '& .row-due-soon': { bgcolor: '#FFFBEB', '&:hover': { bgcolor: '#FEF3C7' } },
           }}
           autoHeight
         />
