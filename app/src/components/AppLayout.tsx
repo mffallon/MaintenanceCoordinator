@@ -227,7 +227,7 @@ export default function AppLayout() {
                       fontWeight: isActive ? 600 : 400,
                       fontSize: (item as any).indent ? '0.8rem' : '0.875rem',
                       color: isActive ? '#0065BD' : (item as any).indent ? '#5c6874' : '#293036',
-                      textDecoration: (item as any).strikethrough ? 'line-through' : undefined,
+                      sx: { textDecoration: (item as any).strikethrough ? 'line-through' : undefined },
                     }}
                   />
                 </ListItemButton>
