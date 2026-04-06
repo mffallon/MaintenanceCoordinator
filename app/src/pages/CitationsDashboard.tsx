@@ -35,6 +35,7 @@ import PageHeader from '../components/PageHeader';
 import PageFilters from '../components/PageFilters';
 import { useCommunityFilter } from '../components/CommunityFilter';
 import { facilities, citations, surveys, regions as avirRegions } from '../data/avir-data';
+import { effectiveLastSurveyDate } from '../utils/surveyWindowOverrides';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import type { AvirFacility, AvirSurvey } from '../data/avir-data';
 import { fmtDate } from '../utils/formatDate';
@@ -78,13 +79,6 @@ function buildRegionBreakdown(filteredFacilities: AvirFacility[]) {
 
 // Upcoming survey window data (mirrors SurveyManagement overrides)
 const TODAY_DASH = new Date('2026-04-05');
-const UPCOMING_OVERRIDES: Record<number, string> = {
-  0: '2025-01-18',
-  1: '2025-02-05',
-  2: '2025-02-22',
-  3: '2025-03-10',
-  4: '2025-03-28',
-};
 function deriveUpcomingAlerts(facilityId: string): number {
   const facCitations = citations.filter((c) => c.facilityId === facilityId);
   const openCits = facCitations.filter((c) => c.status === 'Open' || c.status === 'Pending');
@@ -98,9 +92,8 @@ function deriveUpcomingAlerts(facilityId: string): number {
 
 const upcomingSurveyRows = facilities
   .filter((f) => f.lastSurveyDate)
-  .map((f, i) => {
-    const overriddenDate = UPCOMING_OVERRIDES[i];
-    const last = new Date(overriddenDate ?? f.lastSurveyDate);
+  .map((f) => {
+    const last = new Date(effectiveLastSurveyDate(f.id, f.lastSurveyDate));
     const windowEnd = new Date(last);
     windowEnd.setMonth(windowEnd.getMonth() + 15);
     const windowEndISO = windowEnd.toISOString().split('T')[0];
