@@ -171,7 +171,7 @@ export default function CommunityFilter() {
   const { checkedLeaves, setCheckedLeaves, isAllSelected } = useCommunityFilter();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['corp-lcc']));
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['corp-avir']));
   const anchorRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 

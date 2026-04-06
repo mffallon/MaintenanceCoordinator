@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
+import React from 'react';
 import { Box, Typography, Tabs, Tab, Button } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { CommunityFilter } from './CommunityFilter';
 
 interface PageHeaderTab {
   label: string;
@@ -14,8 +14,7 @@ interface Props {
   activeTab?: number;
   onTabChange?: (value: number) => void;
   actions?: ReactNode;
-  subtitle?: string;
-  hideCommunity?: boolean;
+  subtitle?: React.ReactNode;
   backLabel?: string;
   onBack?: () => void;
 }
@@ -27,7 +26,6 @@ export default function PageHeader({
   onTabChange,
   actions,
   subtitle,
-  hideCommunity = false,
   backLabel,
   onBack,
 }: Props) {
@@ -35,10 +33,11 @@ export default function PageHeader({
     <Box
       sx={{
         bgcolor: '#F7F8F9',
-        mx: -3,
+        ml: -3,
         mt: -3,
         mb: 2,
         borderBottom: '1px solid #E0E4E7',
+        width: 'calc(100vw - 256px)',
       }}
     >
       <Box sx={{ px: 3, pt: 2, pb: tabs ? 0 : 2 }}>
@@ -69,16 +68,6 @@ export default function PageHeader({
             >
               {title}
             </Typography>
-            <Typography
-              sx={{
-                fontSize: '0.8rem',
-                color: '#8492a1',
-                fontWeight: 400,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Jan 2024 – Mar 2026
-            </Typography>
           </Box>
           {actions}
         </Box>
@@ -88,12 +77,6 @@ export default function PageHeader({
           </Typography>
         )}
 
-        {/* Communities filter — hierarchical tree picker */}
-        {!hideCommunity && (
-          <Box sx={{ mb: tabs ? 1.5 : 0 }}>
-            <CommunityFilter />
-          </Box>
-        )}
       </Box>
 
       {/* Sub-tabs (Level 3) — only if tabs provided */}

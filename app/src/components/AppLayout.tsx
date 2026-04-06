@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Toolbar, Typography, Box, List, ListItemButton,
@@ -8,6 +8,11 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
 import ContentPasteSearchIcon from '@mui/icons-material/ContentPasteSearch';
 import BusinessIcon from '@mui/icons-material/Business';
+import ScienceIcon from '@mui/icons-material/Science';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import InsightsIcon from '@mui/icons-material/Insights';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -25,9 +30,14 @@ const topTabs = [
 // Side nav items (Level 2) — flat list
 const sideNavItems = [
   { label: 'Dashboard', icon: <DashboardIcon fontSize="small" />, path: '/' },
-  { label: 'Citations', icon: <AssignmentLateIcon fontSize="small" />, path: '/citations' },
-  { label: 'Survey Management', icon: <ContentPasteSearchIcon fontSize="small" />, path: '/surveys' },
-  { label: 'Facility Summaries', icon: <BusinessIcon fontSize="small" />, path: '/facilities' },
+  { label: 'Survey Planning', icon: <ContentPasteSearchIcon fontSize="small" />, path: '/surveys' },
+  { label: 'Community Summaries', icon: <BusinessIcon fontSize="small" />, path: '/facilities', strikethrough: true },
+  { label: 'Survey Overview', icon: <ScienceIcon fontSize="small" />, path: '/citations-remix' },
+  { label: 'K-Tags', icon: <LocalFireDepartmentIcon fontSize="small" />, path: '/citations-remix/tags/k', indent: true },
+  { label: 'N-Tags (State)', icon: <AccountBalanceIcon fontSize="small" />, path: '/citations-remix/tags/state', indent: true },
+  { label: 'E-Tags', icon: <HealthAndSafetyIcon fontSize="small" />, path: '/citations-remix/tags/e', indent: true },
+  { label: 'Plans of Correction', icon: <AssignmentLateIcon fontSize="small" />, path: '/poc' },
+  { label: 'Trends (Future)', icon: <InsightsIcon fontSize="small" />, path: '/trends' },
 ];
 
 // TELS logo as text (matches Figma: bold, dark)
@@ -36,6 +46,13 @@ const telsLogoUrl = 'https://www.figma.com/api/mcp/asset/cd89a197-1238-4380-988f
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top on route change
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   // Determine active top tab
   const isOnCitations = true; // prototype only covers Citations
@@ -44,7 +61,13 @@ export default function AppLayout() {
   const activeSidePath = sideNavItems.find((item) => {
     if (item.path === '/') return location.pathname === '/';
     if (item.path === '/facilities') return location.pathname.startsWith('/facilities') || location.pathname.startsWith('/facility/');
-    return location.pathname.startsWith(item.path);
+    // Exact match first to avoid /citations matching /citations-remix
+    if (location.pathname === item.path) return true;
+    // Only startsWith if the path isn't a prefix of another nav item
+    if (item.path.startsWith('/citations-remix/tags/')) return location.pathname === item.path;
+    if (item.path === '/citations-remix') return location.pathname === '/citations-remix';
+    if (item.path !== '/citations') return location.pathname.startsWith(item.path);
+    return location.pathname === '/citations';
   })?.path || '/';
 
   return (
@@ -75,8 +98,7 @@ export default function AppLayout() {
               />
               <Typography
                 className="tels-fallback"
-                style={{ display: 'none' }}
-                sx={{ fontWeight: 800, fontSize: '1.1rem', color: '#293036', letterSpacing: '-0.5px' }}
+                sx={{ display: 'none', fontWeight: 800, fontSize: '1.1rem', color: '#293036', letterSpacing: '-0.5px' }}
               >
                 TELS
               </Typography>
@@ -186,8 +208,9 @@ export default function AppLayout() {
                   sx={{
                     borderRadius: '4px',
                     mb: 0.25,
-                    py: 1,
+                    py: (item as any).indent ? 0.6 : 1,
                     px: 1.5,
+                    pl: (item as any).indent ? 4 : 1.5,
                     '&.Mui-selected': {
                       bgcolor: 'rgba(0, 101, 189, 0.08)',
                       '&:hover': { bgcolor: 'rgba(0, 101, 189, 0.12)' },
@@ -195,15 +218,16 @@ export default function AppLayout() {
                     '&:hover': { bgcolor: 'rgba(103,119,135,0.08)' },
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 36, color: isActive ? '#0065BD' : '#293036' }}>
+                  <ListItemIcon sx={{ minWidth: (item as any).indent ? 28 : 36, color: isActive ? '#0065BD' : '#5c6874' }}>
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText
                     primary={item.label}
                     primaryTypographyProps={{
                       fontWeight: isActive ? 600 : 400,
-                      fontSize: '0.875rem',
-                      color: isActive ? '#0065BD' : '#293036',
+                      fontSize: (item as any).indent ? '0.8rem' : '0.875rem',
+                      color: isActive ? '#0065BD' : (item as any).indent ? '#5c6874' : '#293036',
+                      sx: { textDecoration: (item as any).strikethrough ? 'line-through' : undefined },
                     }}
                   />
                 </ListItemButton>
@@ -214,6 +238,7 @@ export default function AppLayout() {
 
         {/* Main Content */}
         <Box
+          ref={mainRef}
           component="main"
           sx={{
             flexGrow: 1,
@@ -222,10 +247,9 @@ export default function AppLayout() {
             bgcolor: '#ECEEF0',
             width: `calc(100vw - ${SIDENAV_WIDTH}px)`,
             maxWidth: `calc(100vw - ${SIDENAV_WIDTH}px)`,
-            overflowX: 'hidden',
           }}
         >
-          <Box sx={{ p: 3 }}>
+          <Box sx={{ p: 3, maxWidth: 1280 }}>
             <Outlet />
           </Box>
         </Box>

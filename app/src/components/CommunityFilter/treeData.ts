@@ -1,9 +1,8 @@
 import { TreeNode } from './types';
-import { facilities } from '../../data/facilities';
+import { facilities } from '../../data/avir-data';
 
-// Build hierarchy: Life Care Centers → Division (by state group) → Region → Facility
+// Build hierarchy: Avir → Region → Facility
 function buildTree(): TreeNode {
-  // Group facilities by region, then state
   const regionMap = new Map<string, typeof facilities>();
   for (const f of facilities) {
     const list = regionMap.get(f.region) || [];
@@ -11,42 +10,26 @@ function buildTree(): TreeNode {
     regionMap.set(f.region, list);
   }
 
-  const divisions: TreeNode[] = [];
-  const regionNames = [...regionMap.keys()].sort();
-
-  // Create 2 divisions to show hierarchy depth
-  const div1Regions = regionNames.slice(0, Math.ceil(regionNames.length / 2));
-  const div2Regions = regionNames.slice(Math.ceil(regionNames.length / 2));
-
-  const buildDivision = (name: string, regionKeys: string[]): TreeNode => ({
-    id: `div-${name.toLowerCase().replace(/\s/g, '-')}`,
-    label: name,
-    kind: 'division',
-    children: regionKeys.map((rName) => {
-      const facs = regionMap.get(rName) || [];
-      return {
-        id: `reg-${rName.toLowerCase()}`,
-        label: `${rName} Region`,
-        kind: 'region' as const,
-        children: facs
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((f) => ({
-            id: f.id,
-            label: f.name.replace(/^Life Care Center of /, 'LCC '),
-            kind: 'facility' as const,
-          })),
-      };
-    }),
-  });
-
-  divisions.push(buildDivision('East Division', div1Regions));
-  divisions.push(buildDivision('West Division', div2Regions));
+  const regionNodes: TreeNode[] = [...regionMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([region, facs]) => ({
+      id: `reg-${region.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+      label: region,
+      kind: 'region' as const,
+      children: facs
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((f) => ({
+          id: f.id,
+          label: f.name,
+          kind: 'facility' as const,
+        })),
+    }));
 
   return {
-    id: 'corp-lcc',
-    label: 'Life Care Centers of America',
+    id: 'corp-avir',
+    label: 'Avir',
     kind: 'corporation',
-    children: divisions,
+    children: regionNodes,
   };
 }
 
