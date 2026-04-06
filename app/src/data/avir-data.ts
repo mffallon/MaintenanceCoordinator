@@ -66,11 +66,11 @@ export interface AvirKTagHistory {
 // --- Build facilities ---
 
 const facilityMap = new Map<string, {
-  name: string; region: string; surveys: typeof rawData.surveys;
+  name: string; region: string; surveys: RawSurvey[];
   totalK: number; totalN: number; totalE: number; total: number; hasWaiver: boolean;
 }>();
 
-for (const s of rawData.surveys) {
+for (const s of rawSurveys) {
   const name = s.facility;
   if (!facilityMap.has(name)) {
     facilityMap.set(name, {
@@ -129,7 +129,7 @@ function getFacId(name: string): string {
 // --- Build surveys ---
 
 let surveyIdx = 0;
-export const surveys: AvirSurvey[] = rawData.surveys
+export const surveys: AvirSurvey[] = rawSurveys
   .filter((s) => s.date)
   .map((s) => ({
     id: `srv-${++surveyIdx}`,
@@ -166,9 +166,11 @@ function tagType(tag: string): 'K' | 'N' | 'E' {
 // Raw JSON element shapes (needed for noImplicitAny when TS can't infer from JSON)
 type RawCitation = { date: string; region: string; facility: string; surveyor: string; tag: string; description: string; observation: string; status?: string };
 type RawKTagHistoryEntry = { year: number; date: string; region: string; facility: string; surveyRegion: string; surveyor: string; citedTags: string[]; waiverTags: string[]; total: number };
+type RawSurvey = { date: string; region: string; facility: string; surveyor?: string; kTags: number; nTags: number; eTags: number; total: number; isWaiver: boolean; isPending: boolean };
+const rawSurveys = rawSurveys as RawSurvey[];
 
 // Check which surveys have waivers
-const waiverFacilities = new Set(rawData.surveys.filter((s) => s.isWaiver).map((s) => s.facility));
+const waiverFacilities = new Set(rawSurveys.filter((s) => s.isWaiver).map((s) => s.facility));
 
 const kCitations: AvirCitation[] = (rawData.kCitations2026 as RawCitation[]).map((c) => ({
   id: `cit-${++citIdx}`,
