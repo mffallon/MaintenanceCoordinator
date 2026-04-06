@@ -150,6 +150,7 @@ export default function SurveyManagement() {
     {
       field: 'alerts', headerName: 'Alerts', width: 90, type: 'number' as const, align: 'right' as const, headerAlign: 'right' as const,
       renderCell: (p: GridRenderCellParams) => {
+        if (p.row.daysUntilDue > 90) return <Typography variant="body2" sx={{ color: '#94A3B8' }}>—</Typography>;
         const count = p.value as number;
         if (count === 0) return <Typography variant="body2" sx={{ color: '#16A34A', fontWeight: 600 }}>—</Typography>;
         return (
