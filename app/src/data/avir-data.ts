@@ -229,7 +229,7 @@ export const kTagHistory: AvirKTagHistory[] = rawData.kTagsHistory.map((h) => ({
   citedTags: h.citedTags,
   waiverTags: h.waiverTags,
   total: h.total,
-})).sort((a, b) => b.date.localeCompare(a.date));
+})).sort((a: AvirKTagHistory, b: AvirKTagHistory) => b.date.localeCompare(a.date));
 
 // --- Build N-Tag and E-Tag history (grouped by survey: date+facility) ---
 
