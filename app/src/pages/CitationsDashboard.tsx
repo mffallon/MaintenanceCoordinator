@@ -307,19 +307,21 @@ export default function CitationsDashboard() {
   // Community filtered base datasets
   const communityFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)), [passesFilter]);
   const communitySurveys = useMemo(() => surveys.filter((s) => passesFilter(s.facilityId)), [passesFilter]);
+  const ytdFilter = useMemo(() => makeDateFilter('ytd'), []);
+  const communitySurveysYTD = useMemo(() => communitySurveys.filter((s) => ytdFilter(s.date)), [communitySurveys, ytdFilter]);
   const communityCitations = useMemo(() => citations.filter((c) => passesFilter(c.facilityId)), [passesFilter]);
 
   // Summary stats (filtered by community)
   const filteredStats = useMemo(() => ({
     totalFacilities: communityFacilities.length,
     surveyedFacilities: communityFacilities.filter((f) => f.surveyed).length,
-    totalSurveys: communitySurveys.length,
+    totalSurveys: communitySurveysYTD.length,
     totalCitations: communityCitations.length,
     totalKTags: communityCitations.filter((c) => c.tagType === 'K').length,
     totalNTags: communityCitations.filter((c) => c.tagType === 'N').length,
     totalETags: communityCitations.filter((c) => c.tagType === 'E').length,
-    deficiencyFree: communitySurveys.filter((s) => s.total === 0 && !s.isPending).length,
-  }), [communityFacilities, communitySurveys, communityCitations]);
+    deficiencyFree: communitySurveysYTD.filter((s) => s.total === 0 && !s.isPending).length,
+  }), [communityFacilities, communitySurveysYTD, communityCitations]);
 
   const avgCitationsNum = communityFacilities.length > 0 ? communityFacilities.reduce((s, f) => s + f.totalCitations, 0) / communityFacilities.length : 0;
   const avgCitations = avgCitationsNum.toFixed(1);

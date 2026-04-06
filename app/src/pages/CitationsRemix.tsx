@@ -36,6 +36,7 @@ interface SurveyRow {
   eTags: number;
   totalCitations: number;
   isWaiver: boolean;
+  isPending: boolean;
 }
 
 export default function CitationsRemix() {
@@ -67,6 +68,7 @@ export default function CitationsRemix() {
         eTags: s.eTags,
         totalCitations: s.total,
         isWaiver: s.isWaiver,
+        isPending: s.isPending,
       }));
   }, [passesFilter, dateRange]);
 
@@ -184,7 +186,7 @@ export default function CitationsRemix() {
     ];
   }, [filteredRows]);
 
-  const deficiencyFreeCount = useMemo(() => allRows.filter((r) => r.totalCitations === 0).length, [allRows]);
+  const deficiencyFreeCount = useMemo(() => allRows.filter((r) => r.totalCitations === 0 && !r.isPending).length, [allRows]);
 
   // Build a filter for the previous equivalent period
   const prevPeriodFilter = useMemo((): ((dateStr: string) => boolean) | null => {
