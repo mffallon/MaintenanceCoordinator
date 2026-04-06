@@ -107,7 +107,7 @@ export default function TagTypeDetail() {
       },
       { field: 'surveyor', headerName: 'Surveyor', width: 150 },
       {
-        field: 'total', headerName: 'Total', width: 80, align: 'right', headerAlign: 'right', type: 'number',
+        field: 'total', headerName: 'Total', width: 80, align: 'right' as const, headerAlign: 'right' as const, type: 'number' as const,
         renderCell: (p) => (
           <Typography variant="body2" sx={{ fontWeight: p.row._isTotalRow ? 800 : 600 }}>{p.value}</Typography>
         ),

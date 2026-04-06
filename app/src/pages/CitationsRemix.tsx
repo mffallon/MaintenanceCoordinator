@@ -119,7 +119,7 @@ export default function CitationsRemix() {
       ),
     },
     {
-      field: 'totalCitations', headerName: 'Total Citations', flex: 0.5, minWidth: 80, align: 'center', headerAlign: 'center', type: 'number',
+      field: 'totalCitations', headerName: 'Total Citations', flex: 0.5, minWidth: 80, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
       renderCell: (p: GridRenderCellParams) => {
         const v = p.value as number;
         return v > 0 ? (
@@ -129,7 +129,7 @@ export default function CitationsRemix() {
       },
     },
     {
-      field: 'kTags', headerName: 'K-Tags', flex: 0.4, minWidth: 70, align: 'center', headerAlign: 'center', type: 'number',
+      field: 'kTags', headerName: 'K-Tags', flex: 0.4, minWidth: 70, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
       renderCell: (p: GridRenderCellParams) => {
         const v = p.value as number;
         return v > 0 ? (
@@ -139,7 +139,7 @@ export default function CitationsRemix() {
       },
     },
     {
-      field: 'stateTags', headerName: 'State Tags', flex: 0.5, minWidth: 80, align: 'center', headerAlign: 'center', type: 'number',
+      field: 'stateTags', headerName: 'State Tags', flex: 0.5, minWidth: 80, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
       renderCell: (p: GridRenderCellParams) => {
         const v = p.value as number;
         return v > 0 ? (
@@ -149,7 +149,7 @@ export default function CitationsRemix() {
       },
     },
     {
-      field: 'eTags', headerName: 'E-Tags', flex: 0.4, minWidth: 70, align: 'center', headerAlign: 'center', type: 'number',
+      field: 'eTags', headerName: 'E-Tags', flex: 0.4, minWidth: 70, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
       renderCell: (p: GridRenderCellParams) => {
         const v = p.value as number;
         return v > 0 ? (

@@ -130,7 +130,7 @@ export default function SurveyManagement() {
       ),
     },
     {
-      field: 'daysUntilDue', headerName: 'Days Until Due', width: 130, type: 'number', align: 'right', headerAlign: 'right',
+      field: 'daysUntilDue', headerName: 'Days Until Due', width: 130, type: 'number' as const, align: 'right' as const, headerAlign: 'right' as const,
       renderCell: (p: GridRenderCellParams) => {
         const d = p.value as number;
         const color = d < 0 ? '#991B1B' : d <= 30 ? '#92400E' : d <= 90 ? '#1E40AF' : '#166534';
@@ -142,13 +142,13 @@ export default function SurveyManagement() {
       },
     },
     {
-      field: 'totalCitations', headerName: 'Prior Citations', width: 120, type: 'number', align: 'right', headerAlign: 'right',
+      field: 'totalCitations', headerName: 'Prior Citations', width: 120, type: 'number' as const, align: 'right' as const, headerAlign: 'right' as const,
       renderCell: (p: GridRenderCellParams) => (
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{p.value as number}</Typography>
       ),
     },
     {
-      field: 'alerts', headerName: 'Alerts', width: 90, type: 'number', align: 'right', headerAlign: 'right',
+      field: 'alerts', headerName: 'Alerts', width: 90, type: 'number' as const, align: 'right' as const, headerAlign: 'right' as const,
       renderCell: (p: GridRenderCellParams) => {
         const count = p.value as number;
         if (count === 0) return <Typography variant="body2" sx={{ color: '#16A34A', fontWeight: 600 }}>—</Typography>;

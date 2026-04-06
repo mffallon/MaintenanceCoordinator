@@ -360,28 +360,28 @@ export default function CitationsDashboard() {
         <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{p.value ? fmtDate(p.value as string) : '—'}</Typography>
       ),
     },
-    { field: 'surveyCount', headerName: 'Surveys', width: 80, align: 'center', headerAlign: 'center', type: 'number' },
-    { field: 'totalCitations', headerName: 'Citations', width: 90, align: 'center', headerAlign: 'center', type: 'number' },
+    { field: 'surveyCount', headerName: 'Surveys', width: 80, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const },
+    { field: 'totalCitations', headerName: 'Citations', width: 90, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const },
     {
-      field: 'totalKTags', headerName: 'K Tags', width: 80, align: 'center', headerAlign: 'center',
+      field: 'totalKTags', headerName: 'K Tags', width: 80, align: 'center' as const, headerAlign: 'center' as const,
       renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
         ? <Chip label={p.value} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 36 }} />
         : <Typography variant="caption" color="text.secondary">0</Typography>,
     },
     {
-      field: 'totalNTags', headerName: 'N Tags', width: 80, align: 'center', headerAlign: 'center',
+      field: 'totalNTags', headerName: 'N Tags', width: 80, align: 'center' as const, headerAlign: 'center' as const,
       renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
         ? <Chip label={p.value} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700, minWidth: 36 }} />
         : <Typography variant="caption" color="text.secondary">0</Typography>,
     },
     {
-      field: 'totalETags', headerName: 'E Tags', width: 80, align: 'center', headerAlign: 'center',
+      field: 'totalETags', headerName: 'E Tags', width: 80, align: 'center' as const, headerAlign: 'center' as const,
       renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
         ? <Chip label={p.value} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700, minWidth: 36 }} />
         : <Typography variant="caption" color="text.secondary">0</Typography>,
     },
     {
-      field: 'hasWaiver', headerName: 'Waiver', width: 80, align: 'center', headerAlign: 'center',
+      field: 'hasWaiver', headerName: 'Waiver', width: 80, align: 'center' as const, headerAlign: 'center' as const,
       renderCell: (p: GridRenderCellParams) => p.value
         ? <Chip label="Yes" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />
         : <Typography variant="caption" color="text.secondary">No</Typography>,
