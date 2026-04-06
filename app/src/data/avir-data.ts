@@ -163,10 +163,14 @@ function tagType(tag: string): 'K' | 'N' | 'E' {
   return 'N';
 }
 
+// Raw JSON element shapes (needed for noImplicitAny when TS can't infer from JSON)
+type RawCitation = { date: string; region: string; facility: string; surveyor: string; tag: string; description: string; observation: string; status?: string };
+type RawKTagHistoryEntry = { year: number; date: string; region: string; facility: string; surveyRegion: string; surveyor: string; citedTags: string[]; waiverTags: string[]; total: number };
+
 // Check which surveys have waivers
 const waiverFacilities = new Set(rawData.surveys.filter((s) => s.isWaiver).map((s) => s.facility));
 
-const kCitations: AvirCitation[] = rawData.kCitations2026.map((c) => ({
+const kCitations: AvirCitation[] = (rawData.kCitations2026 as RawCitation[]).map((c) => ({
   id: `cit-${++citIdx}`,
   date: c.date,
   region: c.region,
@@ -181,7 +185,7 @@ const kCitations: AvirCitation[] = rawData.kCitations2026.map((c) => ({
   isWaiver: waiverFacilities.has(c.facility),
 }));
 
-const nCitations: AvirCitation[] = rawData.nCitations2026.map((c) => ({
+const nCitations: AvirCitation[] = (rawData.nCitations2026 as RawCitation[]).map((c) => ({
   id: `cit-${++citIdx}`,
   date: c.date,
   region: c.region,
@@ -196,7 +200,7 @@ const nCitations: AvirCitation[] = rawData.nCitations2026.map((c) => ({
   isWaiver: false,
 }));
 
-const eCitations: AvirCitation[] = rawData.eCitations2026.map((c) => ({
+const eCitations: AvirCitation[] = (rawData.eCitations2026 as RawCitation[]).map((c) => ({
   id: `cit-${++citIdx}`,
   date: c.date,
   region: c.region,
@@ -217,7 +221,7 @@ export const citations: AvirCitation[] = [...kCitations, ...nCitations, ...eCita
 // --- Build K-Tag history (2025+) ---
 
 let histIdx = 0;
-export const kTagHistory: AvirKTagHistory[] = rawData.kTagsHistory.map((h) => ({
+export const kTagHistory: AvirKTagHistory[] = (rawData.kTagsHistory as RawKTagHistoryEntry[]).map((h) => ({
   id: `kh-${++histIdx}`,
   year: h.year,
   date: h.date,
