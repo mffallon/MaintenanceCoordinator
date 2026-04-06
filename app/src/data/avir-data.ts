@@ -167,7 +167,7 @@ function tagType(tag: string): 'K' | 'N' | 'E' {
 type RawCitation = { date: string; region: string; facility: string; surveyor: string; tag: string; description: string; observation: string; status?: string };
 type RawKTagHistoryEntry = { year: number; date: string; region: string; facility: string; surveyRegion: string; surveyor: string; citedTags: string[]; waiverTags: string[]; total: number };
 type RawSurvey = { date: string; region: string; facility: string; surveyor?: string; kTags: number; nTags: number; eTags: number; total: number; isWaiver: boolean; isPending: boolean };
-const rawSurveys = rawSurveys as RawSurvey[];
+const rawSurveys = rawData.surveys as RawSurvey[];
 
 // Check which surveys have waivers
 const waiverFacilities = new Set(rawSurveys.filter((s) => s.isWaiver).map((s) => s.facility));
