@@ -421,7 +421,7 @@ export default function CitationsDashboard() {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard title="Deficiency-Free Surveys" value={filteredStats.deficiencyFree} subtitle={`Out of ${filteredStats.totalSurveys} total surveys`} icon={<ShieldIcon />} color="#2E7D32"
-            action={{ label: 'Review', onClick: () => navigate('/surveys') }} />
+            action={{ label: 'Review', onClick: () => navigate('/citations-remix') }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard title="Avg Citations per Survey" value={avgCitations} subtitle={`Across ${communityFacilities.length} communities`} icon={<TrendingUpIcon />} color="#F57C00"
