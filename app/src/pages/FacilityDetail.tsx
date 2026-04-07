@@ -170,24 +170,6 @@ function SurveyPrepContent({ facility, facCitations, facSurveys }: {
                 sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 3 } }} />
             </Box>
           ))}
-          {facCitations.length > 0 && (
-            <>
-              <Divider sx={{ my: 1 }} />
-              <Box sx={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', bgcolor: '#F1F5F9', mb: 0.5 }}>
-                {['Open', 'Pending', 'Completed'].filter(s => statusCounts[s]).map((s) => (
-                  <Box key={s} sx={{ width: `${((statusCounts[s] || 0) / facCitations.length) * 100}%`, bgcolor: statusColor(s) }} />
-                ))}
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1.5 }}>
-                {['Open', 'Pending', 'Completed'].filter(s => statusCounts[s]).map((s) => (
-                  <Box key={s} sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: statusColor(s) }} />
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#64748B' }}>{statusCounts[s]} {s}</Typography>
-                  </Box>
-                ))}
-              </Box>
-            </>
-          )}
         </Paper>
 
         {/* Surveyor History */}
