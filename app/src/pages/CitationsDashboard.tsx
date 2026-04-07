@@ -94,8 +94,11 @@ const upcomingSurveyRows = facilities
   .filter((f) => f.lastSurveyDate)
   .map((f) => {
     const last = new Date(effectiveLastSurveyDate(f.id, f.lastSurveyDate));
+    const windowStart = new Date(last);
+    windowStart.setMonth(windowStart.getMonth() + 9);
     const windowEnd = new Date(last);
     windowEnd.setMonth(windowEnd.getMonth() + 15);
+    const windowStartISO = windowStart.toISOString().split('T')[0];
     const windowEndISO = windowEnd.toISOString().split('T')[0];
     const days = Math.round((windowEnd.getTime() - TODAY_DASH.getTime()) / (1000 * 60 * 60 * 24));
     const status = days < 0 ? 'Overdue' : days <= 30 ? 'Due Soon' : days <= 90 ? 'Upcoming' : 'On Track';
@@ -103,7 +106,7 @@ const upcomingSurveyRows = facilities
     const prevCitations = citations.filter((c) => c.facilityId === f.id).length;
     const lastSurvey = surveys.filter((s) => s.facilityId === f.id).sort((a, b) => b.date.localeCompare(a.date))[0];
     const lastSurveyor = lastSurvey?.surveyor || '—';
-    return { id: f.id, name: f.name, region: f.region, windowEnd: windowEndISO, daysUntilDue: days, status, alerts, prevCitations, lastSurveyor };
+    return { id: f.id, name: f.name, region: f.region, windowStart: windowStartISO, windowEnd: windowEndISO, daysUntilDue: days, status, alerts, prevCitations, lastSurveyor };
   })
   .filter((r) => r.daysUntilDue >= 0 && r.daysUntilDue <= 90)
   .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
@@ -134,7 +137,7 @@ function UpcomingSurveysPanel() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 160 }}>Window Closes</TableCell>
+              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 160 }}>Window Opens</TableCell>
               <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
               <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 140 }}>Surveyor</TableCell>
               <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 110 }} align="right">Prev. Citations</TableCell>
@@ -149,7 +152,7 @@ function UpcomingSurveysPanel() {
                 <TableRow key={r.id} hover sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
                   onClick={() => navigate(`/surveys/${r.id}`)}>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{fmtDate(r.windowEnd)}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{fmtDate(r.windowStart)}</Typography>
                     {r.daysUntilDue <= 30
                       ? <Chip label={`${r.daysUntilDue} days away`} size="small" sx={{ mt: 0.25, fontWeight: 700, fontSize: '0.68rem', bgcolor: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, height: 18 }} />
                       : <Typography variant="caption" sx={{ color: '#64748B' }}>{r.daysUntilDue} days away</Typography>
