@@ -41,7 +41,7 @@ const sideNavItems = [
 ];
 
 // TELS logo as text (matches Figma: bold, dark)
-const telsLogoUrl = 'https://www.figma.com/api/mcp/asset/cd89a197-1238-4380-988f-7bc6c50570fa';
+const telsLogoUrl = 'https://www.figma.com/api/mcp/asset/d2f14079-d1af-4545-8155-5b8d58bf47c7';
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -85,21 +85,11 @@ export default function AppLayout() {
         <Toolbar sx={{ minHeight: '60px !important', px: 1, gap: 1 }}>
           {/* TELS Logo */}
           <Box sx={{ display: 'flex', alignItems: 'center', px: 2, mr: 1, flexShrink: 0 }}>
-            <img
-              src={telsLogoUrl}
-              alt="TELS"
-              style={{ height: 20, width: 106, objectFit: 'contain' }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).parentElement!.querySelector('.tels-fallback')?.removeAttribute('style');
-              }}
-            />
-            <Typography
-              className="tels-fallback"
-              sx={{ display: 'none', fontWeight: 800, fontSize: '1.1rem', color: '#293036', letterSpacing: '-0.5px' }}
-            >
-              TELS
-            </Typography>
+            <svg width="107" height="21" viewBox="0 0 107 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="21" height="21" rx="3" fill="#0065BD"/>
+              <path d="M6 6h9M10.5 6v9" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
+              <text x="27" y="16" fontFamily="Inter, sans-serif" fontWeight="800" fontSize="15" fill="#293036" letterSpacing="-0.5">TELS</text>
+            </svg>
           </Box>
 
           {/* Main Nav Tabs */}
