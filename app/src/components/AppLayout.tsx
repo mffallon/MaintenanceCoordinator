@@ -2,17 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Toolbar, Box, List, ListItemButton,
-  ListItemIcon, ListItemText, IconButton, Divider, Menu, MenuItem, Typography,
+  ListItemText, IconButton, Divider, Menu, MenuItem, Typography,
 } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
-import ContentPasteSearchIcon from '@mui/icons-material/ContentPasteSearch';
-import BusinessIcon from '@mui/icons-material/Business';
-import ScienceIcon from '@mui/icons-material/Science';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
-import InsightsIcon from '@mui/icons-material/Insights';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
@@ -67,18 +58,20 @@ const helpItems: DropdownItem[] = [
 ];
 
 const sideNavItems = [
-  { label: 'Dashboard', icon: <DashboardIcon fontSize="small" />, path: '/' },
-  { label: 'Survey Planning', icon: <ContentPasteSearchIcon fontSize="small" />, path: '/surveys' },
-  { label: 'Community Summaries', icon: <BusinessIcon fontSize="small" />, path: '/facilities' },
-  { label: 'Survey Overview', icon: <ScienceIcon fontSize="small" />, path: '/citations-remix' },
-  { label: 'K-Tags', icon: <LocalFireDepartmentIcon fontSize="small" />, path: '/citations-remix/tags/k', indent: true },
-  { label: 'N-Tags (State)', icon: <AccountBalanceIcon fontSize="small" />, path: '/citations-remix/tags/state', indent: true },
-  { label: 'E-Tags', icon: <HealthAndSafetyIcon fontSize="small" />, path: '/citations-remix/tags/e', indent: true },
-  { label: 'Plans of Correction', icon: <AssignmentLateIcon fontSize="small" />, path: '/poc' },
-  { label: 'Trends (Future)', icon: <InsightsIcon fontSize="small" />, path: '/trends' },
+  { label: 'Dashboard', path: '/' },
+  { label: 'Pre-Survey', path: '/surveys' },
+  { label: 'Survey Overviews', path: '/citations-remix' },
+  { label: 'K-Tags', path: '/citations-remix/tags/k', indent: true },
+  { label: 'N-Tags (State)', path: '/citations-remix/tags/state', indent: true },
+  { label: 'E-Tags', path: '/citations-remix/tags/e', indent: true },
+  { label: 'Community Summaries', path: '/facilities' },
+  { label: 'Plans of Correction (Future)', path: '/poc' },
+  { label: 'Trends (Future)', path: '/trends' },
 ];
 
-const toolsLabelToPath: Record<string, string> = {};
+const toolsLabelToPath: Record<string, string> = {
+  'Citations Dashboard': '/',
+};
 
 // ─── Menu styles ─────────────────────────────────────────
 const menuPaperSx = {
@@ -139,6 +132,7 @@ function NavDropdownMenu({
       anchorEl={anchor}
       open={Boolean(anchor)}
       onClose={onClose}
+      autoFocus={false}
       slotProps={{ paper: { sx: menuPaperSx } }}
     >
       {items.map((item, i) => {
@@ -219,8 +213,6 @@ export default function AppLayout({
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  const isHome = location.pathname === '/';
-
   const activeSidePath = sideNavItems.find((item) => {
     if (item.path === '/') return location.pathname === '/';
     if (item.path === '/facilities') return location.pathname.startsWith('/facilities') || location.pathname.startsWith('/facility/');
@@ -232,10 +224,9 @@ export default function AppLayout({
   })?.path || '/';
 
   const isNavItemActive = (item: NavItemDef): boolean => {
+    if (item.label === 'Home' || item.label === 'Tools') return false;
     if (corpConfigActive && item.isConfigurations) return true;
-    if (item.label === 'Home') return isHome && !corpConfigActive;
-    if (item.label === 'Tools') return clickedItem === 'Tools' && !corpConfigActive;
-    if (item.isConfigurations) return clickedItem === 'Configurations' && !isHome;
+    if (item.isConfigurations) return clickedItem === 'Configurations';
     return clickedItem === item.label && !corpConfigActive;
   };
 
@@ -268,32 +259,13 @@ export default function AppLayout({
           {/* Logo */}
           <Box
             onClick={() => { setClickedItem(null); onCorpConfigClose?.(); navigate('/'); }}
-            sx={{ display: 'flex', alignItems: 'center', px: 2, mr: 0.5, flexShrink: 0, cursor: 'pointer' }}
+            sx={{ display: 'flex', alignItems: 'center', px: 2, flexShrink: 0, cursor: 'pointer' }}
           >
             <TelsLogo />
           </Box>
 
-          {/* Vertical rule + app title (when not home context) */}
-          {!isHome && (
-            <>
-              <Box sx={{ width: '1px', height: 24, bgcolor: '#e0e4e7', flexShrink: 0 }} />
-              <Typography sx={{
-                fontFamily: '"Inter", sans-serif',
-                fontWeight: 700,
-                fontSize: '18px',
-                letterSpacing: '-0.252px',
-                color: '#293036',
-                ml: 1.5,
-                mr: 0.5,
-                flexShrink: 0,
-              }}>
-                Citations
-              </Typography>
-            </>
-          )}
-
           {/* Nav Items */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%', ml: isHome ? 0 : 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%' }}>
             {topNavItems.map((item) => {
               const isActive = isNavItemActive(item);
               const isOpen = dropdownAnchor?.label === item.label;
@@ -309,7 +281,7 @@ export default function AppLayout({
                 >
                   <Box sx={{
                     display: 'flex', alignItems: 'center',
-                    px: '10px', height: '44px', borderRadius: '4px',
+                    pl: '10px', pr: '12px', height: '44px', borderRadius: '4px',
                     bgcolor: isActive ? 'rgba(0,101,189,0.08)' : 'transparent',
                     '&:hover': { bgcolor: isActive ? 'rgba(0,101,189,0.12)' : 'rgba(103,119,135,0.08)' },
                   }}>
@@ -454,9 +426,6 @@ export default function AppLayout({
                     '&:hover': { bgcolor: 'rgba(103,119,135,0.08)' },
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: (item as any).indent ? 28 : 36, color: isActive ? '#0065BD' : '#5c6874' }}>
-                    {item.icon}
-                  </ListItemIcon>
                   <ListItemText
                     primary={item.label}
                     primaryTypographyProps={{
