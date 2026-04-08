@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Toolbar, Typography, Box, List, ListItemButton,
-  ListItemIcon, ListItemText, IconButton, Divider,
+  ListItemIcon, ListItemText, IconButton, Divider, Menu, MenuItem,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
@@ -40,13 +40,12 @@ const sideNavItems = [
   { label: 'Trends (Future)', icon: <InsightsIcon fontSize="small" />, path: '/trends' },
 ];
 
-// TELS logo as text (matches Figma: bold, dark)
-const telsLogoUrl = 'https://www.figma.com/api/mcp/asset/d2f14079-d1af-4545-8155-5b8d58bf47c7';
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const mainRef = useRef<HTMLDivElement>(null);
+  const [toolsAnchor, setToolsAnchor] = useState<null | HTMLElement>(null);
 
   // Scroll to top on route change
   useEffect(() => {
@@ -111,11 +110,11 @@ export default function AppLayout() {
               return (
                 <Box
                   key={tab.label}
-                  onClick={() => tab.path && navigate(tab.path)}
+                  onClick={(e) => tab.dropdown ? setToolsAnchor(e.currentTarget) : tab.path && navigate(tab.path)}
                   sx={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center',
                     height: '100%', justifyContent: 'center', position: 'relative',
-                    cursor: tab.path ? 'pointer' : 'default',
+                    cursor: 'pointer',
                   }}
                 >
                   <Box
@@ -127,6 +126,7 @@ export default function AppLayout() {
                   >
                     <Typography
                       sx={{
+                        fontFamily: '"Inter", sans-serif',
                         fontSize: '16px',
                         fontWeight: isActive ? 700 : 500,
                         color: '#293036',
@@ -139,7 +139,6 @@ export default function AppLayout() {
                     </Typography>
                     {tab.dropdown && <KeyboardArrowDownIcon sx={{ color: '#293036', fontSize: 20, ml: -0.25 }} />}
                   </Box>
-                  {/* Selection indicator */}
                   {isActive && (
                     <Box sx={{
                       position: 'absolute', bottom: 0, left: 14, right: 14,
@@ -150,6 +149,38 @@ export default function AppLayout() {
               );
             })}
           </Box>
+
+          {/* Tools Dropdown Menu */}
+          <Menu
+            anchorEl={toolsAnchor}
+            open={Boolean(toolsAnchor)}
+            onClose={() => setToolsAnchor(null)}
+            slotProps={{ paper: { sx: { mt: 0.5, minWidth: 220, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid #E0E4E7' } } }}
+          >
+            {sideNavItems.map((item) => (
+              <MenuItem
+                key={item.path}
+                onClick={() => { navigate(item.path); setToolsAnchor(null); }}
+                selected={activeSidePath === item.path}
+                sx={{
+                  fontFamily: '"Inter", sans-serif',
+                  fontSize: '0.875rem',
+                  fontWeight: activeSidePath === item.path ? 600 : 400,
+                  color: activeSidePath === item.path ? '#0065BD' : '#293036',
+                  pl: (item as { indent?: boolean }).indent ? 4 : 2,
+                  py: 1,
+                  gap: 1.5,
+                  '&.Mui-selected': { bgcolor: '#EFF6FF' },
+                  '&:hover': { bgcolor: '#F8FAFC' },
+                }}
+              >
+                <Box sx={{ color: activeSidePath === item.path ? '#0065BD' : '#5c6874', display: 'flex', alignItems: 'center' }}>
+                  {item.icon}
+                </Box>
+                {item.label}
+              </MenuItem>
+            ))}
+          </Menu>
 
           <Box sx={{ flexGrow: 1 }} />
 
