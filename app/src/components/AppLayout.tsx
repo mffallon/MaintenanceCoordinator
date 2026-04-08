@@ -40,16 +40,17 @@ interface AppLayoutProps {
 
 // ─── Nav definitions ─────────────────────────────────────
 const toolsDropdown: DropdownItem[] = [
-  { divider: true, sectionLabel: 'Citations' },
-  { label: 'Dashboard' },
-  { label: 'Survey Planning' },
-  { label: 'Community Summaries' },
-  { label: 'Survey Overview' },
-  { label: 'K-Tags' },
-  { label: 'N-Tags (State)' },
-  { label: 'E-Tags' },
-  { label: 'Plans of Correction' },
-  { label: 'Trends (Future)' },
+  { label: 'Assets - Compliance' },
+  { label: 'Assets (Current)' },
+  { label: 'Capital' },
+  { label: 'Capital Planning' },
+  { label: 'Citations Dashboard' },
+  { label: 'Facility Service Coverage' },
+  { label: 'Interactive Reporting' },
+  { label: 'News Message Manager' },
+  { label: 'Onboard New Facility' },
+  { label: 'Site Visit Checklist' },
+  { label: 'Unit Turns (Current)' },
 ];
 
 const topNavItems: NavItemDef[] = [
@@ -77,17 +78,7 @@ const sideNavItems = [
   { label: 'Trends (Future)', icon: <InsightsIcon fontSize="small" />, path: '/trends' },
 ];
 
-const toolsLabelToPath: Record<string, string> = {
-  'Dashboard': '/',
-  'Survey Planning': '/surveys',
-  'Community Summaries': '/facilities',
-  'Survey Overview': '/citations-remix',
-  'K-Tags': '/citations-remix/tags/k',
-  'N-Tags (State)': '/citations-remix/tags/state',
-  'E-Tags': '/citations-remix/tags/e',
-  'Plans of Correction': '/poc',
-  'Trends (Future)': '/trends',
-};
+const toolsLabelToPath: Record<string, string> = {};
 
 // ─── Menu styles ─────────────────────────────────────────
 const menuPaperSx = {
@@ -218,7 +209,7 @@ export default function AppLayout({
   const location = useLocation();
   const mainRef = useRef<HTMLDivElement>(null);
 
-  const [clickedItem, setClickedItem] = useState<string | null>('Tools');
+  const [clickedItem, setClickedItem] = useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<{ label: string; el: HTMLElement } | null>(null);
   const [helpAnchor, setHelpAnchor] = useState<null | HTMLElement>(null);
   const [personAnchor, setPersonAnchor] = useState<null | HTMLElement>(null);
