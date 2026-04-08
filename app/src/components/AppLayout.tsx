@@ -21,10 +21,10 @@ const SIDENAV_WIDTH = 256;
 
 // Top nav tabs (Level 1)
 const topTabs = [
-  { label: 'Home', path: null },
-  { label: 'Citations', path: '/' },
-  { label: 'Reports', path: null },
-  { label: 'Configurations', path: null },
+  { label: 'Home', path: null, dropdown: false },
+  { label: 'Reports', path: null, dropdown: false },
+  { label: 'Tools', path: '/', dropdown: true },
+  { label: 'Configurations', path: null, dropdown: false },
 ];
 
 // Side nav items (Level 2) — flat list
@@ -83,45 +83,29 @@ export default function AppLayout() {
         }}
       >
         <Toolbar sx={{ minHeight: '60px !important', px: 1, gap: 1 }}>
-          {/* TELS Logo + Command Center */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mr: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, flexShrink: 0 }}>
-              <img
-                src={telsLogoUrl}
-                alt="TELS"
-                style={{ height: 20, width: 106, objectFit: 'contain' }}
-                onError={(e) => {
-                  // Fallback if Figma asset expires
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  (e.target as HTMLImageElement).parentElement!.querySelector('.tels-fallback')?.removeAttribute('style');
-                }}
-              />
-              <Typography
-                className="tels-fallback"
-                sx={{ display: 'none', fontWeight: 800, fontSize: '1.1rem', color: '#293036', letterSpacing: '-0.5px' }}
-              >
-                TELS
-              </Typography>
-            </Box>
-            <Box
-              sx={{
-                display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer',
-                px: 1.25, py: 1.25, borderRadius: '4px',
-                '&:hover': { bgcolor: 'rgba(103,119,135,0.08)' },
+          {/* TELS Logo */}
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 2, mr: 1, flexShrink: 0 }}>
+            <img
+              src={telsLogoUrl}
+              alt="TELS"
+              style={{ height: 20, width: 106, objectFit: 'contain' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+                (e.target as HTMLImageElement).parentElement!.querySelector('.tels-fallback')?.removeAttribute('style');
               }}
+            />
+            <Typography
+              className="tels-fallback"
+              sx={{ display: 'none', fontWeight: 800, fontSize: '1.1rem', color: '#293036', letterSpacing: '-0.5px' }}
             >
-              <Typography sx={{ fontWeight: 700, fontSize: '18px', color: '#293036', letterSpacing: '-0.25px' }}>
-                Command Center
-              </Typography>
-              <KeyboardArrowDownIcon sx={{ color: '#293036', fontSize: 24 }} />
-            </Box>
+              TELS
+            </Typography>
           </Box>
 
           {/* Main Nav Tabs */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%' }}>
             {topTabs.map((tab) => {
-              const isActive = tab.label === 'Citations' && isOnCitations;
-              const hasDrop = false; // no dropdowns in prototype
+              const isActive = tab.label === 'Tools' && isOnCitations;
               return (
                 <Box
                   key={tab.label}
@@ -151,7 +135,7 @@ export default function AppLayout() {
                     >
                       {tab.label}
                     </Typography>
-                    {hasDrop && <KeyboardArrowDownIcon sx={{ color: '#293036', fontSize: 24, ml: -0.25 }} />}
+                    {tab.dropdown && <KeyboardArrowDownIcon sx={{ color: '#293036', fontSize: 20, ml: -0.25 }} />}
                   </Box>
                   {/* Selection indicator */}
                   {isActive && (
