@@ -47,7 +47,8 @@ export default function CitationsRemix() {
   const [viewMenuAnchor, setViewMenuAnchor] = useState<null | HTMLElement>(null);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
   const [selectedSurveyor, setSelectedSurveyor] = useState<string | null>(null);
-  const [surveyorFilter, setSurveyorFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
+  const [latestOnly, setLatestOnly] = useState(true);
   const [tagDrawer, setTagDrawer] = useState<{ row: SurveyRow; tagType: 'K' | 'State' | 'E' | 'All' } | null>(null);
 
   // Build survey-level rows directly from Avir survey data
@@ -72,13 +73,22 @@ export default function CitationsRemix() {
       }));
   }, [passesFilter, dateRange]);
 
-  const surveyors = useMemo(() =>
-    [...new Set(allRows.map((r) => r.surveyor).filter((s) => s && s !== '—'))].sort(),
+  const regions = useMemo(() =>
+    [...new Set(allRows.map((r) => r.region).filter(Boolean))].sort(),
   [allRows]);
 
-  const filteredRows = useMemo(() =>
-    surveyorFilter ? allRows.filter((r) => r.surveyor === surveyorFilter) : allRows,
-  [allRows, surveyorFilter]);
+  const filteredRows = useMemo(() => {
+    let rows = regionFilter ? allRows.filter((r) => r.region === regionFilter) : allRows;
+    if (latestOnly) {
+      const latestByFacility = new Map<string, string>();
+      rows.forEach((r) => {
+        const current = latestByFacility.get(r.facilityId);
+        if (!current || r.surveyDate > current) latestByFacility.set(r.facilityId, r.surveyDate);
+      });
+      rows = rows.filter((r) => latestByFacility.get(r.facilityId) === r.surveyDate);
+    }
+    return rows;
+  }, [allRows, regionFilter, latestOnly]);
 
   const toggleCol = (col: string) => {
     setHiddenCols((prev) => {
@@ -186,7 +196,7 @@ export default function CitationsRemix() {
     ];
   }, [filteredRows]);
 
-  const deficiencyFreeCount = useMemo(() => allRows.filter((r) => r.totalCitations === 0 && !r.isPending).length, [allRows]);
+  const deficiencyFreeCount = useMemo(() => filteredRows.filter((r) => r.totalCitations === 0 && !r.isPending).length, [filteredRows]);
 
   // Build a filter for the previous equivalent period
   const prevPeriodFilter = useMemo((): ((dateStr: string) => boolean) | null => {
@@ -224,7 +234,7 @@ export default function CitationsRemix() {
     const filtered = avirCitations.filter((c) =>
       passesFilter(c.facilityId) &&
       passesDate(c.date) &&
-      (!surveyorFilter || filteredRows.some((r) => r.facilityId === c.facilityId && r.surveyDate === c.date))
+      (!regionFilter || filteredRows.some((r) => r.facilityId === c.facilityId && r.surveyDate === c.date))
     );
     const map = new Map<string, { count: number; description: string; type: string }>();
     filtered.forEach((c) => {
@@ -248,7 +258,7 @@ export default function CitationsRemix() {
       tag, ...v,
       prevCount: prevPeriodFilter ? (prevMap.get(tag) ?? null) : null,
     }));
-  }, [filteredRows, passesFilter, dateRange, surveyorFilter, prevPeriodFilter]);
+  }, [filteredRows, passesFilter, dateRange, regionFilter, prevPeriodFilter]);
 
   return (
     <Box>
@@ -257,15 +267,22 @@ export default function CitationsRemix() {
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         extraFilters={
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Surveyor</InputLabel>
-            <Select value={surveyorFilter} label="Surveyor" onChange={(e) => setSurveyorFilter(e.target.value)}>
-              <MenuItem value="">All surveyors</MenuItem>
-              {surveyors.map((s) => (
-                <MenuItem key={s} value={s}>{s}</MenuItem>
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel>CMS Region</InputLabel>
+            <Select value={regionFilter} label="CMS Region" onChange={(e) => setRegionFilter(e.target.value)}>
+              <MenuItem value="">All regions</MenuItem>
+              {regions.map((r) => (
+                <MenuItem key={r} value={r}>{r}</MenuItem>
               ))}
             </Select>
           </FormControl>
+        }
+        afterFilters={
+          <FormControlLabel
+            control={<Switch checked={latestOnly} onChange={(e) => setLatestOnly(e.target.checked)} size="small" />}
+            label={<Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: '#293036' }}>Latest survey only</Typography>}
+            sx={{ ml: 0.5 }}
+          />
         }
         actions={
           <Button size="small" variant="contained" color="inherit" disableElevation startIcon={<FileDownloadIcon />}>

@@ -6,12 +6,13 @@ interface Props {
   dateRange?: string;
   onDateRangeChange?: (value: string) => void;
   extraFilters?: ReactNode;
+  afterFilters?: ReactNode;
   actions?: ReactNode;
 }
 
-export default function PageFilters({ dateRange, onDateRangeChange, extraFilters, actions }: Props) {
+export default function PageFilters({ dateRange, onDateRangeChange, extraFilters, afterFilters, actions }: Props) {
   return (
-    <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'flex-end' }}>
+    <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
       <Box sx={{ minWidth: 280 }}>
         <CommunityFilter />
       </Box>
@@ -33,6 +34,7 @@ export default function PageFilters({ dateRange, onDateRangeChange, extraFilters
           </Select>
         </FormControl>
       )}
+      {afterFilters}
       {actions && (
         <>
           <Box sx={{ flexGrow: 1 }} />

@@ -91,8 +91,6 @@ export default function SurveyManagement() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
   const [search, setSearch] = useState('');
-  const [dateRange, setDateRange] = useState('all');
-
   const rows = useMemo(() => {
     return allUpcomingRows.filter((r) => {
       if (!passesFilter(r.facilityId)) return false;
@@ -163,7 +161,7 @@ export default function SurveyManagement() {
   return (
     <Box>
       <PageHeader title="Survey Planning" />
-      <PageFilters dateRange={dateRange} onDateRangeChange={setDateRange} />
+      <PageFilters />
 
       {/* Summary callouts */}
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>

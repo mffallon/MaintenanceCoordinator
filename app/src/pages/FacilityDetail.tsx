@@ -200,7 +200,7 @@ function SurveyPrepContent({ facility, facCitations, facSurveys }: {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <TrendingUpIcon sx={{ color: '#DC2626', fontSize: 20 }} />
           <Box>
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>Surveyor Focus Areas</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>{facility.region} Focus Areas</Typography>
             <Typography variant="caption" sx={{ color: '#64748B' }}>Tags most cited across the portfolio in the past 3 months</Typography>
           </Box>
         </Box>
