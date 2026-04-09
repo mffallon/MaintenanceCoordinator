@@ -306,7 +306,13 @@ export default function CitationsRemix() {
             p: 2, flex: 1, borderRadius: 3, border: '1px solid #E0E4E7',
             cursor: 'pointer', transition: 'box-shadow 0.15s',
             '&:hover': { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-          }} onClick={() => navigate(`/citations-remix/tags/${t.type.toLowerCase()}`)}>
+          }} onClick={() => {
+            const params = new URLSearchParams();
+            if (dateRange) params.set('dateRange', dateRange);
+            if (regionFilter) params.set('region', regionFilter);
+            if (latestOnly) params.set('latestOnly', '1');
+            navigate(`/citations-remix/tags/${t.type.toLowerCase()}?${params.toString()}`);
+          }}>
             <Typography variant="caption" sx={{ fontWeight: 600, color: '#5c6874' }}>{t.label}</Typography>
             <Typography variant="h4" sx={{ fontWeight: 800, my: 0.5 }}>{t.count}</Typography>
             <Typography variant="caption" color="text.secondary">{t.subtitle}</Typography>

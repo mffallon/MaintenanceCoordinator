@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import {
   Box, Typography, Paper, Chip, LinearProgress, Divider, Drawer, IconButton,
   Table, TableBody, TableCell, TableHead, TableRow,
-  Autocomplete, TextField,
+  Autocomplete, TextField, FormControl, InputLabel, Select, MenuItem,
+  FormControlLabel, Switch,
 } from '@mui/material';
 import { DataGridPro } from '@mui/x-data-grid-pro';
 import type { GridColDef } from '@mui/x-data-grid-pro';
@@ -28,9 +29,12 @@ const typeLabels: Record<string, { title: string; subtitle: string }> = {
 export default function TagTypeDetail() {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { passesFilter } = useCommunityFilter();
   const info = typeLabels[type || ''] || typeLabels.k;
-  const [dateRange, setDateRange] = useState('all');
+  const [dateRange, setDateRange] = useState(searchParams.get('dateRange') || 'all');
+  const [regionFilter, setRegionFilter] = useState(searchParams.get('region') || '');
+  const [latestOnly, setLatestOnly] = useState(searchParams.get('latestOnly') === '1');
   const [drawerCitation, setDrawerCitation] = useState<{ tag: string; facility: string; facilityId: string; date: string; region: string; surveyor: string; description: string; observation: string; status: string } | null>(null);
 
   // Look up citation detail from citations array
@@ -64,17 +68,34 @@ export default function TagTypeDetail() {
     );
   }, [rawHistory, passesFilter, dateRange, waiverFacilityDates]);
 
+  const regions = useMemo(() =>
+    [...new Set(filteredHistory.map((h) => h.region).filter(Boolean))].sort(),
+  [filteredHistory]);
+
+  const displayedHistory = useMemo(() => {
+    let rows = regionFilter ? filteredHistory.filter((h) => h.region === regionFilter) : filteredHistory;
+    if (latestOnly) {
+      const latestByFacility = new Map<string, string>();
+      rows.forEach((h) => {
+        const current = latestByFacility.get(h.facilityId);
+        if (!current || h.date > current) latestByFacility.set(h.facilityId, h.date);
+      });
+      rows = rows.filter((h) => latestByFacility.get(h.facilityId) === h.date);
+    }
+    return rows;
+  }, [filteredHistory, regionFilter, latestOnly]);
+
   // Collect all unique tags across filtered rows for dynamic columns
   const allUniqueTags = useMemo(() => {
     const tagSet = new Set<string>();
-    filteredHistory.forEach((h) => h.citedTags.forEach((t) => tagSet.add(t)));
+    displayedHistory.forEach((h) => h.citedTags.forEach((t) => tagSet.add(t)));
     return [...tagSet].sort((a, b) => {
       // Sort by numeric portion
       const numA = parseInt(a.replace(/[^0-9]/g, ''), 10);
       const numB = parseInt(b.replace(/[^0-9]/g, ''), 10);
       return numA - numB;
     });
-  }, [filteredHistory]);
+  }, [displayedHistory]);
 
   // Build columns: fixed + dynamic tag columns
   const columns: GridColDef[] = useMemo(() => {
@@ -141,7 +162,7 @@ export default function TagTypeDetail() {
 
   // Build rows with dynamic tag fields
   const rows = useMemo(() => {
-    const dataRows = filteredHistory.map((h) => {
+    const dataRows = displayedHistory.map((h) => {
       const row: Record<string, unknown> = {
         id: h.id,
         date: h.date,
@@ -161,7 +182,7 @@ export default function TagTypeDetail() {
     });
 
     return dataRows;
-  }, [filteredHistory, allUniqueTags]);
+  }, [displayedHistory, allUniqueTags]);
 
   // Pinned totals row
   const pinnedRows = useMemo(() => {
@@ -246,7 +267,28 @@ export default function TagTypeDetail() {
           />
         }
       />
-      <PageFilters dateRange={dateRange} onDateRangeChange={setDateRange} />
+      <PageFilters
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        extraFilters={
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel>CMS Region</InputLabel>
+            <Select value={regionFilter} label="CMS Region" onChange={(e) => setRegionFilter(e.target.value)}>
+              <MenuItem value="">All regions</MenuItem>
+              {regions.map((r) => (
+                <MenuItem key={r} value={r}>{r}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        }
+        afterFilters={
+          <FormControlLabel
+            control={<Switch checked={latestOnly} onChange={(e) => setLatestOnly(e.target.checked)} size="small" />}
+            label={<Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: '#293036' }}>Latest survey only</Typography>}
+            sx={{ ml: 0.5 }}
+          />
+        }
+      />
 
 
       {/* Most Cited Tags — Top 5 */}
@@ -319,12 +361,12 @@ export default function TagTypeDetail() {
       {/* Summary */}
       <Paper sx={{ px: 2, py: 1, borderRadius: '12px 12px 0 0', border: '1px solid #E0E4E7', borderBottom: 'none', bgcolor: '#FAFBFC' }}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {filteredHistory.length} surveys
+          {displayedHistory.length} surveys
           <Typography component="span" variant="body2" sx={{ color: '#5c6874', ml: 1 }}>
-            across {new Set(filteredHistory.map((h) => h.facilityId)).size} facilities
+            across {new Set(displayedHistory.map((h) => h.facilityId)).size} facilities
           </Typography>
           <Typography component="span" variant="body2" sx={{ color: '#5c6874', ml: 1 }}>
-            · {allUniqueTags.length} unique tags · {filteredHistory.reduce((s, h) => s + h.total, 0)} total citations
+            · {allUniqueTags.length} unique tags · {displayedHistory.reduce((s, h) => s + h.total, 0)} total citations
           </Typography>
         </Typography>
       </Paper>
