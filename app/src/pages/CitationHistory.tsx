@@ -239,10 +239,10 @@ export default function CitationHistory() {
           columns={columns}
           rowHeight={60}
           initialState={{
-            pagination: { paginationModel: { pageSize: 25 } },
+            pagination: { paginationModel: { pageSize: 15 } },
             sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
           }}
-          pageSizeOptions={[10, 25, 50, 100]}
+          pageSizeOptions={[15, 25, 50, 100]}
           disableRowSelectionOnClick
           disableColumnMenu
           onRowClick={(params) => navigate(`/facility/${params.row.facilityId}`)}

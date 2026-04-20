@@ -12,3 +12,14 @@ body {
 .MuiDataGrid-sortButton:hover {
   background: rgba(0, 0, 0, 0.04) !important;
 }
+
+/* Hide MUI X Pro license watermark */
+.MuiDataGrid-main > div:last-child:not([class*="MuiDataGrid"]) {
+  display: none !important;
+}
+[class*="MuiDataGrid"] + div[style*="position"] {
+  display: none !important;
+}
+div[class^="css-"][style*="z-index: 100000"] {
+  display: none !important;
+}

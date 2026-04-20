@@ -1,81 +1,20 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Grid, Typography, TextField, Button, Chip, FormControl, InputLabel,
-  Select, MenuItem, Switch, FormControlLabel, IconButton, Tooltip, Paper,
-  Menu, ListItemIcon, ListItemText, Divider, InputAdornment,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination,
-  LinearProgress,
+  Box, Grid, Typography, Button, Chip, IconButton, Paper, ButtonBase,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
-import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import { BarChart } from '@mui/x-charts';
-import { LineChart as MuiLineChart } from '@mui/x-charts';
-import BusinessIcon from '@mui/icons-material/Business';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import TaskAltIcon from '@mui/icons-material/TaskAlt';
-import ShieldIcon from '@mui/icons-material/Shield';
-import StarIcon from '@mui/icons-material/Star';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import CategoryIcon from '@mui/icons-material/Category';
-import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
-import AddTaskIcon from '@mui/icons-material/AddTask';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import SummaryCard from '../components/SummaryCard';
 import PageHeader from '../components/PageHeader';
 import PageFilters from '../components/PageFilters';
 import { useCommunityFilter } from '../components/CommunityFilter';
-import { facilities, citations, surveys, regions as avirRegions } from '../data/avir-data';
+import { facilities, citations, surveys } from '../data/avir-data';
 import { effectiveLastSurveyDate } from '../utils/surveyWindowOverrides';
-import EventNoteIcon from '@mui/icons-material/EventNote';
-import type { AvirFacility, AvirSurvey } from '../data/avir-data';
+import type { AvirSurvey } from '../data/avir-data';
 import { fmtDate } from '../utils/formatDate';
 import { makeDateFilter } from '../utils/dateFilter';
-
-// Build survey trend data grouped by month (accepts filtered surveys)
-function buildSurveyTrends(filteredSurveys: AvirSurvey[]) {
-  const monthMap = new Map<string, { month: string; kTags: number; nTags: number; eTags: number; total: number; surveys: number }>();
-  for (const s of filteredSurveys) {
-    if (!s.date) continue;
-    const d = new Date(s.date);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    if (!monthMap.has(key)) {
-      monthMap.set(key, { month: label, kTags: 0, nTags: 0, eTags: 0, total: 0, surveys: 0 });
-    }
-    const m = monthMap.get(key)!;
-    m.kTags += s.kTags;
-    m.nTags += s.nTags;
-    m.eTags += s.eTags;
-    m.total += s.total;
-    m.surveys += 1;
-  }
-  return [...monthMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
-}
-
-// Build tag type breakdown by region for bar chart (accepts filtered facilities)
-function buildRegionBreakdown(filteredFacilities: AvirFacility[]) {
-  const regionMap = new Map<string, { region: string; kTags: number; nTags: number; eTags: number }>();
-  for (const fac of filteredFacilities) {
-    if (!regionMap.has(fac.region)) {
-      regionMap.set(fac.region, { region: fac.region, kTags: 0, nTags: 0, eTags: 0 });
-    }
-    const r = regionMap.get(fac.region)!;
-    r.kTags += fac.totalKTags;
-    r.nTags += fac.totalNTags;
-    r.eTags += fac.totalETags;
-  }
-  return [...regionMap.values()].sort((a, b) => (b.kTags + b.nTags + b.eTags) - (a.kTags + a.nTags + a.eTags));
-}
 
 // Upcoming survey window data (mirrors SurveyManagement overrides)
 const TODAY_DASH = new Date('2026-04-05');
@@ -117,67 +56,90 @@ function UpcomingSurveysPanel() {
   const rows = upcomingSurveyRows.filter((r) => passesFilter(r.id));
   if (rows.length === 0) return null;
 
-  const statusColors: Record<string, { color: string; bg: string; border: string }> = {
-    'Overdue':  { color: '#991B1B', bg: '#FEE2E2', border: '#FECACA' },
-    'Due Soon': { color: '#92400E', bg: '#FEF3C7', border: '#FDE68A' },
-    'Upcoming': { color: '#1E40AF', bg: '#DBEAFE', border: '#BFDBFE' },
-  };
-
   return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <EventNoteIcon sx={{ color: '#0065BD' }} />
-          <Typography variant="h6">Upcoming Surveys — Next 90 Days</Typography>
-          <Chip label={`${rows.length} communities`} size="small" color="primary" />
-        </Box>
-        <Button variant="text" size="small" onClick={() => navigate('/surveys')}>View all →</Button>
+    <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}>
+        <Typography sx={{ fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
+          <Box component="span" sx={{ fontWeight: 700 }}>Upcoming surveys</Box>
+          <Box component="span" sx={{ fontWeight: 400 }}> - Next 90 days</Box>
+        </Typography>
+        <Button variant="text" size="medium" onClick={() => navigate('/surveys')}
+          endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+          sx={{ fontWeight: 600, fontSize: '16px', color: '#0065BD', letterSpacing: '-0.176px' }}>
+          Pre-surveys
+        </Button>
       </Box>
-      <TableContainer>
+      <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
         <Table size="small">
-          <TableHead>
+          <TableHead sx={{ bgcolor: '#e0e4e7' }}>
+            {/* Group header row */}
             <TableRow>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 160 }}>Window Opens</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 140 }}>Surveyor</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 110 }} align="right">Prev. Citations</TableCell>
-              <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 90 }} align="right">Alerts</TableCell>
-              <TableCell sx={{ bgcolor: '#e0e4e7', width: 32, px: 0 }} />
+              <TableCell colSpan={2} sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '3px', px: 2, borderBottom: '1px solid rgba(41,48,54,0.15)', textAlign: 'center' }}>
+                Survey Window
+              </TableCell>
+              <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+              <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+              <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+              <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+              <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+            </TableRow>
+            {/* Sub-header row */}
+            <TableRow>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, whiteSpace: 'nowrap', width: 150 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                  Days until open
+                  <ArrowDownwardIcon sx={{ fontSize: 16, color: '#293036' }} />
+                </Box>
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 110, textAlign: 'center' }}>Open date</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 150 }}>Surveyor</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 130 }} align="right">Prev. Citations</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">Alerts</TableCell>
+              <TableCell sx={{ bgcolor: '#e0e4e7', width: 48, px: 0 }} />
             </TableRow>
           </TableHead>
-          <TableBody>
-            {rows.map((r) => {
-              const sc = statusColors[r.status] || statusColors['Upcoming'];
+          <TableBody sx={{ bgcolor: 'white' }}>
+            {rows.map((r, idx) => {
+              const isOverdue = r.status === 'Overdue';
+              const isDueSoon = r.status === 'Due Soon';
+              const borderColor = isOverdue ? '#D32F2F' : isDueSoon ? '#ED6C02' : '#FDE68A';
+              const isLast = idx === rows.length - 1;
               return (
-                <TableRow key={r.id} hover sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
+                <TableRow key={r.id} hover sx={{
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: '#F0F7FF' },
+                  bgcolor: (isOverdue || isDueSoon) ? '#FFF5F5' : 'inherit',
+                  ...(isLast && { '& td': { borderBottom: 'none' } }),
+                }}
                   onClick={() => navigate(`/surveys/${r.id}`)}>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{fmtDate(r.windowStart)}</Typography>
-                    {r.daysUntilDue <= 30
-                      ? <Chip label={`${r.daysUntilDue} days away`} size="small" sx={{ mt: 0.25, fontWeight: 700, fontSize: '0.68rem', bgcolor: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, height: 18 }} />
-                      : <Typography variant="caption" sx={{ color: '#64748B' }}>{r.daysUntilDue} days away</Typography>
-                    }
+                  <TableCell align="center" sx={{ boxShadow: `inset 4px 0 0 0 ${borderColor}` }}>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.daysUntilDue}</Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{fmtDate(r.windowStart)}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036' }}>
                       {r.name.replace('Avir at ', '')}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748B' }}>{r.region}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.region}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption">{r.lastSurveyor}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.lastSurveyor}</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{r.prevCitations}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.prevCitations}</Typography>
                   </TableCell>
-                  <TableCell align="right">
-                    {r.alerts > 0
-                      ? <Chip label={r.alerts} size="small" sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: '#FEE2E2', color: '#991B1B', minWidth: 32 }} />
-                      : <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
-                    }
+                  <TableCell align="right" sx={r.alerts > 0 ? { bgcolor: '#FEE2E2' } : {}}>
+                    <Typography sx={{ fontSize: '14px', fontWeight: r.alerts > 0 ? 700 : 400, color: r.alerts > 0 ? '#991B1B' : '#293036' }}>
+                      {r.alerts}
+                    </Typography>
                   </TableCell>
-                  <TableCell sx={{ px: 0 }}>
-                    <ChevronRightIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
+                  <TableCell sx={{ px: 1 }}>
+                    <IconButton size="small">
+                      <ArrowForwardIcon sx={{ fontSize: 18, color: '#293036' }} />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               );
@@ -207,66 +169,79 @@ function RecentlyCompletedSurveys() {
   }, [passesFilter]);
 
   return (
-    <Paper sx={{ p: 2.5, mb: 3, borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <AssignmentIcon sx={{ color: '#0065BD' }} />
-          <Typography variant="h6">Recently Completed Surveys</Typography>
-          <Chip label="Last 30 days" size="small" color="primary" />
-        </Box>
-        <Button variant="text" size="small" onClick={() => navigate('/citations-remix')} sx={{ fontWeight: 600, fontSize: '0.8rem' }}>View all →</Button>
+    <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.5 }}>
+        <Typography sx={{ fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
+          <Box component="span" sx={{ fontWeight: 700 }}>Completed surveys</Box>
+          <Box component="span" sx={{ fontWeight: 400 }}> - Last 30 days</Box>
+        </Typography>
+        <Button variant="text" size="medium" onClick={() => navigate('/citations-remix')}
+          endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+          sx={{ fontWeight: 600, fontSize: '16px', color: '#0065BD', letterSpacing: '-0.176px' }}>
+          All surveys
+        </Button>
       </Box>
 
       {recentSurveys.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+        <Typography sx={{ py: 3, textAlign: 'center', fontSize: '14px', color: '#64748B' }}>
           No surveys completed in the last 30 days
         </Typography>
       ) : (
-        <TableContainer>
+        <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 110 }}>Survey Date</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 140 }}>Surveyor</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 70 }} align="right">K</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 70 }} align="right">N</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 70 }} align="right">E</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">Total</TableCell>
-                <TableCell sx={{ bgcolor: '#e0e4e7', width: 32, px: 0 }} />
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 160 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
+                    Survey date
+                    <ArrowDownwardIcon sx={{ fontSize: 16, color: '#293036' }} />
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 160 }}>Surveyor</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">K-Tags</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">N-Tags</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">E-Tags</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">Total</TableCell>
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 48, px: 0 }} />
               </TableRow>
             </TableHead>
-            <TableBody>
-              {recentSurveys.map((srv) => (
+            <TableBody sx={{ bgcolor: 'white' }}>
+              {recentSurveys.map((srv, idx) => (
                 <TableRow key={srv.id} hover
-                  sx={{ cursor: 'pointer', '&:hover': { bgcolor: srv.total === 0 ? '#DCFCE7' : '#F0F7FF' }, bgcolor: srv.total === 0 ? '#F0FDF4' : 'inherit' }}
+                  sx={{
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: srv.total === 0 ? '#c7f2df' : '#F0F7FF' },
+                    ...(idx === recentSurveys.length - 1 && { '& td': { borderBottom: 'none' } }),
+                    bgcolor: srv.total === 0 ? '#e3f9ef' : 'inherit',
+                  }}
                   onClick={() => navigate(`/facility/${srv.facilityId}`)}>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(srv.date)}</Typography>
+                  <TableCell align="center">
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{fmtDate(srv.date)}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{srv.facility.replace('Avir at ', '')}</Typography>
-                    <Typography variant="caption" sx={{ color: '#64748B' }}>{srv.region}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036' }}>{srv.facility.replace('Avir at ', '')}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{srv.region}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption">{srv.surveyor || '—'}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{srv.surveyor || '—'}</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: srv.kTags > 0 ? '#DC2626' : '#94A3B8', fontSize: '0.8rem' }}>{srv.kTags || '—'}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.kTags ? '#293036' : '#94A3B8' }}>{srv.kTags || '—'}</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: srv.nTags > 0 ? '#2563EB' : '#94A3B8', fontSize: '0.8rem' }}>{srv.nTags || '—'}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.nTags ? '#293036' : '#94A3B8' }}>{srv.nTags || '—'}</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: srv.eTags > 0 ? '#D97706' : '#94A3B8', fontSize: '0.8rem' }}>{srv.eTags || '—'}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.eTags ? '#293036' : '#94A3B8' }}>{srv.eTags || '—'}</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    {srv.total === 0
-                      ? <Chip label="Def-Free" size="small" sx={{ bgcolor: '#BBF7D0', color: '#166534', fontWeight: 700, fontSize: '0.65rem' }} />
-                      : <Typography variant="body2" sx={{ fontWeight: 700 }}>{srv.total}</Typography>}
+                    <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036' }}>{srv.total}</Typography>
                   </TableCell>
-                  <TableCell sx={{ px: 0 }}>
-                    <ChevronRightIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
+                  <TableCell sx={{ px: 1 }}>
+                    <IconButton size="small">
+                      <ArrowForwardIcon sx={{ fontSize: 18, color: '#293036' }} />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))}
@@ -284,154 +259,140 @@ export default function CitationsDashboard() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
 
-  // Filters
-  const [search, setSearch] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const [showFilters, setShowFilters] = useState(true);
-  const [rowMenuAnchor, setRowMenuAnchor] = useState<null | HTMLElement>(null);
-  const [rowMenuFacId, setRowMenuFacId] = useState<string | null>(null);
-
-  const filtered = useMemo(() => {
-    return facilities.filter((f) => {
-      if (!passesFilter(f.id)) return false;
-      if (search && !f.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (selectedRegion && f.region !== selectedRegion) return false;
-      return true;
-    });
-  }, [search, selectedRegion, passesFilter]);
-
   // Community filtered base datasets
   const communityFacilities = useMemo(() => facilities.filter((f) => passesFilter(f.id)), [passesFilter]);
   const communitySurveys = useMemo(() => surveys.filter((s) => passesFilter(s.facilityId)), [passesFilter]);
   const ytdFilter = useMemo(() => makeDateFilter('ytd'), []);
   const communitySurveysYTD = useMemo(() => communitySurveys.filter((s) => ytdFilter(s.date)), [communitySurveys, ytdFilter]);
-  const communityCitations = useMemo(() => citations.filter((c) => passesFilter(c.facilityId)), [passesFilter]);
 
-  // Summary stats (filtered by community)
+  // Summary stats
   const filteredStats = useMemo(() => ({
-    totalFacilities: communityFacilities.length,
-    surveyedFacilities: communityFacilities.filter((f) => f.surveyed).length,
     totalSurveys: communitySurveysYTD.length,
-    totalCitations: communityCitations.length,
-    totalKTags: communityCitations.filter((c) => c.tagType === 'K').length,
-    totalNTags: communityCitations.filter((c) => c.tagType === 'N').length,
-    totalETags: communityCitations.filter((c) => c.tagType === 'E').length,
     deficiencyFree: communitySurveysYTD.filter((s) => s.total === 0 && !s.isPending).length,
-  }), [communityFacilities, communitySurveysYTD, communityCitations]);
+  }), [communitySurveysYTD]);
 
   const avgCitationsNum = communityFacilities.length > 0 ? communityFacilities.reduce((s, f) => s + f.totalCitations, 0) / communityFacilities.length : 0;
   const avgCitations = avgCitationsNum.toFixed(1);
 
-  // Chart data — trend always shows last 12 months regardless of date filter
-  const last12MonthsCutoff = useMemo(() => {
-    const d = new Date('2026-04-05');
-    d.setMonth(d.getMonth() - 12);
-    return d.toISOString().split('T')[0];
-  }, []);
-  const surveys12m = useMemo(
-    () => surveys.filter((s) => passesFilter(s.facilityId) && s.date >= last12MonthsCutoff),
-    [passesFilter, last12MonthsCutoff],
-  );
-  const surveyTrendData = useMemo(() => buildSurveyTrends(surveys12m), [surveys12m]);
-  const regionBreakdown = useMemo(() => buildRegionBreakdown(communityFacilities), [communityFacilities]);
+  const filteredUpcoming = upcomingSurveyRows.filter((r) => passesFilter(r.id));
+  const upcomingCount = filteredUpcoming.length;
+  const overdueCount = filteredUpcoming.filter((r) => r.status === 'Overdue').length;
+  const upcomingAlerts = filteredUpcoming.reduce((s, r) => s + r.alerts, 0);
 
-  const resetFilters = () => {
-    setSearch(''); setSelectedRegion('');
+  // Card styles matching Figma node 2824:127663
+  // Outer: gray75 bg with gray100 border, rounded 8px
+  // Header: just px/py inside gray bg, no separate border
+  // White body: white bg, gray100 border, full 8px radius, p:16
+  const cardOuterSx = {
+    flex: 1, borderRadius: '8px', border: '1px solid #e0e4e7',
+    bgcolor: '#eceef0',
+    display: 'flex', flexDirection: 'column', alignItems: 'stretch', textAlign: 'left',
+    cursor: 'pointer', '&:hover': { boxShadow: '0 2px 8px rgba(0,0,0,0.08)' },
   };
-
-  const columns: GridColDef[] = [
-    {
-      field: 'name', headerName: 'Community', flex: 2, minWidth: 220,
-      renderCell: (p: GridRenderCellParams) => (
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-            onClick={() => navigate(`/facility/${p.row.id}`)}>
-            {p.value}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">{p.row.region}, {p.row.state}</Typography>
-        </Box>
-      ),
-    },
-    { field: 'region', headerName: 'Region', width: 110 },
-    { field: 'lastSurveyDate', headerName: 'Last Survey', width: 110,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{p.value ? fmtDate(p.value as string) : '—'}</Typography>
-      ),
-    },
-    { field: 'surveyCount', headerName: 'Surveys', width: 80, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const },
-    { field: 'totalCitations', headerName: 'Citations', width: 90, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const },
-    {
-      field: 'totalKTags', headerName: 'K Tags', width: 80, align: 'center' as const, headerAlign: 'center' as const,
-      renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
-        ? <Chip label={p.value} size="small" sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, minWidth: 36 }} />
-        : <Typography variant="caption" color="text.secondary">0</Typography>,
-    },
-    {
-      field: 'totalNTags', headerName: 'N Tags', width: 80, align: 'center' as const, headerAlign: 'center' as const,
-      renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
-        ? <Chip label={p.value} size="small" sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700, minWidth: 36 }} />
-        : <Typography variant="caption" color="text.secondary">0</Typography>,
-    },
-    {
-      field: 'totalETags', headerName: 'E Tags', width: 80, align: 'center' as const, headerAlign: 'center' as const,
-      renderCell: (p: GridRenderCellParams) => (p.value as number) > 0
-        ? <Chip label={p.value} size="small" sx={{ bgcolor: '#FEF9C3', color: '#854D0E', fontWeight: 700, minWidth: 36 }} />
-        : <Typography variant="caption" color="text.secondary">0</Typography>,
-    },
-    {
-      field: 'hasWaiver', headerName: 'Waiver', width: 80, align: 'center' as const, headerAlign: 'center' as const,
-      renderCell: (p: GridRenderCellParams) => p.value
-        ? <Chip label="Yes" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />
-        : <Typography variant="caption" color="text.secondary">No</Typography>,
-    },
-    {
-      field: 'actions', headerName: '', width: 50, sortable: false, filterable: false,
-      renderCell: (p: GridRenderCellParams) => (
-        <IconButton size="small" onClick={(e) => { setRowMenuAnchor(e.currentTarget); setRowMenuFacId(p.row.id); }}>
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
-      ),
-    },
-  ];
+  const cardHeaderSx = {
+    px: 2, py: 1, height: 44, display: 'flex', alignItems: 'center',
+  };
+  const cardBodySx = {
+    bgcolor: 'white', borderRadius: '8px', borderTop: '1px solid #e0e4e7',
+    p: 2, position: 'relative', flexGrow: 1,
+    display: 'flex', flexDirection: 'column',
+  };
 
   return (
     <Box>
       <PageHeader
         title="Citations Dashboard"
         actions={
-          <Button variant="contained" color="primary" startIcon={<UploadFileIcon />} size="small">Upload Survey</Button>
+          <Button variant="contained" color="inherit" startIcon={<UploadFileIcon />} size="medium">Upload survey</Button>
         }
       />
       <PageFilters />
 
-      {/* Summary Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Survey Windows Approaching" value={upcomingSurveyRows.filter((r) => passesFilter(r.id)).length} icon={<EventNoteIcon />} color="#B45309"
-            subtitle="Within 90 days"
-            action={{ label: 'View', onClick: () => navigate('/surveys') }} />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Overdue POCs" value={communityCitations.filter((c) => c.status === 'Open' && Math.round((TODAY_DASH.getTime() - new Date(c.date).getTime()) / 86400000) > 60).length} subtitle={`Of ${communityCitations.filter((c) => c.status === 'Open' || c.status === 'Pending').length} open POCs`} icon={<TaskAltIcon />} color="#7B1FA2"
-            action={{ label: 'View', onClick: () => navigate('/poc') }} />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Deficiency-Free Surveys" value={filteredStats.deficiencyFree} subtitle={`Out of ${filteredStats.totalSurveys} total surveys`} icon={<ShieldIcon />} color="#2E7D32"
-            action={{ label: 'Review', onClick: () => navigate('/citations-remix') }} />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard title="Avg Citations per Survey" value={avgCitations} subtitle={`Across ${communityFacilities.length} communities`} icon={<TrendingUpIcon />} color="#F57C00"
-            action={{ label: 'Communities', onClick: () => navigate('/facilities') }} />
-        </Grid>
-      </Grid>
+      {/* Summary Cards - 3 cards per Figma */}
+      <Box sx={{ display: 'flex', gap: 2, my: 3 }}>
+        {/* Survey Windows Approaching — yellow theme */}
+        <ButtonBase onClick={() => navigate('/surveys')} sx={{ ...cardOuterSx, bgcolor: '#fff2d1', border: '1px solid #fee08d' }}>
+          <Box sx={{ ...cardHeaderSx }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '16px', color: '#613b01', letterSpacing: '-0.176px' }}>
+              Upcoming Surveys
+            </Typography>
+          </Box>
+          <Box sx={{ ...cardBodySx, borderTop: '1px solid #fee08d' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '36px', color: '#835701', lineHeight: '44px', letterSpacing: '-0.684px' }}>
+                {upcomingCount}
+              </Typography>
+              {upcomingAlerts > 0 && (
+                <Chip label={`${upcomingAlerts} alert${upcomingAlerts !== 1 ? 's' : ''}`} color="error" size="small" />
+              )}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mt: '4px' }}>
+              <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#613b01', lineHeight: '16px', letterSpacing: '-0.084px' }}>
+                Open within 90 days
+              </Typography>
+              <Button variant="text" size="small" component="span" tabIndex={-1}
+                endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{ fontWeight: 600, fontSize: '14px', color: '#835701', p: 0, minWidth: 'unset', lineHeight: '16px', height: 'auto', minHeight: 'unset' }}>
+                View
+              </Button>
+            </Box>
+          </Box>
+        </ButtonBase>
+
+        {/* Average Citations per Survey */}
+        <ButtonBase onClick={() => navigate('/facilities')} sx={{ ...cardOuterSx }}>
+          <Box sx={{ ...cardHeaderSx }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
+              Average citations per Survey
+            </Typography>
+          </Box>
+          <Box sx={{ ...cardBodySx }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '36px', color: '#293036', lineHeight: '44px', letterSpacing: '-0.684px' }}>
+              {avgCitations}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mt: '4px' }}>
+              <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036', lineHeight: '16px', letterSpacing: '-0.084px' }}>
+                Across {communityFacilities.length} communities
+              </Typography>
+              <Button variant="text" size="small" component="span" tabIndex={-1}
+                endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{ fontWeight: 600, fontSize: '14px', color: '#0065BD', p: 0, minWidth: 'unset', lineHeight: '16px', height: 'auto', minHeight: 'unset' }}>
+                View
+              </Button>
+            </Box>
+          </Box>
+        </ButtonBase>
+
+        {/* Deficiency-Free Surveys */}
+        <ButtonBase onClick={() => navigate('/citations-remix')} sx={{ ...cardOuterSx, bgcolor: '#c7f2df' }}>
+          <Box sx={{ ...cardHeaderSx }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '16px', color: '#0b2f1f', letterSpacing: '-0.176px' }}>
+              Deficiency-Free Surveys
+            </Typography>
+          </Box>
+          <Box sx={{ ...cardBodySx, borderTop: '1px solid #abeccf' }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '36px', color: '#196c46', lineHeight: '44px', letterSpacing: '-0.684px' }}>
+              {filteredStats.deficiencyFree}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mt: '4px' }}>
+              <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036', lineHeight: '16px', letterSpacing: '-0.084px' }}>
+                Out of {filteredStats.totalSurveys} Surveys this year
+              </Typography>
+              <Button variant="text" size="small" component="span" tabIndex={-1}
+                endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{ fontWeight: 600, fontSize: '14px', color: '#0065BD', p: 0, minWidth: 'unset', lineHeight: '16px', height: 'auto', minHeight: 'unset' }}>
+                View
+              </Button>
+            </Box>
+          </Box>
+        </ButtonBase>
+      </Box>
 
       {/* Upcoming Surveys */}
       <UpcomingSurveysPanel />
 
-      {/* Recently Completed Surveys */}
+      {/* Completed Surveys */}
       <RecentlyCompletedSurveys />
-
-
     </Box>
   );
 }

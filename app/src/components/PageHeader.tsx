@@ -9,7 +9,7 @@ interface PageHeaderTab {
 }
 
 interface Props {
-  title: string;
+  title: React.ReactNode;
   tabs?: PageHeaderTab[];
   activeTab?: number;
   onTabChange?: (value: number) => void;
@@ -32,29 +32,30 @@ export default function PageHeader({
   return (
     <Box
       sx={{
-        bgcolor: '#F7F8F9',
         ml: -3,
         mt: -3,
         mb: 2,
-        borderBottom: '1px solid #E0E4E7',
         width: 'calc(100vw - 256px)',
       }}
     >
-      <Box sx={{ px: 3, pt: 2, pb: tabs ? 0 : 2 }}>
-        {/* Back link */}
+      <Box sx={{ px: 3, pt: 2, pb: tabs ? 0 : 0 }}>
+        {/* Back link — breadcrumb style per Figma */}
         {backLabel && onBack && (
-          <Button
-            variant="text"
-            size="small"
-            startIcon={<ArrowBackIcon sx={{ fontSize: '14px !important' }} />}
+          <Box
             onClick={onBack}
-            sx={{ mb: 0.5, ml: -1, p: 0, minWidth: 'unset', color: '#8492a1', fontWeight: 400, fontSize: '0.8rem', bgcolor: 'transparent', '&:hover': { bgcolor: 'transparent', color: '#293036' } }}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 0.75, mb: 1, cursor: 'pointer',
+              color: '#5c6874', '&:hover': { color: '#293036' },
+            }}
           >
-            {backLabel}
-          </Button>
+            <ArrowBackIcon sx={{ fontSize: 16 }} />
+            <Typography sx={{ fontSize: '14px', fontWeight: 400, lineHeight: 1.5, letterSpacing: '-0.07px' }}>
+              {backLabel}
+            </Typography>
+          </Box>
         )}
         {/* Title row */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
             <Typography
               sx={{

@@ -1,10 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useState } from 'react';
 import {
-  Box, Typography, Paper, Chip, LinearProgress, Divider, Drawer, IconButton,
-  Table, TableBody, TableCell, TableHead, TableRow,
-  Autocomplete, TextField, FormControl, InputLabel, Select, MenuItem,
+  Box, Typography, Paper, Chip, LinearProgress, Divider, Drawer, IconButton, Button, Menu, MenuItem as MuiMenuItem, TextField, InputAdornment,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  FormControl, InputLabel, Select, MenuItem,
   FormControlLabel, Switch,
 } from '@mui/material';
 import { DataGridPro } from '@mui/x-data-grid-pro';
@@ -12,6 +11,11 @@ import type { GridColDef } from '@mui/x-data-grid-pro';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon2 from '@mui/icons-material/ChevronRight';
+import SellIcon from '@mui/icons-material/Sell';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import SearchIcon from '@mui/icons-material/Search';
 import { facilities, citations, surveys, kTagHistory, nTagHistory, eTagHistory, tagDescriptions } from '../data/avir-data';
 import type { AvirKTagHistory } from '../data/avir-data';
 import { useCommunityFilter } from '../components/CommunityFilter';
@@ -35,7 +39,27 @@ export default function TagTypeDetail() {
   const [dateRange, setDateRange] = useState(searchParams.get('dateRange') || 'all');
   const [regionFilter, setRegionFilter] = useState(searchParams.get('region') || '');
   const [latestOnly, setLatestOnly] = useState(searchParams.get('latestOnly') === '1');
+  const gridPaperRef = useRef<HTMLDivElement>(null);
+  const [jumpMenuAnchor, setJumpMenuAnchor] = useState<null | HTMLElement>(null);
+  const [jumpSearch, setJumpSearch] = useState('');
+  const [scrolledRight, setScrolledRight] = useState(false);
+  const scrollTableRight = () => {
+    const scroller = gridPaperRef.current?.querySelector('.MuiDataGrid-virtualScroller') as HTMLDivElement | null;
+    if (scroller) {
+      scroller.scrollBy({ left: 400, behavior: 'smooth' });
+      setTimeout(() => setScrolledRight(scroller.scrollLeft > 10), 500);
+    }
+  };
+  const scrollTableLeft = () => {
+    const scroller = gridPaperRef.current?.querySelector('.MuiDataGrid-virtualScroller') as HTMLDivElement | null;
+    if (scroller) {
+      scroller.scrollBy({ left: -400, behavior: 'smooth' });
+      setTimeout(() => setScrolledRight(scroller.scrollLeft > 10), 500);
+    }
+  };
+
   const [drawerCitation, setDrawerCitation] = useState<{ tag: string; facility: string; facilityId: string; date: string; region: string; surveyor: string; description: string; observation: string; status: string } | null>(null);
+
 
   // Look up citation detail from citations array
   const openCitationDrawer = (facilityId: string, date: string, tag: string) => {
@@ -101,36 +125,39 @@ export default function TagTypeDetail() {
   const columns: GridColDef[] = useMemo(() => {
     const fixed: GridColDef[] = [
       {
-        field: 'date', headerName: 'Date', width: 110,
+        field: 'date', headerName: 'Survey date', width: 145, align: 'right' as const, headerAlign: 'right' as const,
         renderCell: (p) => (
-          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
+          <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036' }}>{fmtDate(p.value as string)}</Typography>
         ),
       },
       {
-        field: 'facility', headerName: 'Community', width: 220,
+        field: 'facility', headerName: 'Community', width: 280,
         renderCell: (p) => {
-          if (p.row._isTotalRow) return <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.85rem' }}>Total</Typography>;
+          if (p.row._isTotalRow) return <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>Total</Typography>;
           return (
-            <Box sx={{ lineHeight: 1.2 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0065BD', fontSize: '0.8rem', lineHeight: 1.3, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                onClick={() => navigate(`/facility/${p.row.facilityId}`)}>
-                {p.value}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036', lineHeight: '16px' }}>
+                {(p.value as string).replace('Avir at ', '')}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#5c6874', fontSize: '0.65rem', lineHeight: 1 }}>{p.row.region}</Typography>
+              <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036', lineHeight: '16px' }}>{p.row.region}</Typography>
             </Box>
           );
         },
       },
-      { field: 'surveyRegion', headerName: 'Survey region', width: 160,
+      { field: 'surveyRegion', headerName: 'CMS Region', width: 160,
         renderCell: (p) => (
-          <Typography variant="caption">{(p.value as string) || '—'}</Typography>
+          <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{(p.value as string) || '—'}</Typography>
         ),
       },
-      { field: 'surveyor', headerName: 'Surveyor', width: 150 },
-      {
-        field: 'total', headerName: 'Total', width: 80, align: 'right' as const, headerAlign: 'right' as const, type: 'number' as const,
+      { field: 'surveyor', headerName: 'Surveyor', width: 155,
         renderCell: (p) => (
-          <Typography variant="body2" sx={{ fontWeight: p.row._isTotalRow ? 800 : 600 }}>{p.value}</Typography>
+          <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{(p.value as string) || '—'}</Typography>
+        ),
+      },
+      {
+        field: 'total', headerName: 'Total', width: 100, align: 'right' as const, headerAlign: 'right' as const, type: 'number' as const,
+        renderCell: (p) => (
+          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>{p.value}</Typography>
         ),
       },
     ];
@@ -138,21 +165,21 @@ export default function TagTypeDetail() {
     const tagCols: GridColDef[] = allUniqueTags.map((tag) => ({
       field: `tag_${tag}`,
       headerName: tag.replace(/^[KNE]-?/, ''),
-      width: 70,
+      width: 85,
       align: 'right' as const,
       headerAlign: 'right' as const,
       sortable: false,
       renderCell: (p) => {
         if (p.row._isTotalRow) {
           const count = p.value as number;
-          return count > 0 ? <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{count}</Typography> : <Typography variant="caption" color="text.disabled">—</Typography>;
+          return count > 0 ? <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>{count}</Typography> : <Typography sx={{ fontSize: '14px', color: '#94A3B8' }}>—</Typography>;
         }
         const cited = p.value === 1;
         const waiver = p.row[`waiver_${tag}`] === 1;
         const handleClick = () => openCitationDrawer(p.row.facilityId as string, p.row.date as string, tag);
-        if (waiver) return <Chip label="W" size="small" onClick={handleClick} sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: '#FEF9C3', color: '#854D0E', minWidth: 28, cursor: 'pointer' }} />;
-        if (cited) return <Chip label="X" size="small" onClick={handleClick} sx={{ fontWeight: 700, fontSize: '0.7rem', minWidth: 28, cursor: 'pointer' }} />;
-        return <Typography variant="caption" color="text.disabled">—</Typography>;
+        if (waiver) return <Chip label="W" size="small" onClick={handleClick} sx={{ fontWeight: 700, fontSize: '13px', bgcolor: '#FEF9C3', color: '#854D0E', minWidth: 28, cursor: 'pointer' }} />;
+        if (cited) return <Chip label="X" size="small" onClick={handleClick} sx={{ fontWeight: 700, fontSize: '13px', minWidth: 28, cursor: 'pointer' }} />;
+        return <Typography sx={{ fontSize: '14px', color: '#94A3B8' }}>—</Typography>;
       },
     }));
 
@@ -250,30 +277,59 @@ export default function TagTypeDetail() {
   return (
     <Box>
       <PageHeader
-        title={info.title}
-        backLabel="Back to Survey Overview"
-        onBack={() => navigate('/citations-remix')}
-        actions={
-          <Autocomplete
-            size="small"
-            options={allUniqueTags}
-            getOptionLabel={(opt) => {
-              const desc = tagDescriptions.get(opt);
-              return desc ? `${opt} — ${desc}` : opt;
-            }}
-            onChange={(_, val) => { if (val) navigate(`/citations-remix/tags/${type}/${val}`); }}
-            renderInput={(params) => <TextField {...params} label="View by Tag" placeholder="Search tags..." />}
-            sx={{ width: 320 }}
-          />
+        title={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <span>{info.title}</span>
+            <Button
+              variant="contained" color="inherit" size="small"
+              startIcon={<SellIcon sx={{ fontSize: '16px !important' }} />}
+              endIcon={<KeyboardArrowDownIcon />}
+              onClick={(e) => { setJumpMenuAnchor(e.currentTarget); setJumpSearch(''); }}
+              sx={{ fontWeight: 600, fontSize: '0.875rem' }}
+            >
+              Jump to {tagPrefix}-Tag
+            </Button>
+            <Menu
+              anchorEl={jumpMenuAnchor}
+              open={Boolean(jumpMenuAnchor)}
+              onClose={() => setJumpMenuAnchor(null)}
+              PaperProps={{ sx: { maxHeight: 320, width: 300 } }}
+            >
+              <Box sx={{ px: 1.5, py: 1, position: 'sticky', top: 0, bgcolor: 'white', zIndex: 1 }}>
+                <TextField
+                  size="small" fullWidth placeholder="Search tags..."
+                  value={jumpSearch} onChange={(e) => setJumpSearch(e.target.value)}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+                  autoFocus
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+              </Box>
+              {allUniqueTags
+                .filter((t) => !jumpSearch || t.toLowerCase().includes(jumpSearch.toLowerCase()) || (tagDescriptions.get(t) || '').toLowerCase().includes(jumpSearch.toLowerCase()))
+                .map((tag) => (
+                  <MuiMenuItem key={tag} onClick={() => { setJumpMenuAnchor(null); navigate(`/citations-remix/tags/${type}/${tag}`); }}
+                    sx={{ fontSize: '14px' }}>
+                    <Box>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px' }}>{tag}</Typography>
+                      {tagDescriptions.get(tag) && (
+                        <Typography sx={{ fontSize: '12px', color: '#64748B' }}>{tagDescriptions.get(tag)}</Typography>
+                      )}
+                    </Box>
+                  </MuiMenuItem>
+                ))}
+            </Menu>
+          </Box>
         }
+        backLabel="Back to surveys"
+        onBack={() => navigate('/citations-remix')}
       />
       <PageFilters
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         extraFilters={
-          <FormControl size="small" sx={{ minWidth: 220 }}>
+          <FormControl size="small" variant="filled" sx={{ minWidth: 220 }}>
             <InputLabel>CMS Region</InputLabel>
-            <Select value={regionFilter} label="CMS Region" onChange={(e) => setRegionFilter(e.target.value)}>
+            <Select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
               <MenuItem value="">All regions</MenuItem>
               {regions.map((r) => (
                 <MenuItem key={r} value={r}>{r}</MenuItem>
@@ -291,98 +347,94 @@ export default function TagTypeDetail() {
       />
 
 
-      {/* Most Cited Tags — Top 5 */}
+      {/* Top 5 Tags */}
       {tagBreakdown.length > 0 && (
-        <Paper sx={{ mb: 3, borderRadius: 3, border: '1px solid #E0E4E7', overflow: 'hidden' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2.5, pt: 2.5, pb: 1.5 }}>
-            <WhatshotIcon sx={{ color: '#DC2626', fontSize: 20 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Most cited {info.title}</Typography>
+        <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 2.5 }}>
+            <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', letterSpacing: '-0.176px' }}>
+              Top 5 {info.title}
+            </Typography>
           </Box>
+          <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
           <Table size="small">
-            <TableHead>
+            <TableHead sx={{ bgcolor: '#e0e4e7' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '4px', px: 1.5 }}>Tag</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '4px', px: 1.5 }}>Description</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '4px', px: 1.5, width: 90 }} align="right">Citations</TableCell>
-                <TableCell sx={{ fontWeight: 400, color: '#293036', fontSize: '14px', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', lineHeight: '16px', py: '4px', px: 1.5, width: 280 }}>Status</TableCell>
-                <TableCell sx={{ bgcolor: '#e0e4e7', width: 32, px: 0 }} />
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 95 }}>Tag</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Description</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 100 }} align="right">Count</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, whiteSpace: 'nowrap' }} align="right">vs Previous Period</TableCell>
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 48, px: 0 }} />
               </TableRow>
             </TableHead>
-            <TableBody>
-              {tagBreakdown.map((t, i) => (
-                <TableRow key={t.tag} sx={{ '&:hover': { bgcolor: '#F0F7FF' }, cursor: 'pointer' }}
-                  onClick={() => navigate(`/citations-remix/tags/${type}/${t.tag}`)}>
-                  <TableCell sx={{ py: '3px', px: 1.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.8rem', color: '#293036' }}>{t.tag}</Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: '3px', px: 1.5 }}>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                      {t.desc.length > 80 ? t.desc.slice(0, 80) + '...' : t.desc}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" sx={{ py: '3px', px: 1.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{t.count}</Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: '3px', px: 1.5 }}>
-                    {(() => {
-                      const statusColors: Record<string, string> = { Completed: '#16A34A', Pending: '#F59E0B', Open: '#DC2626', NA: '#94A3B8' };
-                      const order = ['Open', 'Pending', 'Completed', 'NA'];
-                      const entries = order.filter((s) => t.statuses.has(s)).map((s) => ({ status: s, val: t.statuses.get(s)!, color: statusColors[s] }));
-                      const total = [...t.statuses.values()].reduce((a, b) => a + b, 0);
-                      return (
-                        <Box>
-                          <Box sx={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', bgcolor: '#F1F5F9', mb: 0.5 }}>
-                            {entries.map(({ status, val, color }) => (
-                              <Box key={status} sx={{ width: `${(val / total) * 100}%`, bgcolor: color }} />
-                            ))}
-                          </Box>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'nowrap' }}>
-                            {entries.map(({ status, val, color }) => (
-                              <Box key={status} sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
-                                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
-                                <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#64748B' }}>{val} {status}</Typography>
-                              </Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell sx={{ width: 32, px: 0 }}>
-                    <ChevronRightIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-                  </TableCell>
-                </TableRow>
-              ))}
+            <TableBody sx={{ bgcolor: 'white' }}>
+              {tagBreakdown.map((t, idx) => {
+                const isLast = idx === tagBreakdown.length - 1;
+                return (
+                  <TableRow key={t.tag} sx={{
+                    '&:hover': { bgcolor: '#F0F7FF' }, cursor: 'pointer',
+                    ...(isLast && { '& td': { borderBottom: 'none' } }),
+                  }}
+                    onClick={() => navigate(`/citations-remix/tags/${type}/${t.tag}`)}>
+                    <TableCell sx={{ py: 1, px: 2 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>{t.tag}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1, px: 2 }}>
+                      <Typography sx={{ fontSize: '14px', color: '#293036' }}>
+                        {t.desc.length > 80 ? t.desc.slice(0, 80) + '...' : t.desc}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1, px: 2 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>{t.count}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1, px: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, color: '#DC2626' }}>
+                        <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: '#DC2626', flexShrink: 0 }} />
+                        <Typography sx={{ fontWeight: 600, fontSize: '14px', color: '#DC2626' }}>80%</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ px: 1 }}>
+                      <IconButton size="small">
+                        <ChevronRightIcon sx={{ fontSize: 18, color: '#293036' }} />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
+          </TableContainer>
         </Paper>
       )}
 
-      {/* Summary */}
-      <Paper sx={{ px: 2, py: 1, borderRadius: '12px 12px 0 0', border: '1px solid #E0E4E7', borderBottom: 'none', bgcolor: '#FAFBFC' }}>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {displayedHistory.length} surveys
-          <Typography component="span" variant="body2" sx={{ color: '#5c6874', ml: 1 }}>
-            across {new Set(displayedHistory.map((h) => h.facilityId)).size} facilities
-          </Typography>
-          <Typography component="span" variant="body2" sx={{ color: '#5c6874', ml: 1 }}>
-            · {allUniqueTags.length} unique tags · {displayedHistory.reduce((s, h) => s + h.total, 0)} total citations
-          </Typography>
-        </Typography>
-      </Paper>
-
       {/* DataGrid Table */}
-      <Paper sx={{ borderRadius: '0 0 12px 12px', border: '1px solid #E0E4E7', overflow: 'hidden' }}>
+      <Paper ref={gridPaperRef} elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}>
+          <Typography sx={{ fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
+            <Box component="span" sx={{ fontWeight: 700 }}>{allUniqueTags.length} unique tags</Box>
+            <Box component="span" sx={{ fontWeight: 400 }}> - {displayedHistory.reduce((s, h) => s + h.total, 0)} total citations</Box>
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {scrolledRight && (
+              <IconButton size="small" onClick={scrollTableLeft} sx={{ color: '#0065BD' }}>
+                <ChevronLeftIcon />
+              </IconButton>
+            )}
+            <IconButton size="small" onClick={scrollTableRight} sx={{ color: '#0065BD' }}>
+              <ChevronRightIcon2 />
+            </IconButton>
+          </Box>
+        </Box>
         <DataGridPro
           rows={rows}
           columns={columns}
           pinnedRows={pinnedRows}
-          rowHeight={42}
+          rowHeight={56}
+          columnHeaderHeight={36}
           disableColumnMenu
           disableRowSelectionOnClick
-          pageSizeOptions={[25, 50, 100]}
+          pageSizeOptions={[15, 25, 50, 100]}
           initialState={{
-            pagination: { paginationModel: { pageSize: 25 } },
+            pagination: { paginationModel: { pageSize: 15 } },
             sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
             pinnedColumns: { left: ['date', 'facility'] },
           }}
@@ -393,19 +445,22 @@ export default function TagTypeDetail() {
           }}
           sx={{
             border: 'none',
+            borderRadius: '0 !important',
             '& .MuiDataGrid-columnHeaders': { bgcolor: '#e0e4e7', borderBottom: 'none' },
-            '& .MuiDataGrid-columnHeader': { bgcolor: '#e0e4e7' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 400, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px', lineHeight: '16px' },
+            '& .MuiDataGrid-columnHeader': { bgcolor: '#e0e4e7', py: '6px', px: 2 },
+            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px', lineHeight: '16px' },
             '& .MuiDataGrid-columnSeparator': { display: 'none' },
+            '& .MuiDataGrid-row': { cursor: 'pointer' },
             '& .MuiDataGrid-row:hover': { bgcolor: '#F0F7FF' },
-            '& .MuiDataGrid-cell': { fontSize: '0.8rem', display: 'flex', alignItems: 'center' },
+            '& .MuiDataGrid-cell': { fontSize: '14px', color: '#293036', display: 'flex', alignItems: 'center', fontFeatureSettings: "'lnum' 1, 'tnum' 1", letterSpacing: '-0.084px', '& .MuiTypography-root': { fontSize: '14px' } },
             '& .totals-row': { bgcolor: '#F0F2F4', fontWeight: 700, borderBottom: '2px solid #C0C8D0', '&:hover': { bgcolor: '#F0F2F4' } },
             '& .totals-row .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#F0F2F4' },
-            '& .def-free-row': { bgcolor: '#F0FDF4', '&:hover': { bgcolor: '#DCFCE7' } },
-            '& .def-free-row .MuiDataGrid-cell[data-field="date"]': { borderLeft: '3px solid #16A34A' },
-            '& .def-free-row .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#F0FDF4' },
-            '& .def-free-row:hover .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#DCFCE7' },
+            '& .def-free-row': { bgcolor: '#e3f9ef', '&:hover': { bgcolor: '#c7f2df' } },
+            '& .def-free-row .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#e3f9ef' },
+            '& .def-free-row:hover .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#c7f2df' },
             '& .MuiDataGrid-scrollbarFiller': { display: 'none' },
+            '& .MuiDataGrid-main': { pb: '14px' },
+            '& .MuiDataGrid-sortButton': { color: '#293036' },
             // Hide license watermark overlay
             '& .MuiDataGrid-main > div:last-child:not([class*="MuiDataGrid"])': { display: 'none !important' },
           }}
@@ -413,69 +468,55 @@ export default function TagTypeDetail() {
       </Paper>
 
       {/* Citation Detail Drawer */}
+      {/* Citation Detail Drawer — Figma style */}
       <Drawer
         anchor="right"
         open={!!drawerCitation}
         onClose={() => setDrawerCitation(null)}
-        PaperProps={{ sx: { width: 480, p: 3 } }}
+        PaperProps={{ sx: { width: 480, display: 'flex', flexDirection: 'column' } }}
       >
         {drawerCitation && (
-          <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Citation detail</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 3, pb: 2 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036' }}>Citation details</Typography>
               <IconButton onClick={() => setDrawerCitation(null)} size="small"><CloseIcon /></IconButton>
             </Box>
-            <Divider sx={{ mb: 2 }} />
-
-            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-              <Chip label={drawerCitation.tag} sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.9rem' }} />
-              {drawerCitation.status && (
-                <Chip label={drawerCitation.status} size="small" sx={{
-                  fontWeight: 600,
-                  bgcolor: drawerCitation.status === 'Completed' ? '#DCFCE7' : drawerCitation.status === 'Pending' ? '#FEF9C3' : '#FEE2E2',
-                  color: drawerCitation.status === 'Completed' ? '#166534' : drawerCitation.status === 'Pending' ? '#854D0E' : '#991B1B',
-                }} />
-              )}
-            </Box>
-
-            {drawerCitation.description && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mb: 0.5 }}>Description</Typography>
-                <Typography variant="body2">{drawerCitation.description}</Typography>
+            <Box sx={{ px: 3, flexGrow: 1 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036' }}>
+                {(drawerCitation.facility || '').replace('Avir at ', '')}
+              </Typography>
+              <Typography sx={{ fontSize: '14px', fontStyle: 'italic', color: '#5c6874', mb: 2 }}>
+                TX - {drawerCitation.region}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
+                <Box>
+                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#293036' }}>Survey date</Typography>
+                  <Typography sx={{ fontSize: '14px', color: '#293036' }}>{drawerCitation.surveyor || '—'}</Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#293036' }}>Surveyor</Typography>
+                  <Typography sx={{ fontSize: '14px', color: '#293036' }}>{fmtDate(drawerCitation.date)}</Typography>
+                </Box>
               </Box>
-            )}
-
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mb: 0.5 }}>Observation</Typography>
-              <Paper sx={{ p: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.85rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                  {drawerCitation.observation}
+              <Paper elevation={0} sx={{ p: 2.5, bgcolor: '#F7F8F9', border: '1px solid #e0e4e7', borderRadius: '8px' }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036', mb: 0.5 }}>
+                  {drawerCitation.tag}
+                </Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036', mb: 1.5 }}>
+                  {drawerCitation.description || '—'}
+                </Typography>
+                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#5c6874', mb: 0.5 }}>
+                  Observation
+                </Typography>
+                <Typography sx={{ fontSize: '14px', color: '#293036', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                  {drawerCitation.observation || 'No observation details available.'}
                 </Typography>
               </Paper>
             </Box>
-
-            <Divider sx={{ mb: 2 }} />
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-              <Box>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>Community</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0065BD', cursor: 'pointer' }}
-                  onClick={() => { setDrawerCitation(null); navigate(`/facility/${drawerCitation.facilityId}`); }}>
-                  {drawerCitation.facility}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>Region</Typography>
-                <Typography variant="body2">{drawerCitation.region}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>Date</Typography>
-                <Typography variant="body2">{fmtDate(drawerCitation.date)}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>Surveyor</Typography>
-                <Typography variant="body2">{drawerCitation.surveyor || '—'}</Typography>
-              </Box>
+            <Box sx={{ p: 3, pt: 2 }}>
+              <Button variant="contained" color="inherit" disableElevation fullWidth onClick={() => setDrawerCitation(null)}>
+                Close
+              </Button>
             </Box>
           </Box>
         )}

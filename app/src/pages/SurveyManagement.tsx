@@ -1,18 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Chip, TextField, InputAdornment,
+  Box, Typography, Paper, Chip, TextField, InputAdornment, IconButton,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
-import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PageHeader from '../components/PageHeader';
 import PageFilters from '../components/PageFilters';
 import { useCommunityFilter } from '../components/CommunityFilter';
-import { facilities, citations } from '../data/avir-data';
+import { facilities, citations, surveys } from '../data/avir-data';
 import { effectiveLastSurveyDate } from '../utils/surveyWindowOverrides';
 import { fmtDate } from '../utils/formatDate';
-import { makeDateFilter } from '../utils/dateFilter';
 
 const TODAY = new Date('2026-04-05');
 
@@ -30,8 +30,6 @@ function daysUntil(dateStr: string): number {
   return Math.round((new Date(dateStr).getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-
-// Derive documentation gaps from citation data (mirrors SurveyPrepDetail logic)
 function deriveAlerts(totalCitations: number, facilityId: string): number {
   const facCitations = citations.filter((c) => c.facilityId === facilityId);
   const openCits = facCitations.filter((c) => c.status === 'Open' || c.status === 'Pending');
@@ -42,8 +40,6 @@ function deriveAlerts(totalCitations: number, facilityId: string): number {
   return tasks + logs + docs;
 }
 
-// Build upcoming survey rows from facility last survey dates
-// Standard SNF survey cycle: window opens ~9 months after last survey, closes ~15 months after
 function buildUpcomingRows() {
   return facilities
     .filter((f) => f.lastSurveyDate)
@@ -57,6 +53,7 @@ function buildUpcomingRows() {
         days < 0 ? 'Overdue' :
         days <= 30 ? 'Due Soon' :
         days <= 90 ? 'Upcoming' : 'On Track';
+      const lastSurvey = surveys.filter((s) => s.facilityId === f.id).sort((a, b) => b.date.localeCompare(a.date))[0];
       return {
         id: f.id,
         facilityId: f.id,
@@ -69,23 +66,13 @@ function buildUpcomingRows() {
         status,
         totalCitations: f.totalCitations,
         alerts: deriveAlerts(f.totalCitations, f.id),
+        lastSurveyor: lastSurvey?.surveyor || '—',
       };
     })
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
 }
 
 const allUpcomingRows = buildUpcomingRows();
-
-const statusChip = (status: string) => {
-  const styles: Record<string, { bg: string; color: string }> = {
-    'Overdue':  { bg: '#FEE2E2', color: '#991B1B' },
-    'Due Soon': { bg: '#FEF3C7', color: '#92400E' },
-    'Upcoming': { bg: '#DBEAFE', color: '#1E40AF' },
-    'On Track': { bg: '#F0FDF4', color: '#166534' },
-  };
-  const s = styles[status] || styles['On Track'];
-  return <Chip label={status} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: '0.7rem' }} />;
-};
 
 export default function SurveyManagement() {
   const navigate = useNavigate();
@@ -99,135 +86,158 @@ export default function SurveyManagement() {
     });
   }, [passesFilter, search]);
 
-  const overdueCount  = rows.filter((r) => r.status === 'Overdue').length;
-  const dueSoonCount  = rows.filter((r) => r.status === 'Due Soon').length;
+  const overdueCount = rows.filter((r) => r.status === 'Overdue').length;
+  const dueSoonCount = rows.filter((r) => r.status === 'Due Soon').length;
   const upcomingCount = rows.filter((r) => r.status === 'Upcoming').length;
+  const dueSoonAlerts = rows.filter((r) => r.status === 'Due Soon').reduce((s, r) => s + r.alerts, 0);
+  const upcomingAlerts = rows.filter((r) => r.status === 'Upcoming').reduce((s, r) => s + r.alerts, 0);
 
-  const columns: GridColDef[] = [
+  // Card style definitions per Figma
+  const cards = [
     {
-      field: 'windowStart', headerName: 'Window Opens', width: 130,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{fmtDate(p.value as string)}</Typography>
-      ),
+      title: 'Overdue Surveys', count: overdueCount, subtitle: 'Window has passed',
+      outerBg: '#fddce2', borderColor: '#fcc6d1', titleColor: '#4f0513', numberColor: '#ad0b2a',
+      alerts: 0,
     },
     {
-      field: 'windowEnd', headerName: 'Window Closes', width: 130,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{fmtDate(p.value as string)}</Typography>
-      ),
+      title: 'Due soon', count: dueSoonCount, subtitle: 'Open within 30 days',
+      outerBg: '#fde5d9', borderColor: '#fcd7c5', titleColor: '#702906', numberColor: '#cf4b0b',
+      alerts: dueSoonAlerts,
     },
     {
-      field: 'name', headerName: 'Community', flex: 1, minWidth: 200,
-      renderCell: (p: GridRenderCellParams) => (
-        <Box sx={{ lineHeight: 1 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', lineHeight: 1.2 }}>
-            {(p.value as string).replace('Avir at ', '')}
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#5c6874', fontSize: '0.68rem', lineHeight: 1 }}>{p.row.region}</Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'daysUntilDue', headerName: 'Days Until Due', width: 130, type: 'number' as const, align: 'right' as const, headerAlign: 'right' as const,
-      renderCell: (p: GridRenderCellParams) => {
-        const d = p.value as number;
-        const color = d < 0 ? '#991B1B' : d <= 30 ? '#92400E' : d <= 90 ? '#1E40AF' : '#166534';
-        return (
-          <Typography variant="body2" sx={{ fontWeight: 700, color, fontSize: '0.85rem' }}>
-            {d < 0 ? `${Math.abs(d)} overdue` : `${d} days`}
-          </Typography>
-        );
-      },
-    },
-    {
-      field: 'totalCitations', headerName: 'Prior Citations', width: 120, type: 'number' as const, align: 'right' as const, headerAlign: 'right' as const,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>{p.value as number}</Typography>
-      ),
-    },
-    {
-      field: 'alerts', headerName: 'Alerts', width: 90, type: 'number' as const, align: 'right' as const, headerAlign: 'right' as const,
-      renderCell: (p: GridRenderCellParams) => {
-        if (p.row.daysUntilDue > 90) return <Typography variant="body2" sx={{ color: '#94A3B8' }}>—</Typography>;
-        const count = p.value as number;
-        if (count === 0) return <Typography variant="body2" sx={{ color: '#16A34A', fontWeight: 600 }}>—</Typography>;
-        return (
-          <Typography variant="body2" sx={{ fontWeight: 700, color: '#DC2626' }}>{count}</Typography>
-        );
-      },
+      title: 'Upcoming', count: upcomingCount, subtitle: 'Open within 90 days',
+      outerBg: '#fff2d1', borderColor: '#fee08d', titleColor: '#613b01', numberColor: '#835701',
+      alerts: upcomingAlerts,
     },
   ];
 
   return (
     <Box>
-      <PageHeader title="Survey Planning" />
+      <PageHeader title="Pre-Survey Planning" />
       <PageFilters />
 
-      {/* Summary callouts */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        {[
-          { label: 'Overdue',  count: overdueCount,  bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' },
-          { label: 'Due Soon', count: dueSoonCount,  bg: '#FEF3C7', color: '#92400E', border: '#FDE68A' },
-          { label: 'Upcoming', count: upcomingCount, bg: '#DBEAFE', color: '#1E40AF', border: '#BFDBFE' },
-        ].map((t) => (
-          <Paper key={t.label} sx={{ p: 2, flex: 1, borderRadius: 3, border: `1px solid ${t.border}`, bgcolor: t.bg }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: t.color }}>{t.label}</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: t.color, my: 0.5 }}>{t.count}</Typography>
-            <Typography variant="caption" sx={{ color: t.color, opacity: 0.75 }}>
-              {t.label === 'Overdue' ? 'Window has passed' :
-               t.label === 'Due Soon' ? 'Due within 30 days' :
-               t.label === 'Upcoming' ? 'Due within 90 days' : 'More than 90 days out'}
-            </Typography>
-          </Paper>
+      {/* Summary Cards */}
+      <Box sx={{ display: 'flex', gap: 2, my: 3 }}>
+        {cards.map((card) => (
+          <Box key={card.title} sx={{ flex: 1, borderRadius: '8px', bgcolor: card.outerBg, border: `1px solid ${card.borderColor}` }}>
+            <Box sx={{ px: 2, py: 1, height: 44, display: 'flex', alignItems: 'center' }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '16px', color: card.titleColor, letterSpacing: '-0.176px' }}>
+                {card.title}
+              </Typography>
+            </Box>
+            <Box sx={{ bgcolor: 'white', borderRadius: '8px', borderTop: `1px solid ${card.borderColor}`, p: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '36px', color: card.numberColor, lineHeight: '44px', letterSpacing: '-0.684px' }}>
+                  {card.count}
+                </Typography>
+                {card.alerts > 0 && (
+                  <Chip label={`${card.alerts} alert${card.alerts !== 1 ? 's' : ''}`} color="error" size="small" />
+                )}
+              </Box>
+              <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036', lineHeight: '16px', letterSpacing: '-0.084px', mt: '4px' }}>
+                {card.subtitle}
+              </Typography>
+            </Box>
+          </Box>
         ))}
       </Box>
 
-      {/* Table */}
-      <Paper sx={{ px: 2, py: 1.5, borderRadius: '12px 12px 0 0', border: '1px solid #E0E4E7', borderBottom: 'none', bgcolor: '#FAFBFC' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+      {/* Table Section */}
+      <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}>
+          <Typography sx={{ fontSize: '16px', color: '#293036', fontWeight: 700, letterSpacing: '-0.176px' }}>
             {rows.length} communities
           </Typography>
           <TextField
-            size="small" placeholder="Search community..."
+            size="small" placeholder="Search communities"
             value={search} onChange={(e) => setSearch(e.target.value)}
-            sx={{ ml: 'auto', width: 220 }}
+            sx={{ width: 220 }}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
           />
         </Box>
-      </Paper>
-      <Paper sx={{ borderRadius: '0 0 12px 12px', border: '1px solid #E0E4E7', overflow: 'hidden' }}>
-        <DataGrid
-          rows={rows}
-          columns={columns}
-          rowHeight={48}
-          disableColumnMenu
-          disableRowSelectionOnClick
-          pageSizeOptions={[25, 50]}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 25 } },
-            sorting: { sortModel: [{ field: 'daysUntilDue', sort: 'asc' }] },
-          }}
-          onRowClick={(params) => navigate(`/surveys/${params.row.facilityId}`)}
-          getRowClassName={(params) => {
-            const s = params.row.status;
-            if (s === 'Overdue') return 'row-overdue';
-            if (s === 'Due Soon') return 'row-due-soon';
-            return '';
-          }}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: '#e0e4e7', borderBottom: 'none' },
-            '& .MuiDataGrid-columnHeader': { bgcolor: '#e0e4e7' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 400, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px' },
-            '& .MuiDataGrid-columnSeparator': { display: 'none' },
-            '& .MuiDataGrid-row': { cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } },
-            '& .MuiDataGrid-cell': { borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center' },
-            '& .row-overdue': { bgcolor: '#FFF5F5', '&:hover': { bgcolor: '#FEE2E2' } },
-            '& .row-due-soon': { bgcolor: '#FFFBEB', '&:hover': { bgcolor: '#FEF3C7' } },
-          }}
-          autoHeight
-        />
+        <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#e0e4e7' }}>
+              {/* Group header row */}
+              <TableRow>
+                <TableCell colSpan={3} sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '3px', px: 2, borderBottom: '1px solid rgba(41,48,54,0.15)', textAlign: 'center' }}>
+                  Survey Window
+                </TableCell>
+                <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+                <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+                <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+                <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+                <TableCell sx={{ bgcolor: '#e0e4e7', borderBottom: 'none', py: '3px' }} />
+              </TableRow>
+              {/* Sub-header row */}
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, whiteSpace: 'nowrap', width: 150 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                    Days until open
+                    <ArrowDownwardIcon sx={{ fontSize: 16, color: '#293036' }} />
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 130, textAlign: 'center' }}>Open date</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 130, textAlign: 'center' }}>Close date</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 150 }}>Surveyor</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 130 }} align="right">Prev. Citations</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 80 }} align="right">Alerts</TableCell>
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 48, px: 0 }} />
+              </TableRow>
+            </TableHead>
+            <TableBody sx={{ bgcolor: 'white' }}>
+              {rows.map((r, idx) => {
+                const isOverdue = r.status === 'Overdue';
+                const isDueSoon = r.status === 'Due Soon';
+                const isUpcoming = r.status === 'Upcoming';
+                const borderColor = isOverdue ? '#D32F2F' : isDueSoon ? '#ED6C02' : isUpcoming ? '#FDE68A' : 'transparent';
+                const isLast = idx === rows.length - 1;
+                return (
+                  <TableRow key={r.id} hover sx={{
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: '#F0F7FF' },
+                    bgcolor: isOverdue ? '#FFF5F5' : isDueSoon ? '#FFFBEB' : 'inherit',
+                    ...(isLast && { '& td': { borderBottom: 'none' } }),
+                  }}
+                    onClick={() => navigate(`/surveys/${r.facilityId}`)}>
+                    <TableCell align="center" sx={borderColor !== 'transparent' ? { boxShadow: `inset 4px 0 0 0 ${borderColor}` } : {}}>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.daysUntilDue}</Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{fmtDate(r.windowStart)}</Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{fmtDate(r.windowEnd)}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036' }}>
+                        {r.name.replace('Avir at ', '')}
+                      </Typography>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.region}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.lastSurveyor}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.totalCitations}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={r.alerts > 0 ? { bgcolor: '#FEE2E2' } : {}}>
+                      <Typography sx={{ fontSize: '14px', fontWeight: r.alerts > 0 ? 700 : 400, color: r.alerts > 0 ? '#991B1B' : '#293036' }}>
+                        {r.alerts}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ px: 1 }}>
+                      <IconButton size="small">
+                        <ArrowForwardIcon sx={{ fontSize: 18, color: '#293036' }} />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Paper>
     </Box>
   );

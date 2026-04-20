@@ -59,14 +59,13 @@ const helpItems: DropdownItem[] = [
 
 const sideNavItems = [
   { label: 'Dashboard', path: '/' },
-  { label: 'Pre-Survey', path: '/surveys' },
+  { label: 'Pre-survey', path: '/surveys' },
   { label: 'Survey Overviews', path: '/citations-remix' },
   { label: 'K-Tags', path: '/citations-remix/tags/k', indent: true },
-  { label: 'N-Tags (State)', path: '/citations-remix/tags/state', indent: true },
+  { label: 'N-Tags', path: '/citations-remix/tags/state', indent: true },
   { label: 'E-Tags', path: '/citations-remix/tags/e', indent: true },
   { label: 'Community Summaries', path: '/facilities' },
-  { label: 'Plans of Correction (Future)', path: '/poc' },
-  { label: 'Trends (Future)', path: '/trends' },
+  { label: 'Upload Survey', path: '/upload' },
 ];
 
 const toolsLabelToPath: Record<string, string> = {
@@ -251,7 +250,7 @@ export default function AppLayout({
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#ECEEF0', overflowX: 'hidden' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#F7F8F9', overflowX: 'hidden' }}>
       {/* Top NavBar */}
       <AppBar position="fixed" elevation={0} sx={{ bgcolor: '#fff', borderBottom: '1px solid #e0e4e7', zIndex: 1100 }}>
         <Toolbar sx={{ minHeight: '60px !important', px: 1, gap: 1 }}>
@@ -414,16 +413,17 @@ export default function AppLayout({
                   onClick={() => navigate(item.path)}
                   selected={isActive}
                   sx={{
-                    borderRadius: '4px',
-                    mb: 0.25,
-                    py: (item as any).indent ? 0.6 : 1,
+                    borderRadius: 0,
+                    mb: 0,
+                    py: (item as any).indent ? 0.6 : 1.25,
                     px: 1.5,
                     pl: (item as any).indent ? 4 : 1.5,
+                    borderLeft: isActive ? '3px solid #0065BD' : '3px solid transparent',
                     '&.Mui-selected': {
-                      bgcolor: 'rgba(0,101,189,0.08)',
-                      '&:hover': { bgcolor: 'rgba(0,101,189,0.12)' },
+                      bgcolor: 'rgba(0,101,189,0.06)',
+                      '&:hover': { bgcolor: 'rgba(0,101,189,0.10)' },
                     },
-                    '&:hover': { bgcolor: 'rgba(103,119,135,0.08)' },
+                    '&:hover': { bgcolor: 'rgba(103,119,135,0.06)' },
                   }}
                 >
                   <ListItemText
@@ -432,7 +432,7 @@ export default function AppLayout({
                       fontFamily: '"Inter", sans-serif',
                       fontWeight: isActive ? 600 : 400,
                       fontSize: (item as any).indent ? '0.8rem' : '0.875rem',
-                      color: isActive ? '#0065BD' : (item as any).indent ? '#5c6874' : '#293036',
+                      color: isActive ? '#293036' : (item as any).indent ? '#5c6874' : '#293036',
                     }}
                   />
                 </ListItemButton>
@@ -449,7 +449,7 @@ export default function AppLayout({
             flexGrow: 1,
             ml: `${SIDENAV_WIDTH}px`,
             minHeight: `calc(100vh - 60px)`,
-            bgcolor: '#ECEEF0',
+            bgcolor: '#F7F8F9',
             width: `calc(100vw - ${SIDENAV_WIDTH}px)`,
             maxWidth: `calc(100vw - ${SIDENAV_WIDTH}px)`,
           }}

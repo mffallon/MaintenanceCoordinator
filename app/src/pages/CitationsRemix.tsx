@@ -2,20 +2,22 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Paper,
-  Button, IconButton, Menu, FormControlLabel, Switch,
+  Button, IconButton, FormControlLabel, Switch,
   Drawer, Divider, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  LinearProgress, FormControl, InputLabel, Select, MenuItem,
+  LinearProgress, FormControl, InputLabel, Select, MenuItem, ButtonBase,
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
-import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ViewColumnIcon from '@mui/icons-material/ViewColumn';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonIcon from '@mui/icons-material/Person';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import CancelIcon from '@mui/icons-material/Cancel';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PageHeader from '../components/PageHeader';
 import PageFilters from '../components/PageFilters';
 import { surveys as avirSurveys, citations as avirCitations, facilities as avirFacilities } from '../data/avir-data';
@@ -44,14 +46,23 @@ export default function CitationsRemix() {
   const { passesFilter } = useCommunityFilter();
 
   const [dateRange, setDateRange] = useState('ytd');
-  const [viewMenuAnchor, setViewMenuAnchor] = useState<null | HTMLElement>(null);
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
   const [selectedSurveyor, setSelectedSurveyor] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState('');
   const [latestOnly, setLatestOnly] = useState(true);
   const [tagDrawer, setTagDrawer] = useState<{ row: SurveyRow; tagType: 'K' | 'State' | 'E' | 'All' } | null>(null);
+  const [tagFilter, setTagFilter] = useState<'All' | 'K' | 'N' | 'E'>('All');
+  const [sortField, setSortField] = useState<string>('surveyDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // Build survey-level rows directly from Avir survey data
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir(field === 'surveyDate' ? 'desc' : 'asc');
+    }
+  };
+
   const allRows = useMemo<SurveyRow[]>(() => {
     const passesDate = makeDateFilter(dateRange);
     return avirSurveys
@@ -90,115 +101,19 @@ export default function CitationsRemix() {
     return rows;
   }, [allRows, regionFilter, latestOnly]);
 
-  const toggleCol = (col: string) => {
-    setHiddenCols((prev) => {
-      const next = new Set(prev);
-      if (next.has(col)) next.delete(col); else next.add(col);
-      return next;
-    });
-  };
-
-  const columns: GridColDef[] = [
-    {
-      field: 'surveyDate', headerName: 'Survey Date', flex: 0.7, minWidth: 100,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{fmtDate(p.value as string)}</Typography>
-      ),
-    },
-    {
-      field: 'facilityName', headerName: 'Community', flex: 1.2, minWidth: 180,
-      renderCell: (p: GridRenderCellParams) => (
-        <Box sx={{ lineHeight: 1.3 }}>
-          <Typography variant="body2" sx={{
-            fontWeight: 600, color: '#293036', fontSize: '0.8rem',
-            lineHeight: 1.3, mb: 0,
-          }}>
-            {(p.value as string).replace('Avir at ', '')}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2, display: 'block' }}>{p.row.region}</Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'surveyor', headerName: 'Surveyor', flex: 0.7, minWidth: 110,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography variant="body2" sx={{
-          fontWeight: 500, color: '#0065BD', cursor: 'pointer', fontSize: '0.85rem',
-          '&:hover': { textDecoration: 'underline' },
-        }} onClick={(e) => { e.stopPropagation(); setSelectedSurveyor(p.value as string); }}>
-          {p.value as string}
-        </Typography>
-      ),
-    },
-    {
-      field: 'totalCitations', headerName: 'Total Citations', flex: 0.5, minWidth: 80, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
-      renderCell: (p: GridRenderCellParams) => {
-        const v = p.value as number;
-        return v > 0 ? (
-          <Typography variant="body2" sx={{ cursor: 'pointer', color: '#0065BD', fontWeight: 700, '&:hover': { textDecoration: 'underline' } }}
-            onClick={(e) => { e.stopPropagation(); setTagDrawer({ row: p.row as SurveyRow, tagType: 'All' }); }}>{v}</Typography>
-        ) : <Typography variant="body2" color="text.secondary">0</Typography>;
-      },
-    },
-    {
-      field: 'kTags', headerName: 'K-Tags', flex: 0.4, minWidth: 70, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
-      renderCell: (p: GridRenderCellParams) => {
-        const v = p.value as number;
-        return v > 0 ? (
-          <Typography variant="body2" sx={{ cursor: 'pointer', color: '#0065BD', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
-            onClick={(e) => { e.stopPropagation(); setTagDrawer({ row: p.row as SurveyRow, tagType: 'K' }); }}>{v}</Typography>
-        ) : <Typography variant="body2" color="text.secondary">0</Typography>;
-      },
-    },
-    {
-      field: 'stateTags', headerName: 'State Tags', flex: 0.5, minWidth: 80, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
-      renderCell: (p: GridRenderCellParams) => {
-        const v = p.value as number;
-        return v > 0 ? (
-          <Typography variant="body2" sx={{ cursor: 'pointer', color: '#0065BD', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
-            onClick={(e) => { e.stopPropagation(); setTagDrawer({ row: p.row as SurveyRow, tagType: 'State' }); }}>{v}</Typography>
-        ) : <Typography variant="body2" color="text.secondary">0</Typography>;
-      },
-    },
-    {
-      field: 'eTags', headerName: 'E-Tags', flex: 0.4, minWidth: 70, align: 'center' as const, headerAlign: 'center' as const, type: 'number' as const,
-      renderCell: (p: GridRenderCellParams) => {
-        const v = p.value as number;
-        return v > 0 ? (
-          <Typography variant="body2" sx={{ cursor: 'pointer', color: '#0065BD', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
-            onClick={(e) => { e.stopPropagation(); setTagDrawer({ row: p.row as SurveyRow, tagType: 'E' }); }}>{v}</Typography>
-        ) : <Typography variant="body2" color="text.secondary">0</Typography>;
-      },
-    },
-    {
-      field: '_nav', headerName: '', width: 40, sortable: false, disableColumnMenu: true,
-      renderCell: () => <ChevronRightIcon sx={{ fontSize: 20, color: '#8492a1' }} />,
-    },
-  ].filter((c) => !hiddenCols.has(c.field));
-
-  const toggleableCols = [
-    { field: 'surveyDate', label: 'Survey Date' },
-    { field: 'surveyor', label: 'Surveyor' },
-    { field: 'kTags', label: 'K-Tags' },
-    { field: 'stateTags', label: 'State Tags' },
-    { field: 'eTags', label: 'E-Tags' },
-  ];
-
-  // Compute tag type totals across filtered rows (respects surveyor + date + community filters)
   const tagTypeTotals = useMemo(() => {
     const kTotal = filteredRows.reduce((s, r) => s + r.kTags, 0);
     const stateTotal = filteredRows.reduce((s, r) => s + r.stateTags, 0);
     const eTotal = filteredRows.reduce((s, r) => s + r.eTags, 0);
     return [
-      { type: 'K' as const, label: 'K-Tags', subtitle: 'Life Safety Code', count: kTotal },
-      { type: 'State' as const, label: 'N-Tags (State)', subtitle: 'State Regulations', count: stateTotal },
-      { type: 'E' as const, label: 'E-Tags', subtitle: 'Emergency Preparedness', count: eTotal },
+      { type: 'K' as const, label: 'K-Tags', subtitle: 'Life Safety Code', count: kTotal, path: '/citations-remix/tags/k' },
+      { type: 'State' as const, label: 'N-Tags (State)', subtitle: 'State Regulations', count: stateTotal, path: '/citations-remix/tags/state' },
+      { type: 'E' as const, label: 'E-Tags', subtitle: 'Emergency Preparedness', count: eTotal, path: '/citations-remix/tags/e' },
     ];
   }, [filteredRows]);
 
   const deficiencyFreeCount = useMemo(() => filteredRows.filter((r) => r.totalCitations === 0 && !r.isPending).length, [filteredRows]);
 
-  // Build a filter for the previous equivalent period
   const prevPeriodFilter = useMemo((): ((dateStr: string) => boolean) | null => {
     const REF = new Date('2026-04-05');
     const y = REF.getFullYear(); const m = REF.getMonth(); const d = REF.getDate();
@@ -228,7 +143,6 @@ export default function CitationsRemix() {
     return null;
   }, [dateRange]);
 
-  // Top 5 most common tags across filtered citations, with prev-period trend
   const topTags = useMemo(() => {
     const passesDate = makeDateFilter(dateRange);
     const filtered = avirCitations.filter((c) =>
@@ -245,7 +159,6 @@ export default function CitationsRemix() {
       else { map.set(c.tag, { count: 1, description: c.description || '', type }); }
     });
 
-    // Previous period counts for trend
     const prevMap = new Map<string, number>();
     if (prevPeriodFilter) {
       avirCitations
@@ -253,12 +166,42 @@ export default function CitationsRemix() {
         .forEach((c) => prevMap.set(c.tag, (prevMap.get(c.tag) || 0) + 1));
     }
 
-    const sorted = [...map.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+    let entries = [...map.entries()];
+    if (tagFilter !== 'All') {
+      entries = entries.filter(([, v]) => v.type === tagFilter);
+    }
+    const sorted = entries.sort((a, b) => b[1].count - a[1].count).slice(0, 5);
     return sorted.map(([tag, v]) => ({
       tag, ...v,
       prevCount: prevPeriodFilter ? (prevMap.get(tag) ?? null) : null,
     }));
-  }, [filteredRows, passesFilter, dateRange, regionFilter, prevPeriodFilter]);
+  }, [filteredRows, passesFilter, dateRange, regionFilter, prevPeriodFilter, tagFilter]);
+
+  const sortedSurveys = useMemo(() => {
+    const mul = sortDir === 'asc' ? 1 : -1;
+    return [...filteredRows].sort((a, b) => {
+      const av = (a as Record<string, unknown>)[sortField];
+      const bv = (b as Record<string, unknown>)[sortField];
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mul;
+      return String(av ?? '').localeCompare(String(bv ?? '')) * mul;
+    });
+  }, [filteredRows, sortField, sortDir]);
+
+  const totalCitations = filteredRows.reduce((s, r) => s + r.totalCitations, 0);
+
+  // Card styles
+  const cardOuterSx = {
+    flex: 1, borderRadius: '8px', border: '1px solid #e0e4e7',
+    bgcolor: '#eceef0',
+    display: 'flex', flexDirection: 'column', alignItems: 'stretch', textAlign: 'left',
+    cursor: 'pointer', '&:hover': { boxShadow: '0 2px 8px rgba(0,0,0,0.08)' },
+  };
+  const cardHeaderSx = { px: 2, py: 1, height: 44, display: 'flex', alignItems: 'center' };
+  const cardBodySx = {
+    bgcolor: 'white', borderRadius: '8px', borderTop: '1px solid #e0e4e7',
+    p: 2, position: 'relative', flexGrow: 1,
+    display: 'flex', flexDirection: 'column',
+  };
 
   return (
     <Box>
@@ -267,9 +210,9 @@ export default function CitationsRemix() {
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         extraFilters={
-          <FormControl size="small" sx={{ minWidth: 220 }}>
-            <InputLabel>CMS Region</InputLabel>
-            <Select value={regionFilter} label="CMS Region" onChange={(e) => setRegionFilter(e.target.value)}>
+          <FormControl size="small" variant="filled" sx={{ minWidth: 220 }}>
+            <InputLabel>Filter by CMS Region</InputLabel>
+            <Select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
               <MenuItem value="">All regions</MenuItem>
               {regions.map((r) => (
                 <MenuItem key={r} value={r}>{r}</MenuItem>
@@ -291,143 +234,221 @@ export default function CitationsRemix() {
         }
       />
 
-      {/* Tag Type Callouts */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <Paper sx={{
-          p: 2, flex: 1, borderRadius: 3, border: '1px solid #BBF7D0',
-          bgcolor: '#F0FDF4', transition: 'box-shadow 0.15s',
-        }}>
-          <Typography variant="caption" sx={{ fontWeight: 600, color: '#166534' }}>Deficiency Free</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 800, my: 0.5, color: '#16A34A' }}>{deficiencyFreeCount}</Typography>
-          <Typography variant="caption" sx={{ color: '#15803D' }}>Of {filteredRows.length} surveys completed</Typography>
-        </Paper>
+      {/* Summary Cards - 4 cards */}
+      <Box sx={{ display: 'flex', gap: 2, my: 3 }}>
         {tagTypeTotals.map((t) => (
-          <Paper key={t.type} sx={{
-            p: 2, flex: 1, borderRadius: 3, border: '1px solid #E0E4E7',
-            cursor: 'pointer', transition: 'box-shadow 0.15s',
-            '&:hover': { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-          }} onClick={() => {
-            const params = new URLSearchParams();
-            if (dateRange) params.set('dateRange', dateRange);
-            if (regionFilter) params.set('region', regionFilter);
-            if (latestOnly) params.set('latestOnly', '1');
-            navigate(`/citations-remix/tags/${t.type.toLowerCase()}?${params.toString()}`);
-          }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: '#5c6874' }}>{t.label}</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 800, my: 0.5 }}>{t.count}</Typography>
-            <Typography variant="caption" color="text.secondary">{t.subtitle}</Typography>
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#0065BD', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                View all <Box component="span" sx={{ fontSize: '1rem' }}>&rarr;</Box>
+          <ButtonBase key={t.type} onClick={() => navigate(t.path)} sx={{ ...cardOuterSx }}>
+            <Box sx={{ ...cardHeaderSx }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
+                {t.label}
               </Typography>
             </Box>
-          </Paper>
+            <Box sx={{ ...cardBodySx }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '36px', color: '#293036', lineHeight: '44px', letterSpacing: '-0.684px' }}>
+                {t.count}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mt: '4px' }}>
+                <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036', lineHeight: '16px', letterSpacing: '-0.084px' }}>
+                  {t.subtitle}
+                </Typography>
+                <ArrowForwardIcon sx={{ fontSize: 16, color: '#0065BD' }} />
+              </Box>
+            </Box>
+          </ButtonBase>
         ))}
+
+        {/* Deficiency-Free */}
+        <Box sx={{ ...cardOuterSx, bgcolor: '#c7f2df', border: '1px solid #abeccf', cursor: 'default' }}>
+          <Box sx={{ ...cardHeaderSx }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '16px', color: '#0b2f1f', letterSpacing: '-0.176px' }}>
+              Deficiency-Free Surveys
+            </Typography>
+          </Box>
+          <Box sx={{ ...cardBodySx, borderTop: '1px solid #abeccf' }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '36px', color: '#196c46', lineHeight: '44px', letterSpacing: '-0.684px' }}>
+              {deficiencyFreeCount}
+            </Typography>
+            <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036', lineHeight: '16px', letterSpacing: '-0.084px', mt: '4px' }}>
+              Out of {filteredRows.length} Surveys this year
+            </Typography>
+          </Box>
+        </Box>
       </Box>
 
-
       {/* Top 5 Tags */}
-      <Paper sx={{ p: 2, mb: 2, borderRadius: 3, border: '1px solid #E0E4E7' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>Top 5 Tags</Typography>
-        </Box>
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ bgcolor: '#F8FAFC' }}>
-              <TableCell sx={{ fontWeight: 600, fontSize: '0.72rem', color: '#64748B', py: 0.75, width: 90 }}>Tag</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '0.72rem', color: '#64748B', py: 0.75 }}>Description</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.72rem', color: '#64748B', py: 0.75, width: 60 }}>Count</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '0.72rem', color: '#64748B', py: 0.75, width: 120 }}>vs Prior Period</TableCell>
-              <TableCell sx={{ width: 32 }} />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {topTags.map((t) => {
-              const tagColor = t.type === 'K' ? '#991B1B' : t.type === 'E' ? '#854D0E' : '#1E40AF';
-              const diff = t.prevCount !== null ? t.count - t.prevCount : null;
-              const trendIcon = diff === null ? null
-                : diff > 0 ? <TrendingUpIcon sx={{ fontSize: 16 }} />
-                : diff < 0 ? <TrendingDownIcon sx={{ fontSize: 16 }} />
-                : <TrendingFlatIcon sx={{ fontSize: 16 }} />;
-              const trendColor = diff === null ? '#94A3B8'
-                : diff > 0 ? '#DC2626'
-                : diff < 0 ? '#16A34A'
-                : '#64748B';
-              return (
-                <TableRow key={t.tag} hover sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
-                  onClick={() => navigate(`/citations-remix/tags/${t.type.toLowerCase()}/${t.tag}`)}>
-                  <TableCell sx={{ py: 1 }}>
-                    <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: tagColor, fontSize: '0.8rem' }}>
-                      {t.tag}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#293036', fontSize: '0.78rem' }}>
-                      {t.description || '—'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" sx={{ py: 1 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{t.count}</Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: 1 }}>
-                    {diff === null ? (
-                      <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.75rem' }}>—</Typography>
-                    ) : (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: trendColor }}>
-                        {trendIcon}
-                        <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.78rem', color: trendColor }}>
-                          {diff > 0 ? `+${diff}` : diff === 0 ? 'same' : diff}
-                        </Typography>
-                      </Box>
-                    )}
-                  </TableCell>
-                  <TableCell sx={{ py: 1, pl: 0, pr: 0.5 }}>
-                    <ChevronRightIcon sx={{ fontSize: 18, color: '#8492a1', display: 'block' }} />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Paper>
-
-      {/* Summary line */}
-      <Paper sx={{ px: 2, py: 1, borderRadius: 0, border: '1px solid #E0E4E7', borderBottom: 'none', bgcolor: '#FAFBFC' }}>
-        <Typography variant="body2" sx={{ fontWeight: 600, color: '#293036' }}>
-          {filteredRows.length} surveys
-          <Typography component="span" variant="body2" sx={{ color: '#5c6874', ml: 1 }}>
-            {filteredRows.reduce((s, r) => s + r.totalCitations, 0)} total citations
+      <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 2, py: 2.5 }}>
+          <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', letterSpacing: '-0.176px', whiteSpace: 'nowrap' }}>
+            Top 5 Tags
           </Typography>
-        </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {(['All', 'K', 'N', 'E'] as const).map((f) => (
+              <Chip
+                key={f}
+                label={f === 'All' ? 'All' : `${f}-Tags`}
+                size="small"
+                color="default"
+                variant={tagFilter === f ? 'filled' : 'outlined'}
+                icon={tagFilter === f ? <CheckCircleIcon sx={{ fontSize: '16px !important' }} /> : undefined}
+                onClick={() => setTagFilter(f)}
+              />
+            ))}
+          </Box>
+        </Box>
+        <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#e0e4e7' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 95 }}>Tag</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Description</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 100 }} align="right">Count</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, whiteSpace: 'nowrap' }} align="right">vs Previous Period</TableCell>
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 48, px: 0 }} />
+              </TableRow>
+            </TableHead>
+            <TableBody sx={{ bgcolor: 'white' }}>
+              {topTags.map((t, idx) => {
+                const diff = t.prevCount !== null ? t.count - t.prevCount : null;
+                const pctChange = t.prevCount && t.prevCount > 0 ? Math.round(Math.abs(diff!) / t.prevCount * 100) : null;
+                const isLast = idx === topTags.length - 1;
+                return (
+                  <TableRow key={t.tag} hover sx={{
+                    cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' },
+                    ...(isLast && { '& td': { borderBottom: 'none' } }),
+                  }}
+                    onClick={() => navigate(`/citations-remix/tags/${t.type.toLowerCase()}/${t.tag}`)}>
+                    <TableCell sx={{ py: 1 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>
+                        {t.tag}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1 }}>
+                      <Typography sx={{ fontSize: '14px', color: '#293036' }}>
+                        {t.description || '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>{t.count}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1 }}>
+                      {diff === null ? (
+                        <Typography sx={{ color: '#94A3B8', fontSize: '14px' }}>—</Typography>
+                      ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, color: diff > 0 ? '#DC2626' : diff < 0 ? '#16A34A' : '#64748B' }}>
+                          <CancelIcon sx={{ fontSize: 16, color: diff > 0 ? '#DC2626' : '#16A34A' }} />
+                          <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>
+                            {pctChange !== null ? `${pctChange}%` : diff > 0 ? `+${diff}` : diff === 0 ? 'same' : `${diff}`}
+                          </Typography>
+                        </Box>
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ px: 1 }}>
+                      <IconButton size="small">
+                        <ArrowForwardIcon sx={{ fontSize: 18, color: '#293036' }} />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Paper>
 
-      {/* Table */}
-      <Paper sx={{ borderRadius: '0 0 12px 12px', border: '1px solid #E0E4E7', overflow: 'hidden' }}>
-        <DataGrid
-          rows={filteredRows}
-          columns={columns}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 25 } },
-            sorting: { sortModel: [{ field: 'surveyDate', sort: 'desc' }] },
-          }}
-          pageSizeOptions={[10, 25, 50]}
-          disableColumnMenu
-          disableRowSelectionOnClick
-          rowHeight={52}
-          getRowClassName={(params) => params.row.totalCitations === 0 ? 'def-free-row' : ''}
-          onRowClick={(params) => navigate(`/facility/${params.row.facilityId}`)}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: '#e0e4e7', borderBottom: 'none' },
-            '& .MuiDataGrid-columnHeader': { bgcolor: '#e0e4e7' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 400, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px', lineHeight: '16px' },
-            '& .MuiDataGrid-columnSeparator': { display: 'none' },
-            '& .MuiDataGrid-row': { cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } },
-            '& .MuiDataGrid-row.def-free-row': { bgcolor: '#F0FDF4', '&:hover': { bgcolor: '#DCFCE7' } },
-            '& .MuiDataGrid-cell': { borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center' },
-          }}
-          autoHeight
-        />
+      {/* Surveys Table */}
+      <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}>
+          <Typography sx={{ fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
+            <Box component="span" sx={{ fontWeight: 700 }}>{filteredRows.length} surveys</Box>
+            <Box component="span" sx={{ fontWeight: 400 }}> - {totalCitations} total citations</Box>
+          </Typography>
+          <Button variant="contained" color="inherit" startIcon={<UploadFileIcon />} size="medium">
+            Upload survey
+          </Button>
+        </Box>
+        <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#e0e4e7' }}>
+              <TableRow>
+                {([
+                  { field: 'surveyDate', label: 'Survey date', width: 160, align: 'center' as const },
+                  { field: 'facilityName', label: 'Community', align: 'left' as const },
+                  { field: 'surveyor', label: 'Surveyor', width: 160, align: 'left' as const },
+                  { field: 'kTags', label: 'K-Tags', align: 'right' as const, nowrap: true },
+                  { field: 'stateTags', label: 'N-Tags', align: 'right' as const, nowrap: true },
+                  { field: 'eTags', label: 'E-Tags', align: 'right' as const, nowrap: true },
+                  { field: 'totalCitations', label: 'Total', align: 'right' as const, nowrap: true },
+                ] as const).map((col) => (
+                  <TableCell
+                    key={col.field}
+                    align={col.align}
+                    sx={{
+                      fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7',
+                      letterSpacing: '-0.084px', py: '6px', px: 2, cursor: 'pointer', userSelect: 'none',
+                      whiteSpace: 'nowrap' in col && col.nowrap ? 'nowrap' : undefined,
+                      width: 'width' in col ? col.width : undefined,
+                      '&:hover': { color: '#0065BD' },
+                    }}
+                    onClick={() => handleSort(col.field)}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, justifyContent: col.align === 'right' ? 'flex-end' : col.align === 'center' ? 'center' : 'flex-start' }}>
+                      {col.label}
+                      {sortField === col.field && (
+                        sortDir === 'desc'
+                          ? <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+                          : <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+                      )}
+                    </Box>
+                  </TableCell>
+                ))}
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 48, px: 0 }} />
+              </TableRow>
+            </TableHead>
+            <TableBody sx={{ bgcolor: 'white' }}>
+              {sortedSurveys.map((srv, idx) => {
+                const isLast = idx === sortedSurveys.length - 1;
+                return (
+                  <TableRow key={srv.id} hover
+                    sx={{
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: srv.totalCitations === 0 ? '#c7f2df' : '#F0F7FF' },
+                      bgcolor: srv.totalCitations === 0 ? '#e3f9ef' : 'inherit',
+                      ...(isLast && { '& td': { borderBottom: 'none' } }),
+                    }}
+                    onClick={() => navigate(`/facility/${srv.facilityId}`)}>
+                    <TableCell align="center">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{fmtDate(srv.surveyDate)}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036' }}>{srv.facilityName.replace('Avir at ', '')}</Typography>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{srv.region}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{srv.surveyor}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.kTags ? '#293036' : '#94A3B8' }}>{srv.kTags || '—'}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.stateTags ? '#293036' : '#94A3B8' }}>{srv.stateTags || '—'}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.eTags ? '#293036' : '#94A3B8' }}>{srv.eTags || '—'}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036' }}>{srv.totalCitations}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ px: 1 }}>
+                      <IconButton size="small">
+                        <ArrowForwardIcon sx={{ fontSize: 18, color: '#293036' }} />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Paper>
 
       {/* Tag Detail Drawer */}
@@ -438,7 +459,7 @@ export default function CitationsRemix() {
           const prefix = c.tag.split('-')[0];
           if (tagType === 'K') return prefix === 'K';
           if (tagType === 'E') return prefix === 'E';
-          return prefix !== 'K' && prefix !== 'E'; // State
+          return prefix !== 'K' && prefix !== 'E';
         });
         const title = tagType === 'All' ? 'All Citations' : tagType === 'State' ? 'State Tags' : `${tagType}-Tags`;
 
@@ -455,11 +476,8 @@ export default function CitationsRemix() {
                 </Box>
                 <IconButton onClick={() => setTagDrawer(null)} size="small"><CloseIcon /></IconButton>
               </Box>
-
               <Divider sx={{ mb: 2 }} />
-
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>{filtered.length} citation{filtered.length !== 1 ? 's' : ''}</Typography>
-
               {filtered.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">No citations found.</Typography>
               ) : (
@@ -479,13 +497,9 @@ export default function CitationsRemix() {
                         {c.observation}
                       </Typography>
                     )}
-                    {c.isWaiver && (
-                      <Chip label="Waiver" size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600, bgcolor: '#EDE9FE', color: '#5B21B6' }} />
-                    )}
                   </Box>
                 ))
               )}
-
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button variant="contained" color="inherit" disableElevation onClick={() => setTagDrawer(null)}>Close</Button>
               </Box>
@@ -505,15 +519,10 @@ export default function CitationsRemix() {
         const totalCit = surveyorRows.reduce((s, r) => s + r.totalCitations, 0);
         const avgPerSurvey = totalSurveys > 0 ? (totalCit / totalSurveys).toFixed(1) : '0';
         const regionsServed = [...new Set(surveyorRows.map((r) => r.region))];
-        const statesServed = [...new Set(surveyorRows.map((r) => r.state))];
-
-        // Tag distribution percentages
         const tagTotal = totalK + totalState + totalE;
         const kPct = tagTotal > 0 ? Math.round((totalK / tagTotal) * 100) : 0;
         const statePct = tagTotal > 0 ? Math.round((totalState / tagTotal) * 100) : 0;
         const ePct = tagTotal > 0 ? Math.round((totalE / tagTotal) * 100) : 0;
-
-        // Top tag descriptions from this surveyor's citations
         const catCounts = new Map<string, number>();
         surveyorRows.forEach((sr) => {
           const facCits = avirCitations.filter((c) => c.facilityId === sr.facilityId && c.date === sr.surveyDate);
@@ -525,7 +534,6 @@ export default function CitationsRemix() {
           <Drawer anchor="right" open={true} onClose={() => setSelectedSurveyor(null)}
             sx={{ zIndex: 1400, '& .MuiDrawer-paper': { width: 420, boxShadow: '-4px 0 24px rgba(0,0,0,0.12)' } }}>
             <Box sx={{ p: 3 }}>
-              {/* Header */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Box sx={{ width: 44, height: 44, borderRadius: '12px', bgcolor: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -538,8 +546,6 @@ export default function CitationsRemix() {
                 </Box>
                 <IconButton onClick={() => setSelectedSurveyor(null)} size="small"><CloseIcon /></IconButton>
               </Box>
-
-              {/* Summary Stats */}
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 3 }}>
                 <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2 }}>
                   <Typography variant="caption" color="text.secondary">Surveys</Typography>
@@ -558,16 +564,12 @@ export default function CitationsRemix() {
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{regionsServed.join(', ')}</Typography>
                 </Box>
               </Box>
-
               <Divider sx={{ mb: 2.5 }} />
-
-              {/* Tag Distribution */}
               <Box sx={{ mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <TrendingUpIcon sx={{ fontSize: 18, color: '#5c6874' }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Tag Distribution</Typography>
                 </Box>
-
                 {[
                   { label: 'K-Tags (Life Safety)', count: totalK, pct: kPct, color: '#DC2626' },
                   { label: 'State Tags', count: totalState, pct: statePct, color: '#2563EB' },
@@ -583,10 +585,7 @@ export default function CitationsRemix() {
                   </Box>
                 ))}
               </Box>
-
               <Divider sx={{ mb: 2.5 }} />
-
-              {/* Top Citation Categories */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Top Citation Categories</Typography>
                 {topCats.map(([cat, count]) => (
@@ -596,10 +595,7 @@ export default function CitationsRemix() {
                   </Box>
                 ))}
               </Box>
-
               <Divider sx={{ mb: 2.5 }} />
-
-              {/* Survey History */}
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Survey History</Typography>
                 <TableContainer>
@@ -619,9 +615,7 @@ export default function CitationsRemix() {
                         <TableRow key={sr.id} hover sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } }}
                           onClick={() => { setSelectedSurveyor(null); navigate(`/facility/${sr.facilityId}`); }}>
                           <TableCell sx={{ fontSize: '0.75rem', py: 0.75 }}>{fmtDate(sr.surveyDate)}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem', py: 0.75 }}>
-                            {sr.facilityName.replace('Avir at ', '')}
-                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.facilityName.replace('Avir at ', '')}</TableCell>
                           <TableCell align="right" sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.kTags}</TableCell>
                           <TableCell align="right" sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.stateTags}</TableCell>
                           <TableCell align="right" sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.eTags}</TableCell>
@@ -632,18 +626,13 @@ export default function CitationsRemix() {
                   </Table>
                 </TableContainer>
               </Box>
-
-              {/* Close button */}
               <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button variant="contained" color="inherit" disableElevation onClick={() => setSelectedSurveyor(null)}>
-                  Close
-                </Button>
+                <Button variant="contained" color="inherit" disableElevation onClick={() => setSelectedSurveyor(null)}>Close</Button>
               </Box>
             </Box>
           </Drawer>
         );
       })()}
-
     </Box>
   );
 }

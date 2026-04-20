@@ -18,9 +18,9 @@ export default function PageFilters({ dateRange, onDateRangeChange, extraFilters
       </Box>
       {extraFilters}
       {dateRange !== undefined && onDateRangeChange && (
-        <FormControl size="small" sx={{ minWidth: 180 }}>
+        <FormControl size="small" variant="filled" sx={{ minWidth: 180 }}>
           <InputLabel>Date range</InputLabel>
-          <Select value={dateRange} label="Date range" onChange={(e) => onDateRangeChange(e.target.value)}>
+          <Select value={dateRange} onChange={(e) => onDateRangeChange(e.target.value)}>
             <MenuItem value="all">All time</MenuItem>
             <MenuItem value="ytd">Year to date</MenuItem>
             <MenuItem value="30d">Last 30 days</MenuItem>
