@@ -420,8 +420,8 @@ export default function Trends() {
               margin={{ left: 38, right: 4, top: 8, bottom: 28 }}
               slotProps={{
                 legend: {
-                  direction: 'row',
-                  position: { vertical: 'bottom', horizontal: 'middle' },
+                  direction: 'row' as const,
+                  position: { vertical: 'bottom' as const, horizontal: 'center' as const },
                   padding: { top: 0, bottom: 0, left: 0, right: 0 },
                   itemMarkWidth: 12, itemMarkHeight: 12,
                 },
