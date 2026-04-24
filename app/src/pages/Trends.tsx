@@ -420,11 +420,11 @@ export default function Trends() {
               margin={{ left: 38, right: 4, top: 8, bottom: 28 }}
               slotProps={{
                 legend: {
-                  direction: 'row' as const,
-                  position: { vertical: 'bottom' as const, horizontal: 'center' as const },
+                  direction: 'row',
+                  position: { vertical: 'bottom', horizontal: 'center' },
                   padding: { top: 0, bottom: 0, left: 0, right: 0 },
                   itemMarkWidth: 12, itemMarkHeight: 12,
-                },
+                } as any,
               }}
               sx={{
                 '& .MuiChartsAxis-tickLabel': { fontSize: '11px', fill: '#5c6874' },
