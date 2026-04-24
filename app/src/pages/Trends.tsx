@@ -1,341 +1,697 @@
-import { useMemo, useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Chip, LinearProgress, Divider,
+  Box, Typography, Paper, Button, Chip, FormControl, InputLabel, Select, MenuItem,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, FormControlLabel, Switch,
+  Tabs, Tab,
 } from '@mui/material';
-import { BarChart } from '@mui/x-charts';
+import { BarChart } from '@mui/x-charts/BarChart';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import PersonIcon from '@mui/icons-material/Person';
-import MapIcon from '@mui/icons-material/Map';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { surveys, citations, facilities, regions as avirRegions, surveyors as avirSurveyors } from '../data/avir-data';
 import PageHeader from '../components/PageHeader';
 import PageFilters from '../components/PageFilters';
-import { surveys, citations, regions as avirRegions, surveyors as avirSurveyors } from '../data/avir-data';
 import { useCommunityFilter } from '../components/CommunityFilter';
 import { makeDateFilter } from '../utils/dateFilter';
 
-export default function Trends() {
-  const { passesFilter } = useCommunityFilter();
-  const [dateRange, setDateRange] = useState('all');
-  const [selectedSurveyor, setSelectedSurveyor] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const passesDate = useMemo(() => makeDateFilter(dateRange), [dateRange]);
+// ─── Mock peer / nation benchmarks ──────────────────────────────────────────
+// Higher citations per survey = worse. Story: portfolio worse than peers on
+// K & E-Tags, but better on N-Tags. All categories trending up nationally.
+const BENCHMARKS = {
+  K: { peers: 2.8, peerTrend:  5, nation: 3.6, nationTrend: 15, myTrend: 10 },
+  N: { peers: 3.4, peerTrend: -3, nation: 2.9, nationTrend:  8, myTrend: -5 },
+  E: { peers: 3.0, peerTrend: 12, nation: 4.2, nationTrend: 20, myTrend:  8 },
+} as const;
 
-  // --- Surveyor Trends ---
-  const surveyorData = useMemo(() => {
-    const filtered = surveys.filter((s) => passesFilter(s.facilityId) && passesDate(s.date) && s.surveyor);
-    const map = new Map<string, { name: string; surveys: number; kTags: number; nTags: number; eTags: number; total: number; facilities: Set<string> }>();
+const TAG_COLORS = { K: '#F68E5B', N: '#009FDB', E: '#25A36A' } as const;
+const TAG_LABELS = { K: 'K-Tags', N: 'State', E: 'E-Tags' } as const;
 
-    for (const s of filtered) {
-      if (!map.has(s.surveyor)) {
-        map.set(s.surveyor, { name: s.surveyor, surveys: 0, kTags: 0, nTags: 0, eTags: 0, total: 0, facilities: new Set() });
-      }
-      const d = map.get(s.surveyor)!;
-      d.surveys++;
-      d.kTags += s.kTags;
-      d.nTags += s.nTags;
-      d.eTags += s.eTags;
-      d.total += s.total;
-      d.facilities.add(s.facility);
-    }
+type TagType = 'K' | 'N' | 'E';
+type ChartMode = 'per-survey' | 'total';
+type TrendFilter = 'all' | TagType;
+type TrendSort = 'highest-cited' | 'greatest-increase' | 'highest-reduction';
 
-    return [...map.values()].sort((a, b) => b.total - a.total);
-  }, [passesFilter, passesDate]);
+// ─── Horizontal bar with comparison marker ───────────────────────────────────
+function TrendBar({
+  mainRate, compareRate, compareLabel, tagType, isLast, sectionMax, periodDelta,
+}: {
+  mainRate: number; compareRate: number;
+  mainLabel: string; compareLabel: string;
+  tagType: TagType; isLast: boolean; sectionMax: number;
+  periodDelta?: number; // override: period-over-period change in pp (e.g. +5 or -3)
+}) {
+  const max = sectionMax;
+  const mainPct  = Math.round(mainRate * 100);
+  const cmpPct   = Math.round(compareRate * 100);
+  // Use period-over-period delta when provided (increase/reduction modes), else peer-vs-portfolio
+  const delta    = periodDelta !== undefined ? periodDelta : mainPct - cmpPct;
+  const deltaStr = delta > 0 ? `+${delta}%` : `${delta}%`;
+  const barColor = TAG_COLORS[tagType] ?? '#6366F1';
+  // Visual treatment based on period trend direction
+  const isIncrease  = periodDelta !== undefined && periodDelta > 0;
+  const isReduction = periodDelta !== undefined && periodDelta < 0;
 
-  // Top tags per surveyor
-  const surveyorTopTags = useMemo(() => {
-    const target = selectedSurveyor || (surveyorData[0]?.name ?? '');
-    if (!target) return [];
-    const cits = citations.filter((c) => c.surveyor === target && passesFilter(c.facilityId) && passesDate(c.date));
-    const tagMap = new Map<string, { tag: string; desc: string; type: string; count: number }>();
-    for (const c of cits) {
-      if (!tagMap.has(c.tag)) tagMap.set(c.tag, { tag: c.tag, desc: c.description, type: c.tagType, count: 0 });
-      tagMap.get(c.tag)!.count++;
-    }
-    return [...tagMap.values()].sort((a, b) => b.count - a.count).slice(0, 10);
-  }, [selectedSurveyor, surveyorData, passesFilter, passesDate]);
+  // Bar widths as % of track
+  const barWidthPct = (mainRate / max) * 100;
+  // Increase: darker overlay covers the rightmost `delta` pp of the bar
+  const overlayWidthPct = isIncrease && periodDelta !== undefined
+    ? Math.min((periodDelta / 100 / max) * 100, barWidthPct)
+    : 0;
 
-  const activeSurveyor = selectedSurveyor || (surveyorData[0]?.name ?? '');
-
-  // Surveyor bar chart data
-  const surveyorChartData = useMemo(() => {
-    return surveyorData.slice(0, 12).map((s) => ({
-      name: s.name.length > 15 ? s.name.slice(0, 14) + '...' : s.name,
-      'K-Tags': s.kTags,
-      'N-Tags': s.nTags,
-      'E-Tags': s.eTags,
-    }));
-  }, [surveyorData]);
-
-  // --- Region Tag Trends ---
-  const regionTagData = useMemo(() => {
-    const filtered = citations.filter((c) => passesFilter(c.facilityId) && passesDate(c.date));
-    const map = new Map<string, Map<string, number>>();
-
-    for (const c of filtered) {
-      const region = selectedRegion || c.region;
-      if (selectedRegion && c.region !== selectedRegion) continue;
-      if (!map.has(c.tag)) map.set(c.tag, new Map());
-      const regionMap = map.get(c.tag)!;
-      regionMap.set(c.region, (regionMap.get(c.region) || 0) + 1);
-    }
-
-    // Flatten: top tags across all regions (or selected region)
-    const tagTotals = new Map<string, { tag: string; desc: string; type: string; total: number; regions: Map<string, number> }>();
-    for (const c of filtered) {
-      if (selectedRegion && c.region !== selectedRegion) continue;
-      if (!tagTotals.has(c.tag)) {
-        tagTotals.set(c.tag, { tag: c.tag, desc: c.description, type: c.tagType, total: 0, regions: new Map() });
-      }
-      const t = tagTotals.get(c.tag)!;
-      t.total++;
-      t.regions.set(c.region, (t.regions.get(c.region) || 0) + 1);
-    }
-
-    return [...tagTotals.values()].sort((a, b) => b.total - a.total).slice(0, 15);
-  }, [passesFilter, passesDate, selectedRegion]);
-
-  // Region chart data: top 8 regions by total citations, stacked by tag type
-  const regionChartData = useMemo(() => {
-    const filtered = surveys.filter((s) => passesFilter(s.facilityId) && passesDate(s.date));
-    const map = new Map<string, { region: string; K: number; N: number; E: number }>();
-    for (const s of filtered) {
-      if (!map.has(s.region)) map.set(s.region, { region: s.region, K: 0, N: 0, E: 0 });
-      const r = map.get(s.region)!;
-      r.K += s.kTags;
-      r.N += s.nTags;
-      r.E += s.eTags;
-    }
-    return [...map.values()]
-      .sort((a, b) => (b.K + b.N + b.E) - (a.K + a.N + a.E))
-      .slice(0, 8)
-      .map((r) => ({
-        ...r,
-        region: r.region.replace('Region ', 'R').replace(/ - /g, ': '),
-      }));
-  }, [passesFilter, passesDate]);
-
-  const tagTypeChip = (type: string) => {
-    const styles: Record<string, { bg: string; color: string }> = {
-      K: { bg: '#FEE2E2', color: '#991B1B' },
-      N: { bg: '#DBEAFE', color: '#1E40AF' },
-      E: { bg: '#FEF9C3', color: '#854D0E' },
-    };
-    const s = styles[type] || styles.K;
-    return <Chip label={`${type}-Tag`} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: '0.65rem', height: 20 }} />;
-  };
+  // Reduction: hatched extension starts at current bar end, extends right to show previous (higher) rate
+  const reductionExtLeft  = `${barWidthPct}%`;
+  const reductionExtWidth = isReduction && periodDelta !== undefined
+    ? `${(Math.abs(periodDelta) / 100 / max) * 100}%`
+    : '0%';
+  const markerLeft = `${Math.min((compareRate / max) * 100, 98)}%`;
 
   return (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, pb: isLast ? 0 : 0.5 }}>
+      {/* Bar track + dashed marker + comparison label below */}
+      <Box sx={{ flex: 1, position: 'relative' }}>
+        <Box sx={{ position: 'relative', height: 10, bgcolor: '#E2E8F0', borderRadius: 5 }}>
+          {/* Solid bar — current rate, normal color */}
+          <Box sx={{
+            position: 'absolute', top: 0, bottom: 0, left: 0,
+            width: `${(mainRate / max) * 100}%`,
+            bgcolor: barColor,
+            borderRadius: isReduction ? '5px 0 0 5px' : 5,
+          }} />
+          {/* Increase: darker overlay on the right edge of the bar */}
+          {isIncrease && overlayWidthPct > 0 && (
+            <Box sx={{
+              position: 'absolute', top: 0, bottom: 0,
+              left: `${barWidthPct - overlayWidthPct}%`,
+              width: `${overlayWidthPct}%`,
+              bgcolor: barColor,
+              filter: 'brightness(0.68)',
+              borderRadius: '0 5px 5px 0',
+            }} />
+          )}
+          {/* Reduction: hatched extension showing the previous (higher) rate */}
+          {isReduction && (
+            <Box sx={{
+              position: 'absolute', top: 0, bottom: 0,
+              left: reductionExtLeft, width: reductionExtWidth,
+              background: `repeating-linear-gradient(45deg, ${barColor}66, ${barColor}66 3px, transparent 3px, transparent 7px)`,
+              borderRadius: '0 5px 5px 0',
+            }} />
+          )}
+        </Box>
+        <Box sx={{ position: 'absolute', top: -4, height: 18, left: markerLeft, width: 0, borderLeft: '2px dashed #1E3A8A' }} />
+        <Typography sx={{ fontSize: '11px', color: '#64748B', mt: 0.5 }}>
+          {compareLabel}: {cmpPct}%
+        </Typography>
+      </Box>
+      {/* Main % — shifted up so its vertical center aligns with the bar's center (bar=10px, text≈20px → offset -5px) */}
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.4, flexShrink: 0, mt: '-5px', minWidth: 84 }}>
+        <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#293036' }}>
+          {mainPct}%
+        </Typography>
+        <Typography sx={{ fontSize: '11px', fontWeight: 600, color: delta > 0 ? '#EF4444' : '#94A3B8', whiteSpace: 'nowrap' }}>
+          ({deltaStr})
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+const TAG_ROUTES: Record<TagType, string> = {
+  K: '/citations-remix/tags/k',
+  E: '/citations-remix/tags/e',
+  N: '/citations-remix/tags/state',
+};
+
+export default function Trends() {
+  const navigate = useNavigate();
+  const { passesFilter } = useCommunityFilter();
+  const [dateRange, setDateRange]   = useState('12m');
+  const [latestOnly, setLatestOnly] = useState(true);
+  const [chartMode, setChartMode]     = useState<ChartMode>('per-survey');
+  const [chartTagFilter, setChartTagFilter] = useState<TrendFilter>('all');
+
+  // Bottom section local filters
+  // Combined region/surveyor filter encoded as "" | "region:X" | "surveyor:X"
+  const [trendWho, setTrendWho] = useState('');
+  const [trendTagType, setTrendTagType] = useState<TrendFilter>('all');
+
+  const trendRegion   = trendWho.startsWith('region:')   ? trendWho.slice(7)   : '';
+  const trendSurveyor = trendWho.startsWith('surveyor:') ? trendWho.slice(9)   : '';
+  const [trendSort, setTrendSort] = useState<TrendSort>('highest-cited');
+
+  const passesDate = useMemo(() => makeDateFilter(dateRange), [dateRange]);
+
+  // Latest survey date per facility (global — latestOnly toggle)
+  const latestByFacility = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of surveys) {
+      const cur = map.get(s.facilityId);
+      if (!cur || s.date > cur) map.set(s.facilityId, s.date);
+    }
+    return map;
+  }, []);
+
+  const isLatest = (facilityId: string, date: string) => latestByFacility.get(facilityId) === date;
+
+  // ─── Portfolio surveys ────────────────────────────────────────────────────
+  const portfolioSurveys = useMemo(() => surveys.filter((s) =>
+    passesFilter(s.facilityId) &&
+    passesDate(s.date) &&
+    (!latestOnly || isLatest(s.facilityId, s.date)),
+  ), [passesFilter, passesDate, latestOnly, latestByFacility]);
+
+  // ─── Monthly bar chart data (always 12 months; synthetic fill for missing) ──
+  const monthlyData = useMemo(() => {
+    // Aggregate real survey data by month
+    const map = new Map<string, { count: number; K: number; N: number; E: number }>();
+    for (const s of portfolioSurveys) {
+      const month = s.date.slice(0, 7);
+      if (!map.has(month)) map.set(month, { count: 0, K: 0, N: 0, E: 0 });
+      const m = map.get(month)!;
+      m.count++; m.K += s.kTags; m.N += s.nTags; m.E += s.eTags;
+    }
+
+    // Build a fixed 12-month window ending at the ref date
+    const ref = new Date('2026-04-05');
+    const months: string[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+
+    // Deterministic synthetic filler — hash on month string for stable values
+    const synthVal = (month: string, offset: number): number => {
+      const h = month.split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 1), 0);
+      return +((h % 100 + offset) / 30).toFixed(2);
+    };
+
+    return months.map((month, idx) => {
+      const label = new Date(month + '-15').toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      // Slight upward drift in synthetic data toward present to look natural
+      const drift = idx / 11;
+      if (map.has(month)) {
+        const d = map.get(month)!;
+        const div = chartMode === 'per-survey' ? (d.count || 1) : 1;
+        return { label, K: +(d.K / div).toFixed(2), N: +(d.N / div).toFixed(2), E: +(d.E / div).toFixed(2), synthetic: false };
+      }
+      // Synthetic: plausible values that trend upward slightly
+      return {
+        label,
+        K: +(synthVal(month, 60) + drift * 1.2).toFixed(2),
+        N: +(synthVal(month, 80) + drift * 1.5).toFixed(2),
+        E: +(synthVal(month, 10) + drift * 0.3).toFixed(2),
+        synthetic: true,
+      };
+    });
+  }, [portfolioSurveys, chartMode]);
+
+  // ─── Metric card stats ────────────────────────────────────────────────────
+  const cardStats = useMemo(() => {
+    const n = portfolioSurveys.length || 1;
+    return {
+      K: +(portfolioSurveys.reduce((s, sv) => s + sv.kTags, 0) / n).toFixed(1),
+      N: +(portfolioSurveys.reduce((s, sv) => s + sv.nTags, 0) / n).toFixed(1),
+      E: +(portfolioSurveys.reduce((s, sv) => s + sv.eTags, 0) / n).toFixed(1),
+      count: portfolioSurveys.length,
+    };
+  }, [portfolioSurveys]);
+
+  // ─── Regional Peers vs Portfolio (bottom section) ─────────────────────────
+  const portfolioRegions = useMemo(
+    () => new Set(facilities.filter((f) => passesFilter(f.id)).map((f) => f.region)),
+    [passesFilter],
+  );
+
+  const trendSurveyorList = useMemo(
+    () => avirSurveyors,
+    [],
+  );
+
+  const trendData = useMemo(() => {
+    // Portfolio survey keys already date+latestOnly filtered
+    const portKeys = new Set(portfolioSurveys.map((s) => `${s.facilityId}__${s.date}`));
+
+    // Denominators must respect trendRegion so rates stay realistic when filtering
+    const portTotal = Math.max(
+      portfolioSurveys.filter((s) => !trendRegion || s.region === trendRegion).length,
+      1,
+    );
+    const peerTotal = Math.max(
+      surveys.filter((s) =>
+        portfolioRegions.has(s.region) &&
+        passesDate(s.date) &&
+        (!latestOnly || isLatest(s.facilityId, s.date)) &&
+        (!trendRegion || s.region === trendRegion),
+      ).length,
+      1,
+    );
+
+    // Deterministic per-tag modifier that simulates regional peer variation.
+    const peerMod = (tag: string): number => {
+      const h = tag.split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 1), 0);
+      return 0.75 + (h % 40) / 100; // 0.75 – 1.15  (tighter band keeps rates plausible)
+    };
+
+    const buildTagMap = (filterByType: boolean) => {
+      const relevant = citations.filter((c) =>
+        portfolioRegions.has(c.region) &&
+        passesDate(c.date) &&
+        (!latestOnly || isLatest(c.facilityId, c.date)) &&
+        (!trendRegion   || c.region === trendRegion) &&
+        (!trendSurveyor || c.surveyor === trendSurveyor) &&
+        (!filterByType || trendTagType === 'all' || c.tagType === trendTagType),
+      );
+
+      const tagMap = new Map<string, {
+        tag: string; desc: string; type: TagType;
+        portSurveys: Set<string>; peerSurveys: Set<string>;
+      }>();
+      for (const c of relevant) {
+        if (!tagMap.has(c.tag)) {
+          tagMap.set(c.tag, { tag: c.tag, desc: c.description, type: c.tagType as TagType, portSurveys: new Set(), peerSurveys: new Set() });
+        }
+        const entry = tagMap.get(c.tag)!;
+        const key = `${c.facilityId}__${c.date}`;
+        entry.peerSurveys.add(key);
+        if (portKeys.has(key)) entry.portSurveys.add(key);
+      }
+      return [...tagMap.values()].map((d) => {
+        const portfolioRate = d.portSurveys.size / portTotal;
+        const peerRate = Math.min((d.peerSurveys.size / peerTotal) * peerMod(d.tag), 1);
+        return { tag: d.tag, desc: d.desc, type: d.type, portfolioRate, peerRate };
+      });
+    };
+
+    // Filtered rows (for display) — respects trendTagType
+    const filteredRows = buildTagMap(true);
+    // All-tag rows (for global max) — ignores trendTagType so scale stays stable
+    const allRows = buildTagMap(false);
+
+    // Previous-period trend: deterministic hash modifier simulating prior period rates
+    // Positive trend = rate went up (worse), negative = rate went down (better)
+    const prevMod = (tag: string, salt: string): number => {
+      const h = (tag + salt).split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 3), 0);
+      return 0.55 + (h % 90) / 100; // 0.55 – 1.44 multiplier vs current
+    };
+
+    // Global max must include previous rates so reduction extensions always fit in track
+    const globalBarMax = Math.max(
+      ...allRows.flatMap((r) => {
+        const prevPeer = r.peerRate * prevMod(r.tag, 'peer');
+        const prevPort = r.portfolioRate * prevMod(r.tag, 'port');
+        return [r.peerRate, r.portfolioRate, prevPeer, prevPort];
+      }),
+      0.01,
+    );
+
+    const withTrend = filteredRows.map((r) => ({
+      ...r,
+      portfolioTrend: r.portfolioRate - r.portfolioRate * prevMod(r.tag, 'port'),
+      peerTrend:      r.peerRate      - r.peerRate      * prevMod(r.tag, 'peer'),
+    }));
+
+    const sortPeer = (rows: typeof withTrend) => {
+      if (trendSort === 'greatest-increase')
+        return [...rows].filter((r) => r.peerTrend > 0).sort((a, b) => b.peerTrend - a.peerTrend);
+      if (trendSort === 'highest-reduction')
+        return [...rows].filter((r) => r.peerTrend < 0).sort((a, b) => a.peerTrend - b.peerTrend);
+      return [...rows].sort((a, b) => b.peerRate - a.peerRate);
+    };
+    const sortPortfolio = (rows: typeof withTrend) => {
+      if (trendSort === 'greatest-increase')
+        return [...rows].filter((r) => r.portfolioTrend > 0).sort((a, b) => b.portfolioTrend - a.portfolioTrend);
+      if (trendSort === 'highest-reduction')
+        return [...rows].filter((r) => r.portfolioTrend < 0).sort((a, b) => a.portfolioTrend - b.portfolioTrend);
+      return [...rows].sort((a, b) => b.portfolioRate - a.portfolioRate);
+    };
+
+    return {
+      top5Peer:      sortPeer(withTrend).slice(0, 5),
+      top5Portfolio: sortPortfolio(withTrend).slice(0, 5),
+      globalBarMax,
+    };
+  }, [portfolioSurveys, portfolioRegions, passesDate, latestOnly, latestByFacility, trendWho, trendTagType, trendSort]);
+
+  // ─── Chip style helper ────────────────────────────────────────────────────
+  const chipSx = (active: boolean) => ({
+    cursor: 'pointer', fontWeight: 600, fontSize: '12px', height: 28,
+    bgcolor: active ? '#293036' : 'transparent',
+    color:   active ? '#fff'    : '#5c6874',
+    border:  active ? '1.5px solid #293036' : '1.5px solid #e0e4e7',
+    '& .MuiChip-label': { px: 1.5 },
+    '&:hover': { bgcolor: active ? '#1a2025' : '#f0f2f4' },
+  });
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+  return (
     <Box>
-      <PageHeader title="Trends" />
-      <PageFilters dateRange={dateRange} onDateRangeChange={setDateRange} />
-
-      {/* --- Surveyor Section --- */}
-      <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #E0E4E7' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <PersonIcon sx={{ color: '#0065BD' }} />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>Surveyor Focus Areas</Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>What has each surveyor been citing most?</Typography>
-        </Box>
-
-        {/* Surveyor chart */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, color: '#5c6874' }}>Citations by Surveyor</Typography>
-          <BarChart
-            height={280}
-            layout="horizontal"
-            series={[
-              { data: surveyorChartData.map((s) => s['K-Tags']), label: 'K-Tags', color: '#DC2626', stack: 'a' },
-              { data: surveyorChartData.map((s) => s['N-Tags']), label: 'N-Tags', color: '#2563EB', stack: 'a' },
-              { data: surveyorChartData.map((s) => s['E-Tags']), label: 'E-Tags', color: '#CA8A04', stack: 'a' },
-            ]}
-            yAxis={[{ data: surveyorChartData.map((s) => s.name), scaleType: 'band' }]}
-            margin={{ left: 120, right: 10, top: 10, bottom: 30 }}
+      <PageHeader
+        title="Trends"
+        actions={
+          <Button variant="contained" color="inherit" size="small" startIcon={<FileDownloadIcon />}>
+            Export
+          </Button>
+        }
+      />
+      <PageFilters
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        afterFilters={
+          <FormControlLabel
+            control={<Switch checked={latestOnly} onChange={(e) => setLatestOnly(e.target.checked)} size="small" />}
+            label={<Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: '#293036' }}>Latest survey only</Typography>}
+            sx={{ ml: 0.5 }}
           />
-        </Box>
+        }
+      />
 
-        <Divider sx={{ mb: 2 }} />
+      {/* ── Row 1: Monthly Citations + Category Intensity ─────────────────── */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
 
-        {/* Surveyor detail */}
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Select Surveyor</InputLabel>
-            <Select value={activeSurveyor} label="Select Surveyor" onChange={(e) => setSelectedSurveyor(e.target.value)}>
-              {surveyorData.map((s) => (
-                <MenuItem key={s.name} value={s.name}>{s.name} ({s.total} citations)</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        {/* Monthly Citations bar chart */}
+        <Paper elevation={0} sx={{ flex: 1, border: '1px solid #e0e4e7', borderRadius: '8px', pt: 3, px: 3, pb: 2 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '18px', color: '#293036', mb: 1 }}>Monthly Citations</Typography>
 
-          {activeSurveyor && (() => {
-            const s = surveyorData.find((d) => d.name === activeSurveyor);
-            if (!s) return null;
-            return (
-              <Box sx={{ display: 'flex', gap: 3 }}>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#F8FAFC', borderRadius: 2, minWidth: 70 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>{s.surveys}</Typography>
-                  <Typography variant="caption" color="text.secondary">Surveys</Typography>
-                </Box>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#F8FAFC', borderRadius: 2, minWidth: 70 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>{s.total}</Typography>
-                  <Typography variant="caption" color="text.secondary">Citations</Typography>
-                </Box>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#F8FAFC', borderRadius: 2, minWidth: 70 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>{s.facilities.size}</Typography>
-                  <Typography variant="caption" color="text.secondary">Communities</Typography>
-                </Box>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#F8FAFC', borderRadius: 2, minWidth: 70 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>{(s.total / s.surveys).toFixed(1)}</Typography>
-                  <Typography variant="caption" color="text.secondary">Avg/Survey</Typography>
-                </Box>
-              </Box>
-            );
-          })()}
-        </Box>
-
-        {/* Top tags for selected surveyor */}
-        {surveyorTopTags.length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, color: '#5c6874' }}>
-              Top Tags for {activeSurveyor}
-            </Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#F0F2F4' }}>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Tag</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Type</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Description</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75, width: 100 }} align="right">Count</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75, width: 200 }}>Distribution</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {surveyorTopTags.map((t) => (
-                    <TableRow key={t.tag} hover>
-                      <TableCell>
-                        <Chip label={t.tag} size="small" variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace' }} />
-                      </TableCell>
-                      <TableCell>{tagTypeChip(t.type)}</TableCell>
-                      <TableCell><Typography variant="caption">{t.desc}</Typography></TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{t.count}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <LinearProgress variant="determinate"
-                          value={(t.count / (surveyorTopTags[0]?.count || 1)) * 100}
-                          sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9',
-                            '& .MuiLinearProgress-bar': { bgcolor: t.type === 'K' ? '#DC2626' : t.type === 'E' ? '#CA8A04' : '#2563EB', borderRadius: 3 },
-                          }} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+          {/* Tag filter chips */}
+          <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
+            {([['all', 'All citations'], ['K', 'K-Tags'], ['E', 'E-Tags'], ['N', 'State']] as [TrendFilter, string][]).map(([val, label]) => (
+              <Chip key={val} label={label} size="small"
+                onClick={() => setChartTagFilter(val)}
+                sx={chipSx(chartTagFilter === val)} />
+            ))}
           </Box>
-        )}
-      </Paper>
 
-      {/* --- Region Tag Trends --- */}
-      <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E0E4E7' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <MapIcon sx={{ color: '#0065BD' }} />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>Tag Trends by Region</Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>Which tags are trending highest in each region?</Typography>
-        </Box>
+          {/* Per survey / Total tabs */}
+          <Tabs
+            value={chartMode}
+            onChange={(_, v) => setChartMode(v)}
+            sx={{
+              minHeight: 40,
+              borderBottom: '1px solid #e0e4e7',
+              mb: 2,
+              '& .MuiTabs-indicator': { backgroundColor: '#0065BD', height: 2 },
+              '& .MuiTab-root': {
+                minHeight: 40, py: 0, px: 1.5,
+                fontSize: '0.875rem', fontWeight: 600, textTransform: 'none',
+                letterSpacing: '-0.011em', color: '#5c6874',
+                '&.Mui-selected': { color: '#0065BD' },
+              },
+            }}
+          >
+            <Tab value="per-survey" label="Per survey" />
+            <Tab value="total"      label="Total" />
+          </Tabs>
 
-        {/* Region chart */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, color: '#5c6874' }}>Citations by Region</Typography>
-          <BarChart
-            height={250}
-            layout="horizontal"
-            series={[
-              { data: regionChartData.map((r) => r.K), label: 'K-Tags', color: '#DC2626', stack: 'a' },
-              { data: regionChartData.map((r) => r.N), label: 'N-Tags', color: '#2563EB', stack: 'a' },
-              { data: regionChartData.map((r) => r.E), label: 'E-Tags', color: '#CA8A04', stack: 'a' },
-            ]}
-            yAxis={[{ data: regionChartData.map((r) => r.region), scaleType: 'band' }]}
-            margin={{ left: 200, right: 10, top: 10, bottom: 30 }}
-          />
-        </Box>
+          {monthlyData.length > 0 ? (
+            <Box sx={{ mt: 1 }}>
+            <BarChart
+              series={[
+                ...(chartTagFilter === 'all' || chartTagFilter === 'K' ? [{ data: monthlyData.map((m) => m.K), label: 'K-Tags', color: TAG_COLORS.K, stack: 'stack' }] : []),
+                ...(chartTagFilter === 'all' || chartTagFilter === 'E' ? [{ data: monthlyData.map((m) => m.E), label: 'E-Tags', color: TAG_COLORS.E, stack: 'stack' }] : []),
+                ...(chartTagFilter === 'all' || chartTagFilter === 'N' ? [{ data: monthlyData.map((m) => m.N), label: 'State',  color: TAG_COLORS.N, stack: 'stack' }] : []),
+              ]}
+              xAxis={[{ data: monthlyData.map((m) => m.label), scaleType: 'band', categoryGapRatio: 0.2 }]}
+              yAxis={[{ label: chartMode === 'per-survey' ? 'Citations per survey' : 'Total citations' }]}
+              grid={{ horizontal: true }}
+              height={320}
+              margin={{ left: 38, right: 4, top: 8, bottom: 28 }}
+              slotProps={{
+                legend: {
+                  direction: 'row',
+                  position: { vertical: 'bottom', horizontal: 'middle' },
+                  padding: { top: 0, bottom: 0, left: 0, right: 0 },
+                  itemMarkWidth: 12, itemMarkHeight: 12,
+                },
+              }}
+              sx={{
+                '& .MuiChartsAxis-tickLabel': { fontSize: '11px', fill: '#5c6874' },
+                '& .MuiChartsAxis-label':     { fontSize: '12px', fill: '#5c6874' },
+                '& .MuiChartsLegend-label':   { fontSize: '12px', fill: '#293036' },
+                '& .MuiBarElement-root': { stroke: '#fff', strokeWidth: 1 },
+                '& .MuiChartsGrid-line': { stroke: '#cbd5e1', strokeDasharray: '4 4', strokeWidth: 1 },
+                '& .MuiChartsLegend-root': { mt: '-8px' },
+              }}
+            />
+            </Box>
+          ) : (
+            <Box sx={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography sx={{ color: '#94A3B8', fontSize: '14px' }}>No survey data for selected filters</Typography>
+            </Box>
+          )}
+        </Paper>
 
-        <Divider sx={{ mb: 2 }} />
+        {/* Category Intensity — placeholder */}
+        <Paper elevation={0} sx={{ width: 340, flexShrink: 0, border: '1px solid #e0e4e7', borderRadius: '8px', p: 3 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '18px', color: '#293036', mb: 2 }}>Category Intensity</Typography>
+          <Box sx={{
+            height: 270, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
+            bgcolor: '#F7F8F9', borderRadius: '8px', border: '1.5px dashed #cbd5e1',
+          }}>
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style={{ opacity: 0.22, marginBottom: 12 }}>
+              <polygon points="32,4 60,20 60,44 32,60 4,44 4,20" stroke="#293036" strokeWidth="2" fill="none"/>
+              <polygon points="32,14 50,23 50,41 32,50 14,41 14,23" stroke="#293036" strokeWidth="1.5" fill="none"/>
+              <polygon points="32,24 41,29 41,37 32,42 23,37 23,29" stroke="#293036" strokeWidth="1" fill="none"/>
+              <line x1="32" y1="4"  x2="32" y2="60" stroke="#293036" strokeWidth="1"/>
+              <line x1="4"  y1="20" x2="60" y2="44" stroke="#293036" strokeWidth="1"/>
+              <line x1="4"  y1="44" x2="60" y2="20" stroke="#293036" strokeWidth="1"/>
+            </svg>
+            <Typography sx={{ color: '#94A3B8', fontSize: '13px', fontWeight: 600 }}>Radar chart coming soon</Typography>
+            <Typography sx={{ color: '#94A3B8', fontSize: '12px', mt: 0.5 }}>Portfolio vs peers vs national</Typography>
+          </Box>
+        </Paper>
+      </Box>
 
-        {/* Region filter + top tags table */}
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Filter by Region</InputLabel>
-            <Select value={selectedRegion} label="Filter by Region" onChange={(e) => setSelectedRegion(e.target.value)}>
-              <MenuItem value="">All Regions</MenuItem>
-              {avirRegions.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {regionTagData.reduce((s, t) => s + t.total, 0)} citations
-            <Typography component="span" variant="body2" sx={{ color: '#5c6874', ml: 0.5 }}>
-              across {regionTagData.length} unique tags
-            </Typography>
+      {/* ── Row 2: K / N / E metric cards ────────────────────────────────── */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        {(['K', 'E', 'N'] as TagType[]).map((type) => {
+          const bench = BENCHMARKS[type];
+          const myVal = cardStats[type];
+          const myTrend = bench.myTrend;
+          const MyTrendIcon = myTrend >= 0 ? TrendingUpIcon : TrendingDownIcon;
+          const myColor = myTrend >= 0 ? '#EF4444' : '#25A36A';
+
+          return (
+            <Paper key={type} elevation={0} sx={{
+              flex: 1, border: '1px solid #e0e4e7', borderRadius: '8px',
+              display: 'flex', flexDirection: 'column', gap: 1,
+              pt: '13px', pb: 2, px: 2,
+            }}>
+              {/* Header */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pl: 1 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '20px', color: '#293036', letterSpacing: '-0.34px' }}>{TAG_LABELS[type]}</Typography>
+                <Button size="small" variant="text" endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+                  onClick={() => navigate(TAG_ROUTES[type])}
+                  sx={{ color: '#0065BD', fontWeight: 600, fontSize: '0.875rem', px: 1, py: 0.5 }}>
+                  View all
+                </Button>
+              </Box>
+
+              {/* Portfolio value */}
+              <Box sx={{ px: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', letterSpacing: '-0.176px' }}>Per Survey</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#293036', lineHeight: '32px', letterSpacing: '-0.408px' }}>{myVal}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', alignSelf: 'flex-end', pb: '4px' }}>
+                    <MyTrendIcon sx={{ fontSize: 14, color: myColor }} />
+                    <Typography sx={{ fontSize: '12px', fontWeight: 700, color: myColor }}>
+                      {myTrend >= 0 ? '+' : ''}{myTrend}%
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#525f6c', lineHeight: '16px' }}>{cardStats.count} total surveys</Typography>
+              </Box>
+
+              {/* Peers + Nation sub-stats */}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {([
+                  { label: 'Peers',  val: bench.peers,  trend: bench.peerTrend,   bgWhenAbove: '#fef1f3' },
+                  { label: 'Nation', val: bench.nation, trend: bench.nationTrend, bgWhenAbove: 'white'   },
+                ] as const).map(({ label, val, trend, bgWhenAbove }) => {
+                  const BenchIcon = trend >= 0 ? TrendingUpIcon : TrendingDownIcon;
+                  return (
+                    <Box key={label} sx={{
+                      flex: 1, p: 1, borderRadius: '4px',
+                      bgcolor: myVal > val ? bgWhenAbove : 'white',
+                      display: 'flex', flexDirection: 'column', gap: '2px',
+                    }}>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036', letterSpacing: '-0.084px', lineHeight: '20px' }}>{label}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography sx={{ fontSize: '20px', fontWeight: 800, color: '#293036', lineHeight: '28px', letterSpacing: '-0.28px' }}>{val}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <BenchIcon sx={{ fontSize: 16, color: '#293036' }} />
+                          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#293036', lineHeight: '16px' }}>
+                            {trend >= 0 ? '+' : ''}{trend}%
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#525f6c', lineHeight: '16px' }}>Per survey</Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Paper>
+          );
+        })}
+      </Box>
+
+      {/* ── Row 3: Portfolio vs Regional Citations ──────────────────── */}
+      <Paper elevation={0} sx={{ border: '1px solid #e0e4e7', borderRadius: '8px', p: 3 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036' }}>
+            Portfolio vs Regional Citations
           </Typography>
         </Box>
 
-        <Typography variant="subtitle2" sx={{ mb: 1, color: '#5c6874' }}>
-          Top Tags {selectedRegion ? `in ${selectedRegion}` : 'Across All Regions'}
-        </Typography>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: '#F0F2F4' }}>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Rank</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Tag</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Type</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Description</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75, width: 80 }} align="right">Total</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75, width: 200 }}>Distribution</TableCell>
-                {!selectedRegion && (
-                  <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', py: 0.75 }}>Top Region</TableCell>
-                )}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {regionTagData.map((t, i) => {
-                const topRegion = [...t.regions.entries()].sort((a, b) => b[1] - a[1])[0];
-                return (
-                  <TableRow key={t.tag} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: i < 3 ? '#DC2626' : '#293036' }}>
-                        #{i + 1}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={t.tag} size="small" variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace' }} />
-                    </TableCell>
-                    <TableCell>{tagTypeChip(t.type)}</TableCell>
-                    <TableCell><Typography variant="caption">{t.desc}</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{t.total}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <LinearProgress variant="determinate"
-                        value={(t.total / (regionTagData[0]?.total || 1)) * 100}
-                        sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9',
-                          '& .MuiLinearProgress-bar': { bgcolor: t.type === 'K' ? '#DC2626' : t.type === 'E' ? '#CA8A04' : '#2563EB', borderRadius: 3 },
-                        }} />
-                    </TableCell>
-                    {!selectedRegion && topRegion && (
-                      <TableCell>
-                        <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                          {topRegion[0].replace('Region ', 'R').replace(/ - /g, ': ')} ({topRegion[1]})
-                        </Typography>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        {/* Section-level filters + segment control */}
+        <Box sx={{ display: 'flex', gap: 1.5, mb: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+          <FormControl size="small" variant="outlined" sx={{
+            minWidth: 220,
+            '& .MuiInputLabel-root': {
+              fontSize: '0.875rem', fontWeight: 600, color: '#5c6874',
+              '&.Mui-focused': { color: '#0065BD' },
+            },
+            '& .MuiSelect-select': { fontSize: '1rem', letterSpacing: '-0.011em', color: '#293036' },
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e0e4e7', borderRadius: '8px' },
+            '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#b0b8c1' },
+            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0065BD' },
+          }}>
+            <InputLabel shrink>By region or surveyor</InputLabel>
+            <Select
+              value={trendWho}
+              onChange={(e) => setTrendWho(e.target.value)}
+              label="By region or surveyor"
+              displayEmpty
+              notched
+              renderValue={(v) => v ? (v as string).replace(/^(region|surveyor):/, '') : 'All'}
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem disabled sx={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', py: 0.25, letterSpacing: '0.08em' }}>REGIONS</MenuItem>
+              {avirRegions.map((r) => <MenuItem key={`region:${r}`} value={`region:${r}`}>{r}</MenuItem>)}
+              <MenuItem disabled sx={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', py: 0.25, letterSpacing: '0.08em' }}>SURVEYORS</MenuItem>
+              {trendSurveyorList.map((s) => <MenuItem key={`surveyor:${s}`} value={`surveyor:${s}`}>{s}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <Box sx={{ display: 'flex', gap: 0.75 }}>
+            {([['all', 'All citations'], ['K', 'K-Tags'], ['E', 'E-Tags'], ['N', 'State']] as [TrendFilter, string][]).map(([val, label]) => (
+              <Chip key={val} label={label} size="small"
+                onClick={() => setTrendTagType(val)}
+                sx={chipSx(trendTagType === val)} />
+            ))}
+          </Box>
+
+        </Box>
+
+        {/* Sort tabs */}
+        <Tabs
+          value={trendSort}
+          onChange={(_, v) => setTrendSort(v)}
+          sx={{
+            mb: 3,
+            minHeight: 40,
+            borderBottom: '1px solid #e0e4e7',
+            '& .MuiTabs-indicator': { backgroundColor: '#0065BD', height: 2 },
+            '& .MuiTab-root': {
+              minHeight: 40, py: 0, px: 1.5,
+              fontSize: '0.875rem', fontWeight: 600, textTransform: 'none',
+              letterSpacing: '-0.011em',
+              color: '#5c6874',
+              '&.Mui-selected': { color: '#0065BD' },
+            },
+          }}
+        >
+          <Tab value="highest-cited"     label="Highest rate" />
+          <Tab value="greatest-increase" label="Trending up" />
+          <Tab value="highest-reduction" label="Trending down" />
+        </Tabs>
+
+        {(() => {
+          const globalBarMax = trendData.globalBarMax;
+          const tabSuffix = trendSort === 'greatest-increase' ? 'Trending Up'
+            : trendSort === 'highest-reduction' ? 'Trending Down'
+            : 'Top Citations';
+          // Tags that appear in BOTH top-5 lists get a blue left border
+          const sharedTags = new Set(
+            trendData.top5Portfolio
+              .filter((p) => trendData.top5Peer.some((r) => r.tag === p.tag))
+              .map((p) => p.tag),
+          );
+
+          const renderTable = (
+            rows: typeof trendData.top5Portfolio,
+            title: string,
+            isPortfolio: boolean,
+          ) => (
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036', mb: 1.5 }}>
+                {title}
+              </Typography>
+              <TableContainer sx={{ border: '1px solid #e0e4e7', borderRadius: '6px', overflow: 'hidden', bgcolor: '#e0e4e7' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', py: '6px', px: 2, width: 52, bgcolor: '#e0e4e7', borderBottom: '1px solid #d0d5da' }}>Rank</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', py: '6px', px: 2, bgcolor: '#e0e4e7', borderBottom: '1px solid #d0d5da' }}>Citation</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody sx={{ bgcolor: 'white' }}>
+                    {rows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} sx={{ py: 4, textAlign: 'center', color: '#94A3B8', fontSize: '13px', borderBottom: 'none' }}>
+                          No data for selected filters
+                        </TableCell>
+                      </TableRow>
+                    ) : rows.map((row, idx) => {
+                      const isLast = idx === rows.length - 1;
+                      const isShared = sharedTags.has(row.tag);
+                      return (
+                        <TableRow key={row.tag} sx={{
+                          bgcolor: 'white',
+                          '& td': isLast ? { borderBottom: 'none' } : {},
+                          ...(isShared ? { borderLeft: '4px solid #0065BD' } : {}),
+                        }}>
+                          <TableCell sx={{ width: 52, px: 2, py: 2, verticalAlign: 'top' }}>
+                            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#293036' }}>{idx + 1}</Typography>
+                          </TableCell>
+                          <TableCell sx={{ px: 2, py: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, mb: 1, overflow: 'hidden' }}>
+                              <Typography component="span" sx={{ fontSize: '13px', fontWeight: 700, fontFamily: 'monospace', color: '#293036', whiteSpace: 'nowrap' }}>
+                                {row.tag}
+                              </Typography>
+                              <Typography component="span" sx={{ fontSize: '13px', color: '#293036', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {row.desc}
+                              </Typography>
+                            </Box>
+                            <TrendBar
+                              mainRate={isPortfolio ? row.portfolioRate : row.peerRate}
+                              compareRate={isPortfolio ? row.peerRate : row.portfolioRate}
+                              mainLabel={isPortfolio ? 'Portfolio' : 'Peers'}
+                              compareLabel={isPortfolio ? 'Peers' : 'Portfolio'}
+                              tagType={row.type}
+                              isLast={isLast}
+                              sectionMax={globalBarMax}
+                              periodDelta={Math.round((isPortfolio ? row.portfolioTrend : row.peerTrend) * 100)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          );
+
+          return (
+            <Box sx={{ display: 'flex', gap: 3, minWidth: 0 }}>
+              {renderTable(trendData.top5Portfolio, `Portfolio — ${tabSuffix}`, true)}
+              {renderTable(trendData.top5Peer, `Regional Peers — ${tabSuffix}`, false)}
+            </Box>
+          );
+        })()}
       </Paper>
     </Box>
   );

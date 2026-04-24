@@ -18,6 +18,7 @@ export function makeDateFilter(dateRange: string): (dateStr: string) => boolean 
   else if (dateRange === '60d') cutoff = new Date(y, m, d - 60);
   else if (dateRange === '90d') cutoff = new Date(y, m, d - 90);
   else if (dateRange === 'ytd') cutoff = new Date(y, 0, 1);
+  else if (dateRange === '12m') cutoff = new Date(y - 1, m, d);
   else if (dateRange.match(/^\d{4}-\d{2}$/)) monthFilter = dateRange;
 
   return (dateStr: string) => {

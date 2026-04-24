@@ -59,11 +59,12 @@ const helpItems: DropdownItem[] = [
 
 const sideNavItems = [
   { label: 'Dashboard', path: '/' },
+  { label: 'Trends', path: '/trends' },
   { label: 'Pre-survey', path: '/surveys' },
   { label: 'Survey Overviews', path: '/citations-remix' },
   { label: 'K-Tags', path: '/citations-remix/tags/k', indent: true },
-  { label: 'N-Tags', path: '/citations-remix/tags/state', indent: true },
   { label: 'E-Tags', path: '/citations-remix/tags/e', indent: true },
+  { label: 'State Tags', path: '/citations-remix/tags/state', indent: true },
   { label: 'Community Summaries', path: '/facilities' },
   { label: 'Upload Survey', path: '/upload' },
 ];

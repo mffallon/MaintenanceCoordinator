@@ -135,7 +135,7 @@ export default function TagDetail() {
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         extraFilters={
-          <FormControl size="small" variant="filled" sx={{ minWidth: 220 }}>
+          <FormControl size="small" variant="filled" sx={{ minWidth: 220, '& .MuiFilledInput-root': { bgcolor: '#fff', '&:hover': { bgcolor: '#fff' }, '&.Mui-focused': { bgcolor: '#fff' } } }}>
             <InputLabel>Filter by CMS Region</InputLabel>
             <Select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
               <MenuItem value="">All regions</MenuItem>

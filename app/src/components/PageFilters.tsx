@@ -18,10 +18,11 @@ export default function PageFilters({ dateRange, onDateRangeChange, extraFilters
       </Box>
       {extraFilters}
       {dateRange !== undefined && onDateRangeChange && (
-        <FormControl size="small" variant="filled" sx={{ minWidth: 180 }}>
+        <FormControl size="small" variant="filled" sx={{ minWidth: 180, '& .MuiFilledInput-root': { bgcolor: '#fff', '&:hover': { bgcolor: '#fff' }, '&.Mui-focused': { bgcolor: '#fff' } } }}>
           <InputLabel>Date range</InputLabel>
           <Select value={dateRange} onChange={(e) => onDateRangeChange(e.target.value)}>
             <MenuItem value="all">All time</MenuItem>
+            <MenuItem value="12m">Last 12 months</MenuItem>
             <MenuItem value="ytd">Year to date</MenuItem>
             <MenuItem value="30d">Last 30 days</MenuItem>
             <MenuItem value="60d">Last 60 days</MenuItem>
