@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Chip, Button, Divider,
+  Box, Typography, Paper, Chip, Button, Divider, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
   ToggleButtonGroup, ToggleButton, Drawer, IconButton,
 } from '@mui/material';
@@ -9,6 +10,20 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AddTaskIcon from '@mui/icons-material/AddTask';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import FormatBoldIcon from '@mui/icons-material/FormatBold';
+import FormatItalicIcon from '@mui/icons-material/FormatItalic';
+import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import LinkIcon from '@mui/icons-material/Link';
+import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -19,7 +34,7 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import LinearProgress from '@mui/material/LinearProgress';
 import { facilities, citations, surveys, tagDescriptions } from '../data/avir-data';
-import type { AvirCitation, AvirSurvey, AvirFacility } from '../data/avir-data';
+import type { AvirCitation, AvirSurvey, AvirFacility, PocStage, CitationSeverity, WorkOrder } from '../data/avir-data';
 import PageHeader from '../components/PageHeader';
 import { fmtDate } from '../utils/formatDate';
 import { effectiveLastSurveyDate } from '../utils/surveyWindowOverrides';
@@ -322,10 +337,879 @@ function LatestSurveyContent({ facility, facCitations, facSurveys }: {
   );
 }
 
+// ─── POC Stage chip styles ────────────────────────────────────────
+const POC_STAGE_STYLES: Record<PocStage, { bg: string; color: string; border: string }> = {
+  Open:          { bg: 'transparent', color: '#293036', border: '#c4c9ce' },
+  Submitted:     { bg: '#EFF6FF',    color: '#1E40AF',  border: '#BFDBFE' },
+  Approved:      { bg: '#D1FAE5',    color: '#065F46',  border: '#6EE7B7' },
+  'Work Order':  { bg: '#FFFBEB',    color: '#92400E',  border: '#FDE68A' },
+  'Final Review':{ bg: '#F5F3FF',    color: '#5B21B6',  border: '#DDD6FE' },
+  Rejected:      { bg: '#FEE2E2',    color: '#991B1B',  border: '#FECACA' },
+  Closed:        { bg: '#F1F5F9',    color: '#475569',  border: '#E2E8F0' },
+};
+
+function pocChip(stage: PocStage | undefined, dateStr?: string) {
+  if (!stage) return null;
+  const s = POC_STAGE_STYLES[stage];
+  const showDate = !!dateStr && (stage === 'Submitted' || stage === 'Approved' || stage === 'Work Order' || stage === 'Closed');
+  const label = showDate
+    ? (stage === 'Work Order' ? `WO due: ${fmtDate(dateStr!)}` : `${stage} · ${fmtDate(dateStr!)}`)
+    : stage;
+  return (
+    <Chip
+      label={label}
+      size="small"
+      variant="outlined"
+      sx={{
+        height: 22, fontSize: '0.7rem', fontWeight: 600,
+        bgcolor: s.bg,
+        color: s.color,
+        borderColor: s.border,
+        ...(stage !== 'Open' && { bgcolor: s.bg }),
+      }}
+    />
+  );
+}
+
+// ─── Plan of Correction Content ───────────────────────────────────
+type PocSortCol = 'dueDate' | 'tag' | 'severity' | 'surveyDate';
+const SEVERITY_ORDER: Record<CitationSeverity, number> = { IJ: 0, 'Actual Harm': 1, 'Potential Harm': 2, 'No Harm': 3 };
+
+// Compute suggested correction target date based on severity (days after citation date)
+const SEVERITY_CORRECTION_DAYS: Record<CitationSeverity, number> = { IJ: 3, 'Actual Harm': 10, 'Potential Harm': 30, 'No Harm': 30 };
+function computedDueDate(citationDate: string, severity: CitationSeverity | undefined): string {
+  const days = SEVERITY_CORRECTION_DAYS[severity ?? 'Potential Harm'];
+  const d = new Date(citationDate);
+  d.setDate(d.getDate() + days);
+  return toISO(d);
+}
+function computedPocSubmitDue(citationDate: string): string {
+  const d = new Date(citationDate);
+  d.setDate(d.getDate() + 10);
+  return toISO(d);
+}
+// Build a believable Plan of Correction narrative from a citation's tag/observation.
+// Used for seeded POC communities so drawer details aren't blank.
+function synthesizePocResponse(c: AvirCitation): string {
+  const subject = c.description ? c.description.replace(/\.$/, '') : `the deficiency cited under ${c.tag}`;
+  const obs = (c.observation || '').trim().replace(/\s+/g, ' ');
+  const root = obs.length > 0
+    ? `On ${fmtDate(c.date)}, the surveyor observed: "${obs.length > 220 ? obs.slice(0, 217) + '…' : obs}"`
+    : `The deficiency cited under ${c.tag} was identified during the ${fmtDate(c.date)} survey.`;
+  const sevAction = c.severity === 'IJ'
+    ? 'Immediate corrective action was taken to remove the jeopardy condition.'
+    : c.severity === 'Actual Harm'
+    ? 'Corrective action was initiated immediately following the survey exit conference.'
+    : 'Corrective action was scheduled within the standard 30-day window.';
+  return [
+    root,
+    `Corrective action: The facility will address ${subject.toLowerCase()} by repairing/replacing affected equipment, retraining staff on the applicable policy, and updating preventive maintenance schedules. ${sevAction}`,
+    `Responsible party: Maintenance Director and Administrator, with oversight from the QAPI committee.`,
+    `Monitoring: The Administrator will audit compliance weekly for four weeks, then monthly for three months, with findings reported to the QAPI committee. Any recurrence will trigger immediate re-education and root-cause analysis.`,
+    `Date of compliance: target completion within the severity-based correction window.`,
+  ].join('\n\n');
+}
+
+const SEVERITY_CORRECTION_HINT: Record<CitationSeverity, string> = {
+  IJ: 'Immediate action required — correction target within 24–72 hours',
+  'Actual Harm': 'Recommended correction target within 7–10 days',
+  'Potential Harm': 'Recommended correction target within 30 days',
+  'No Harm': 'Recommended correction target within 30 days',
+};
+
+function PlanOfCorrectionContent({ facility, facCitations }: {
+  facility: AvirFacility; facCitations: AvirCitation[];
+}) {
+  const navigate = useNavigate();
+  const pocDue = facility.pocDueDate || '';
+  const daysLeft = pocDue ? daysUntil(pocDue) : 0;
+  const isOverdue = daysLeft < 0;
+
+  const [stageFilter, setStageFilter] = useState<PocStage | null>(null);
+  const [sortBy, setSortBy] = useState<PocSortCol>('dueDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [selectedCitation, setSelectedCitation] = useState<AvirCitation | null>(null);
+  const [pocWriteMode, setPocWriteMode] = useState(false);
+  const [pocDate, setPocDate] = useState('');
+  const [pocResponse, setPocResponse] = useState('');
+  const [draftIds, setDraftIds] = useState<Set<string>>(new Set());
+
+  const closeDrawer = () => { setSelectedCitation(null); setPocWriteMode(false); };
+  const saveAsDraft = () => {
+    if (selectedCitation) setDraftIds((prev) => new Set([...prev, selectedCitation.id]));
+    closeDrawer();
+  };
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!selectedCitation) return;
+    if (e.key === 'Escape') { setSelectedCitation(null); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedCitation((prev) => {
+        if (!prev) return prev;
+        const list = facCitations
+          .filter((c) => !c.pocStatus || c.pocStatus === 'Open' || c.pocStatus === 'Rejected')
+          .sort((a, b) => {
+            let cmp = 0;
+            if (sortBy === 'tag') cmp = a.tag.localeCompare(b.tag);
+            else if (sortBy === 'severity') cmp = (SEVERITY_ORDER[a.severity ?? 'No Harm'] ?? 4) - (SEVERITY_ORDER[b.severity ?? 'No Harm'] ?? 4);
+            else if (sortBy === 'surveyDate') cmp = a.date.localeCompare(b.date);
+            else cmp = a.tag.localeCompare(b.tag);
+            return sortDir === 'asc' ? cmp : -cmp;
+          });
+        const idx = list.findIndex((c) => c.id === prev.id);
+        if (idx === -1) return prev;
+        const next = e.key === 'ArrowDown' ? list[idx + 1] : list[idx - 1];
+        return next ?? prev;
+      });
+    }
+  }, [selectedCitation, facCitations, sortBy, sortDir]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  const handleSort = (col: PocSortCol) => {
+    if (sortBy === col) { setSortDir((d) => d === 'asc' ? 'desc' : 'asc'); }
+    else { setSortBy(col); setSortDir('asc'); }
+  };
+
+  // Count by POC stage — prefer real citation data; fall back to seeded
+  // pocStageCounts when the facility has no citation records yet (seeded POC communities).
+  const realStageCounts = facCitations.reduce<Record<string, number>>((acc, c) => {
+    const s = c.pocStatus || 'Open';
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {});
+  const seededStageCounts = facility.pocStageCounts || {};
+  // Use seeded counts whenever the facility has them (POC_FACILITIES entries) —
+  // their existing citation rows don't carry proper pocStatus tracking.
+  const useSeeded = Object.keys(seededStageCounts).length > 0;
+  const stageCounts: Record<string, number> = useSeeded
+    ? (seededStageCounts as Record<string, number>)
+    : realStageCounts;
+  const countFor = (s: string) => stageCounts[s] || 0;
+
+  // Work order sub-counts
+  const woOpen = useSeeded
+    ? Math.ceil((stageCounts['Work Order'] || 0) / 2)
+    : facCitations.filter((c) => c.pocStatus === 'Work Order' && c.workOrder?.status === 'Open').length;
+  const woInProgress = useSeeded
+    ? Math.floor((stageCounts['Work Order'] || 0) / 2)
+    : facCitations.filter((c) => c.pocStatus === 'Work Order' && c.workOrder?.status === 'In Progress').length;
+
+  // Total POC count (real or seeded)
+  const totalPocCount = useSeeded
+    ? Object.values(stageCounts).reduce((s, n) => s + (n || 0), 0)
+    : facCitations.length;
+
+  // For seeded POC facilities, distribute the real citations across stages
+  // according to the seeded counts so table rows match pipeline cards.
+  const distributedCitations: AvirCitation[] = useSeeded
+    ? (() => {
+        const stageOrder: PocStage[] = ['Open', 'Submitted', 'Approved', 'Work Order', 'Final Review', 'Closed'];
+        // Severities cycled to add visual variety
+        const sevCycle: CitationSeverity[] = ['Potential Harm', 'No Harm', 'Actual Harm', 'Potential Harm', 'No Harm', 'IJ', 'Potential Harm'];
+        const sorted = [...facCitations].sort((a, b) => a.tag.localeCompare(b.tag));
+        const out: AvirCitation[] = [];
+        let i = 0;
+        let woIdx = 0;
+        for (const stage of stageOrder) {
+          const n = stageCounts[stage] || 0;
+          for (let k = 0; k < n && i < sorted.length; k++, i++) {
+            const base = sorted[i];
+            const severity: CitationSeverity = base.severity ?? sevCycle[i % sevCycle.length];
+            const completion = computedDueDate(base.date, severity);
+            // Pre-Open stages have no committed POC yet
+            const isOpen = stage === 'Open';
+            const enriched: AvirCitation = {
+              ...base,
+              pocStatus: stage,
+              severity,
+              pocResponse: isOpen ? base.pocResponse : (base.pocResponse || synthesizePocResponse({ ...base, severity })),
+              pocCompletionDate: isOpen ? base.pocCompletionDate : (base.pocCompletionDate || completion),
+            };
+            // Synthesize a work order for Work Order / Final Review / Closed stages
+            if ((stage === 'Work Order' || stage === 'Final Review' || stage === 'Closed') && !enriched.workOrder) {
+              woIdx++;
+              const woStatus = stage === 'Closed' ? 'Completed' : stage === 'Final Review' ? 'Completed' : (woIdx % 2 === 0 ? 'In Progress' : 'Open');
+              enriched.workOrder = {
+                id: `#${5300 + (facility.id.length * 7 % 90) + woIdx}`,
+                status: woStatus as WorkOrder['status'],
+                title: `Address ${base.tag}: ${base.description?.slice(0, 60) || 'corrective action'}`,
+                location: 'Facility-wide',
+                assignee: ['Marcus Webb', 'Carlos Vega', 'Sarah Nguyen'][woIdx % 3],
+                dueDate: completion,
+              };
+            }
+            out.push(enriched);
+          }
+        }
+        return out;
+      })()
+    : facCitations;
+
+  const allActiveCitations = distributedCitations.filter((c) => !c.pocStatus || ['Open', 'Rejected', 'Submitted', 'Approved', 'Work Order', 'Final Review'].includes(c.pocStatus));
+  const closedCitations = distributedCitations.filter((c) => c.pocStatus === 'Closed');
+  const openCitations = (stageFilter === 'Closed'
+    ? closedCitations
+    : stageFilter
+    ? allActiveCitations.filter((c) => c.pocStatus === stageFilter || (!c.pocStatus && stageFilter === 'Open'))
+    : allActiveCitations
+  ).sort((a, b) => {
+    let cmp = 0;
+    if (sortBy === 'tag') cmp = a.tag.localeCompare(b.tag);
+    else if (sortBy === 'severity') cmp = (SEVERITY_ORDER[a.severity ?? 'No Harm'] ?? 4) - (SEVERITY_ORDER[b.severity ?? 'No Harm'] ?? 4);
+    else if (sortBy === 'surveyDate') cmp = a.date.localeCompare(b.date);
+    else if (sortBy === 'dueDate') {
+      cmp = (a.pocCompletionDate || '').localeCompare(b.pocCompletionDate || '');
+      const primaryResult = sortDir === 'asc' ? cmp : -cmp;
+      if (primaryResult !== 0) return primaryResult;
+      // Secondary: always most severe first
+      return (SEVERITY_ORDER[a.severity ?? 'No Harm'] ?? 4) - (SEVERITY_ORDER[b.severity ?? 'No Harm'] ?? 4);
+    }
+    else cmp = a.tag.localeCompare(b.tag);
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const SEVERITY_STYLES: Record<CitationSeverity, { bg: string; color: string; label: string }> = {
+    'IJ':             { bg: '#FEE2E2', color: '#991B1B', label: 'J–Immediate Jeopardy' },
+    'Actual Harm':    { bg: '#FFEDD5', color: '#9A3412', label: 'G–Actual Harm' },
+    'Potential Harm': { bg: '#FEF9C3', color: '#854D0E', label: 'F–Potential Harm' },
+    'No Harm':        { bg: '#F1F5F9', color: '#475569', label: 'C–No Harm' },
+  };
+
+  const stages: Array<{
+    key: PocStage; label: string; count: number; sub: ReactNode; overdue?: boolean;
+  }> = [
+    {
+      key: 'Open', label: 'Open', count: countFor('Open'),
+      sub: <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.25 }}>{countFor('Rejected')} rejected POCs</Typography>,
+      overdue: isOverdue,
+    },
+    {
+      key: 'Submitted', label: 'Submitted', count: countFor('Submitted'),
+      sub: <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.25 }}>Awaiting CMS review</Typography>,
+    },
+    {
+      key: 'Approved', label: 'Approved POCs', count: countFor('Approved'),
+      sub: <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.25 }}>Ready for work orders</Typography>,
+    },
+    {
+      key: 'Work Order', label: 'Work Orders', count: countFor('Work Order'),
+      sub: (
+        <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.25 }}>
+          <Box component="span" sx={{ fontWeight: 700, color: '#293036' }}>{woOpen}</Box>{' open · '}
+          <Box component="span" sx={{ fontWeight: 700, color: '#293036' }}>{woInProgress}</Box>{' in progress'}
+        </Typography>
+      ),
+      overdue: false,
+    },
+    {
+      key: 'Final Review', label: 'Final review', count: countFor('Final Review'),
+      sub: <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.25 }}>Ready to review internally</Typography>,
+      overdue: false,
+    },
+  ];
+
+  return (
+    <Box sx={{ maxWidth: 1136, mx: 'auto' }}>
+      {/* POC Due Date Banner */}
+      <Paper sx={{
+        px: 2.5, py: 1.5, mb: 2, borderRadius: '8px',
+        border: `1px solid ${isOverdue ? '#FECACA' : '#BFDBFE'}`,
+        bgcolor: isOverdue ? '#FEF2F2' : '#EFF6FF',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <CalendarTodayIcon sx={{ fontSize: 18, color: isOverdue ? '#991B1B' : '#1E40AF' }} />
+          <Box>
+            <Typography sx={{ fontSize: '14px', fontWeight: 700, color: isOverdue ? '#991B1B' : '#1E40AF' }}>
+              Plan of Correction {isOverdue ? 'overdue' : 'due'} {fmtDate(pocDue)}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: isOverdue ? '#991B1B' : '#1E40AF', opacity: 0.85 }}>
+              {isOverdue
+                ? `${Math.abs(daysLeft)} days past due · Surveyed ${fmtDate(facility.lastSurveyDate)}`
+                : `${daysLeft} days remaining · Surveyed ${fmtDate(facility.lastSurveyDate)}`}
+            </Typography>
+          </Box>
+        </Box>
+        <Chip
+          label={isOverdue ? 'Overdue' : 'In Progress'}
+          sx={{ bgcolor: isOverdue ? '#991B1B' : '#1E40AF', color: '#fff', fontWeight: 700, fontSize: '0.8rem' }}
+        />
+      </Paper>
+
+      {/* Combined card: pipeline + citations table */}
+      <Paper elevation={0} sx={{ border: '1px solid #e0e4e7', borderRadius: '8px', overflow: 'hidden' }}>
+        {/* Header */}
+        <Box sx={{ px: 2.5, pt: 2.5, pb: 0 }}>
+          <Typography variant="h6" sx={{ mb: 0.25 }}>Plan of Corrections</Typography>
+          <Button variant="text" size="small" onClick={() => setStageFilter(null)} sx={{ color: '#0065BD', fontWeight: 600, fontSize: '0.875rem', p: 0, minWidth: 0, mb: 1.5 }}>
+            View all ({totalPocCount})
+          </Button>
+
+          {/* Pipeline cards */}
+          <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#293036', fontFamily: 'Inter', lineHeight: '20px', fontStyle: 'normal', fontFeatureSettings: "'liga' off, 'clig' off", mb: 0.75 }}>
+            Filter by Status
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1.5, mb: 1 }}>
+            {stages.map((stage) => {
+              const isSelected = stageFilter === stage.key;
+              return (
+                <Box key={stage.key} onClick={() => setStageFilter(isSelected ? null : stage.key)} sx={{
+                  flex: 1,
+                  border: `1px solid ${isSelected ? '#0065BD' : '#e0e4e7'}`,
+                  borderRadius: '8px',
+                  p: 1.5,
+                  bgcolor: isSelected ? '#F0F7FF' : 'white',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s, background 0.15s',
+                  '&:hover': { borderColor: isSelected ? '#0065BD' : '#b0b8c1', bgcolor: isSelected ? '#F0F7FF' : '#fafbfc' },
+                }}>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#293036', mb: 0.5 }}>
+                    {stage.label}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
+                    <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#293036', lineHeight: 1 }}>
+                      {stage.count}
+                    </Typography>
+                    {stage.overdue && (
+                      <Chip label="overdue" size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#FEE2E2', color: '#991B1B' }} />
+                    )}
+                  </Box>
+                  {stage.sub}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Closed POCs link */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 1.5 }}>
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => setStageFilter(stageFilter === 'Closed' ? null : 'Closed')}
+              sx={{ color: stageFilter === 'Closed' ? '#0D47A1' : '#0065BD', fontWeight: stageFilter === 'Closed' ? 700 : 600, fontSize: '0.8rem', p: 0, textDecoration: stageFilter === 'Closed' ? 'underline' : 'none' }}
+            >
+              Closed POCs ({countFor('Closed')})
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Citations section label */}
+        <Box sx={{ px: 2.5, py: 1.5 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036' }}>
+            {stageFilter === null ? 'All POCs' :
+             stageFilter === 'Final Review' ? openCitations.length + ' ready for review' :
+             stageFilter === 'Closed' ? openCitations.length + ' closed POC' + (openCitations.length !== 1 ? 's' : '') :
+             openCitations.length + ' ' + stageFilter.toLowerCase() + ' POC' + (openCitations.length !== 1 ? 's' : '')}
+          </Typography>
+        </Box>
+
+        <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#e0e4e7' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', bgcolor: '#e0e4e7', width: 110, py: '6px', px: 2, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                  <TableSortLabel
+                    active={sortBy === 'dueDate'}
+                    direction={sortBy === 'dueDate' ? sortDir : 'asc'}
+                    onClick={() => handleSort('dueDate')}
+                    sx={{ '& .MuiTableSortLabel-icon': { fontSize: 14 }, flexDirection: 'row-reverse', gap: 0.25 }}
+                  >
+                    {stageFilter === 'Open' ? 'Plan due' :
+                     stageFilter === 'Closed' ? 'Completed' :
+                     stageFilter ? 'Correction due' :
+                     'Next due date'}
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', bgcolor: '#e0e4e7', py: '6px', px: 2, whiteSpace: 'nowrap' }}>
+                  <TableSortLabel
+                    active={sortBy === 'tag'}
+                    direction={sortBy === 'tag' ? sortDir : 'asc'}
+                    onClick={() => handleSort('tag')}
+                    sx={{ '& .MuiTableSortLabel-icon': { fontSize: 14 } }}
+                  >
+                    Tag / Description
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', bgcolor: '#e0e4e7', width: 160, py: '6px', px: 2, whiteSpace: 'nowrap' }}>
+                  <TableSortLabel
+                    active={sortBy === 'severity'}
+                    direction={sortBy === 'severity' ? sortDir : 'asc'}
+                    onClick={() => handleSort('severity')}
+                    sx={{ '& .MuiTableSortLabel-icon': { fontSize: 14 } }}
+                  >
+                    Severity
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', bgcolor: '#e0e4e7', width: 110, py: '6px', px: 2, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                  <TableSortLabel
+                    active={sortBy === 'surveyDate'}
+                    direction={sortBy === 'surveyDate' ? sortDir : 'asc'}
+                    onClick={() => handleSort('surveyDate')}
+                    sx={{ '& .MuiTableSortLabel-icon': { fontSize: 14 }, flexDirection: 'row-reverse', gap: 0.25 }}
+                  >
+                    Survey date
+                  </TableSortLabel>
+                </TableCell>
+                {(stageFilter === 'Work Order' || stageFilter === 'Final Review') && (
+                  <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', bgcolor: '#e0e4e7', width: 160, py: '6px', px: 2, whiteSpace: 'nowrap' }}>
+                    Work Order
+                  </TableCell>
+                )}
+                <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', bgcolor: '#e0e4e7', width: 110, py: '6px', px: 2, whiteSpace: 'nowrap' }}>
+                  POC status
+                </TableCell>
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 40, px: 0 }} />
+              </TableRow>
+            </TableHead>
+            <TableBody sx={{ bgcolor: 'white' }}>
+              {openCitations.map((c, idx) => {
+                const isLast = idx === openCitations.length - 1;
+                const sev = c.severity ? SEVERITY_STYLES[c.severity] : SEVERITY_STYLES['Potential Harm'];
+                const hasSetDate = !!c.pocCompletionDate;
+                const dueDateStr = hasSetDate ? c.pocCompletionDate! : computedDueDate(c.date, c.severity);
+                const daysRemaining = daysUntil(dueDateStr);
+                const isOverdueRow = daysRemaining < 0;
+                const isDueSoon = !isOverdueRow && daysRemaining <= 7;
+                const dueCellBg = isOverdueRow ? '#FEE2E2' : isDueSoon ? '#FFF7ED' : undefined;
+                return (
+                  <TableRow key={c.id} hover onClick={() => {
+                    setSelectedCitation(c);
+                    setPocWriteMode(true);
+                    setPocResponse(c.pocResponse || '');
+                    setPocDate(c.pocCompletionDate || '');
+                  }} sx={{
+                    cursor: 'pointer',
+                    bgcolor: selectedCitation?.id === c.id ? '#EBF4FF' : 'transparent',
+                    '&:hover': { bgcolor: selectedCitation?.id === c.id ? '#EBF4FF' : '#F0F7FF' },
+                    ...(isLast && { '& td': { borderBottom: 'none' } }),
+                  }}>
+                    <TableCell sx={{ px: 2, py: '10px', textAlign: 'right', bgcolor: dueCellBg }}>
+                      <Typography sx={{ fontSize: '13px', color: isOverdueRow ? '#991B1B' : isDueSoon ? '#92400E' : '#293036', fontStyle: hasSetDate ? 'normal' : 'italic' }}>
+                        {fmtDate(dueDateStr)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ px: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, overflow: 'hidden' }}>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#293036', fontFamily: 'monospace', flexShrink: 0 }}>{c.tag}</Typography>
+                        <Typography sx={{ fontSize: '13px', color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.description}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ px: 2 }}>
+                      <Chip label={sev.label} size="small" sx={{ bgcolor: sev.bg, color: sev.color, fontWeight: 600, height: 22, fontSize: '0.7rem', borderRadius: '4px' }} />
+                    </TableCell>
+                    <TableCell sx={{ px: 2, textAlign: 'right' }}>
+                      <Typography sx={{ fontSize: '13px', color: '#293036' }}>{fmtDate(c.date)}</Typography>
+                    </TableCell>
+                    {(stageFilter === 'Work Order' || stageFilter === 'Final Review') && (
+                      <TableCell sx={{ px: 2 }}>
+                        {c.workOrder ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Chip
+                              label={c.workOrder.status}
+                              size="small"
+                              variant={c.workOrder.status === 'Open' ? 'outlined' : 'filled'}
+                              sx={c.workOrder.status === 'Open'
+                                ? { height: 22, fontSize: '0.7rem', color: '#3e4751', borderColor: '#e0e4e7', bgcolor: '#f7f8f9', borderRadius: '12px' }
+                                : { height: 22, fontSize: '0.7rem', color: '#293036', bgcolor: '#e0e4e7', borderRadius: '12px' }
+                              }
+                            />
+                            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#0065BD' }}>{c.workOrder.id}</Typography>
+                          </Box>
+                        ) : (
+                          <Typography sx={{ fontSize: '13px', color: '#b0b8c1' }}>—</Typography>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell sx={{ px: 2 }}>
+                      {draftIds.has(c.id)
+                        ? <Chip label="Open: Draft" size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 600, color: '#1565C0', borderColor: '#BFDBFE', bgcolor: '#EFF6FF' }} />
+                        : pocChip(c.pocStatus as PocStage, c.pocCompletionDate)}
+                    </TableCell>
+                    <TableCell sx={{ px: 1 }}>
+                      <ChevronRightIcon sx={{ fontSize: 18, color: '#8492a1' }} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Citation Detail Drawer — expands to two-column POC write mode */}
+      <Drawer
+        anchor="right"
+        open={selectedCitation !== null}
+        onClose={closeDrawer}
+        PaperProps={{
+          sx: {
+            width: '50vw',
+            maxWidth: 640,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
+      >
+        {selectedCitation && (() => {
+          const sc = selectedCitation;
+          const sev = sc.severity ? SEVERITY_STYLES[sc.severity] : SEVERITY_STYLES['Potential Harm'];
+          return (
+            <>
+              {/* Header */}
+              <Box sx={{ px: 3, pt: 2.5, pb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e0e4e7', flexShrink: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {pocWriteMode && (
+                    <IconButton size="small" onClick={() => setPocWriteMode(false)} sx={{ color: '#5c6874', mr: 0.5 }}>
+                      <ArrowBackIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                  <Typography sx={{ fontSize: '18px', fontWeight: 700, color: '#1A1A1A' }}>
+                    {pocWriteMode
+                      ? (sc.pocStatus === 'Submitted' || sc.pocStatus === 'Approved' || sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review' || sc.pocStatus === 'Closed'
+                          ? 'Plan of Correction'
+                          : 'Write Plan of Correction')
+                      : 'Citation details'}
+                  </Typography>
+                </Box>
+                <IconButton size="small" onClick={closeDrawer} sx={{ color: '#5c6874' }}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              {/* Scrollable body — single column, stacked */}
+              <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+
+                {/* Facility info */}
+                <Box>
+                  <Typography sx={{ fontSize: '20px', fontWeight: 700, color: '#1A1A1A', lineHeight: 1.2 }}>
+                    {facility.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: '13px', color: '#555', fontStyle: 'italic', mt: 0.5, mb: 1.5 }}>
+                    {facility.state} · {facility.region}
+                  </Typography>
+                </Box>
+
+                <Divider sx={{ borderColor: '#e0e4e7' }} />
+
+                {/* Citation details subheader + meta */}
+                <Box>
+                  <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036', mb: 1.5 }}>
+                    Citation Details
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 4 }}>
+                    <Box>
+                      <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 500, mb: 0.25 }}>Survey date</Typography>
+                      <Typography sx={{ fontSize: '14px', color: '#1A1A1A' }}>{fmtDate(sc.date)}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 500, mb: 0.25 }}>Surveyor</Typography>
+                      <Typography sx={{ fontSize: '14px', color: '#1A1A1A' }}>{sc.surveyor || '—'}</Typography>
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Citation card */}
+                <Box sx={{ bgcolor: '#F5F5F5', borderRadius: '8px', p: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1A1A1A', fontFamily: 'monospace' }}>
+                      {sc.tag}
+                    </Typography>
+                    <Chip label={sev.label} size="small" sx={{ bgcolor: sev.bg, color: sev.color, fontWeight: 600, fontSize: '0.7rem', height: 22, borderRadius: '12px', border: `1px solid ${sev.color}33` }} />
+                  </Box>
+                  <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1A1A1A', mb: 1.5 }}>
+                    {sc.description}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 500, color: '#757575', mb: 0.5 }}>Observation</Typography>
+                  <Typography sx={{ fontSize: '13px', color: '#293036', lineHeight: 1.6 }}>
+                    {sc.observation || 'No observation text recorded for this citation.'}
+                  </Typography>
+                </Box>
+
+                {/* Actions — shown in detail mode only */}
+                {!pocWriteMode && (
+                  <Box>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1A1A1A', mb: 1.5 }}>Actions to take</Typography>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      startIcon={<EditNoteIcon />}
+                      onClick={() => setPocWriteMode(true)}
+                      sx={{ bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' }, borderRadius: '6px', py: 1.5, fontWeight: 600, mb: 1, '& .MuiButton-startIcon': { color: '#fff' } }}
+                    >
+                      Write POC
+                    </Button>
+                    <Button variant="text" fullWidth sx={{ color: '#1565C0', fontWeight: 500 }}>
+                      Request waiver
+                    </Button>
+                  </Box>
+                )}
+
+                {/* POC section — stacked below citation detail */}
+                {pocWriteMode && (() => {
+                  const isReadOnly = sc.pocStatus === 'Submitted' || sc.pocStatus === 'Approved' || sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review' || sc.pocStatus === 'Closed';
+                  const isWorkOrder = sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review';
+                  const wo = sc.workOrder as WorkOrder | undefined;
+                  const woIsCompleted = wo?.status === 'Completed';
+                  const woStatusColor = woIsCompleted ? '#ffffff' : wo?.status === 'In Progress' ? '#1565C0' : '#374151';
+                  const woStatusBg = woIsCompleted ? '#693a77' : wo?.status === 'In Progress' ? '#EFF6FF' : '#F1F5F9';
+                  const woStatusBorder = woIsCompleted ? '#693a77' : wo?.status === 'In Progress' ? '#BFDBFE' : '#CBD5E1';
+                  const woBorderColor = woIsCompleted ? '#824893' : wo?.status === 'In Progress' ? '#1565C0' : '#8492a1';
+                  const woBgColor = woIsCompleted ? '#f8f4fa' : '#f7f8f9';
+                  return isReadOnly ? (
+                    /* ── Approved / Work Order: static read-only POC view ── */
+                    <>
+                      <Divider sx={{ borderColor: '#e0e4e7' }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036' }}>
+                          Plan of Correction
+                        </Typography>
+                        {(() => {
+                          const status = sc.pocStatus as PocStage;
+                          const stageDate = fmtDate(sc.pocCompletionDate || '4/8/2026');
+                          const styles: Record<string, { bg: string; color: string; border: string; label: string }> = {
+                            Submitted:     { bg: '#EFF6FF', color: '#1E40AF', border: '#BFDBFE', label: `Submitted · ${stageDate}` },
+                            Approved:      { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7', label: `Approved · ${stageDate}` },
+                            'Work Order':  { bg: '#F1F5F9', color: '#374151', border: '#CBD5E1', label: `Work Order · ${stageDate}` },
+                            'Final Review':{ bg: '#F5F3FF', color: '#6B21A8', border: '#DDD6FE', label: `Final Review · ${stageDate}` },
+                            Closed:        { bg: '#F1F5F9', color: '#374151', border: '#CBD5E1', label: `Closed · ${stageDate}` },
+                          };
+                          const s = styles[status] || styles.Approved;
+                          return <Chip label={s.label} size="small" sx={{ bgcolor: s.bg, color: s.color, border: `1px solid ${s.border}`, fontWeight: 600, fontSize: '0.7rem', height: 22, borderRadius: '12px' }} />;
+                        })()}
+                      </Box>
+
+                      {/* Due date + Submitted by */}
+                      <Box sx={{ display: 'flex', gap: 4 }}>
+                        <Box>
+                          <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 500, mb: 0.25 }}>Due date</Typography>
+                          <Typography sx={{ fontSize: '14px', color: '#1A1A1A' }}>{fmtDate(sc.pocCompletionDate || '')}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 500, mb: 0.25 }}>Submitted by</Typography>
+                          <Typography sx={{ fontSize: '14px', color: '#1A1A1A' }}>First Last</Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Response text */}
+                      <Box>
+                        <Box sx={{ bgcolor: '#F5F5F5', borderRadius: '8px', p: 2 }}>
+                          <Typography sx={{ fontSize: '13px', color: '#293036', lineHeight: 1.7 }}>
+                            {sc.pocResponse || '—'}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Divider sx={{ borderColor: '#e0e4e7' }} />
+
+                      {/* Work Order section */}
+                      <Box>
+                        <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036', mb: 1.5 }}>
+                          Work Order
+                        </Typography>
+
+                        {isWorkOrder && wo ? (
+                          /* ── Attached work order card ── */
+                          <Box sx={{
+                            bgcolor: woBgColor, borderLeft: `4px solid ${woBorderColor}`,
+                            borderRadius: '4px', p: 2, display: 'flex', flexDirection: 'column', gap: 1,
+                          }}>
+                            {/* Top row: status chip + WO# + due date */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Chip label={wo.status} size="small" sx={{ bgcolor: woStatusBg, color: woStatusColor, border: woIsCompleted ? 'none' : `1px solid ${woStatusBorder}`, fontWeight: 500, fontSize: '0.7rem', height: 22, borderRadius: '12px' }} />
+                                <Typography sx={{ fontSize: '12px', color: '#3e4751' }}>{wo.id}</Typography>
+                              </Box>
+                              <Typography sx={{ fontSize: '14px', color: '#3e4751', letterSpacing: '-0.08px' }}>Due date: {fmtDate(wo.dueDate)}</Typography>
+                            </Box>
+                            {/* Title */}
+                            <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#3e4751', lineHeight: 1.4 }}>
+                              {wo.title}
+                            </Typography>
+                            {/* Location + assignee + button */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                              <Typography sx={{ fontSize: '14px', color: '#3e4751' }}>{wo.location}</Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Typography sx={{ fontSize: '14px', color: '#3e4751' }}>Assigned to: {wo.assignee}</Typography>
+                                <Button size="small" variant="contained" endIcon={<ChevronRightIcon sx={{ fontSize: 16 }} />}
+                                  sx={{ bgcolor: '#E0E4E7', color: '#293036', '&:hover': { bgcolor: '#CBD5E1' }, boxShadow: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, textTransform: 'none', px: 1.5, py: 0.5 }}>
+                                  View details
+                                </Button>
+                              </Box>
+                            </Box>
+                          </Box>
+                        ) : (
+                          /* ── Approved: no WO yet — action buttons ── */
+                          <>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                              <Button startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />} size="small"
+                                sx={{ justifyContent: 'flex-start', px: 1, py: 0.75, color: '#1565C0', fontWeight: 500, fontSize: '13px', textTransform: 'none', borderRadius: '6px', '&:hover': { bgcolor: '#EFF6FF' } }}>
+                                New work order
+                              </Button>
+                            </Box>
+                            <Divider sx={{ my: 1, borderColor: '#e0e4e7' }} />
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                              <Button startIcon={<AttachFileIcon sx={{ fontSize: 16 }} />} size="small"
+                                sx={{ justifyContent: 'flex-start', px: 1, py: 0.75, color: '#293036', fontWeight: 500, fontSize: '13px', textTransform: 'none', borderRadius: '6px', '&:hover': { bgcolor: '#f5f5f5' } }}>
+                                Attach work order
+                              </Button>
+                            </Box>
+                            <Divider sx={{ my: 1, borderColor: '#e0e4e7' }} />
+                            <Button startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 16 }} />} size="small"
+                              sx={{ justifyContent: 'flex-start', px: 1, py: 0.75, color: '#065F46', fontWeight: 600, fontSize: '13px', textTransform: 'none', borderRadius: '6px', '&:hover': { bgcolor: '#D1FAE5' } }}>
+                              Mark as complete
+                            </Button>
+                          </>
+                        )}
+                      </Box>
+                    </>
+                  ) : (
+                    /* ── Open/Submitted: editable form ── */
+                    <>
+                      <Divider sx={{ borderColor: '#e0e4e7' }} />
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                        <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036' }}>
+                          Plan of Correction
+                        </Typography>
+                        <Chip
+                          label={`POC due ${fmtDate(computedPocSubmitDue(sc.date))}`}
+                          size="small"
+                          sx={{ bgcolor: '#FEF9C3', color: '#854D0E', border: '1px solid #FDE68A', fontWeight: 600, fontSize: '0.7rem', height: 22, borderRadius: '12px' }}
+                        />
+                        {(!sc.pocStatus || sc.pocStatus === 'Open') && (
+                          <Button variant="text" size="small" sx={{ color: '#1565C0', fontWeight: 600, fontSize: '0.8rem', px: 1.5, py: 0.5, minWidth: 0, ml: 'auto' }}>
+                            Request waiver
+                          </Button>
+                        )}
+                      </Box>
+
+                      {/* Correction target */}
+                      <Box>
+                        <Typography sx={{ fontSize: '13px', color: '#757575', mb: 0.75 }}>Correction target</Typography>
+                        <TextField type="date" value={pocDate} onChange={(e) => setPocDate(e.target.value)} size="small" sx={{ width: 170 }} InputLabelProps={{ shrink: true }} />
+                        {sc.severity && (
+                          <Typography sx={{ fontSize: '11px', color: '#8492a1', mt: 0.75, lineHeight: 1.4 }}>
+                            {SEVERITY_CORRECTION_HINT[sc.severity]}
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Facility Response */}
+                      <Box>
+                        <Typography sx={{ fontSize: '13px', color: '#757575', mb: 0.75 }}>Facility Response</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, px: 1, py: 0.5, border: '1px solid #d1d5db', borderBottom: '1px solid #e0e4e7', borderRadius: '4px 4px 0 0', bgcolor: '#fafafa' }}>
+                          {[
+                            { icon: <FormatBoldIcon sx={{ fontSize: 16 }} />, label: 'Bold' },
+                            { icon: <FormatItalicIcon sx={{ fontSize: 16 }} />, label: 'Italic' },
+                            { icon: <FormatUnderlinedIcon sx={{ fontSize: 16 }} />, label: 'Underline' },
+                          ].map(({ icon, label }) => (
+                            <IconButton key={label} size="small" title={label} sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>{icon}</IconButton>
+                          ))}
+                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 18, alignSelf: 'center' }} />
+                          {[
+                            { icon: <FormatListBulletedIcon sx={{ fontSize: 16 }} />, label: 'Bullet list' },
+                            { icon: <FormatListNumberedIcon sx={{ fontSize: 16 }} />, label: 'Numbered list' },
+                          ].map(({ icon, label }) => (
+                            <IconButton key={label} size="small" title={label} sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>{icon}</IconButton>
+                          ))}
+                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 18, alignSelf: 'center' }} />
+                          <IconButton size="small" title="Link" sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>
+                            <LinkIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Box>
+                        <TextField multiline minRows={6} fullWidth placeholder="Describe the corrective action the facility will take…" value={pocResponse} onChange={(e) => setPocResponse(e.target.value)}
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: '0 0 4px 4px', alignItems: 'flex-start', '& fieldset': { borderColor: '#d1d5db', borderTop: 'none' }, '&:hover fieldset': { borderColor: '#9ca3af' }, '&.Mui-focused fieldset': { borderColor: '#1565C0' } } }}
+                        />
+                      </Box>
+
+                      {/* Attach file */}
+                      <Box>
+                        <Typography sx={{ fontSize: '13px', color: '#757575', mb: 0.75 }}>Attach file</Typography>
+                        <Box sx={{ border: '1.5px dashed #d1d5db', borderRadius: '6px', py: 3, px: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, cursor: 'pointer', '&:hover': { bgcolor: '#f9fafb', borderColor: '#9ca3af' } }}>
+                          <InsertDriveFileOutlinedIcon sx={{ fontSize: 30, color: '#9ca3af' }} />
+                          <Typography sx={{ fontSize: '13px', color: '#374151' }}>
+                            <Box component="span" sx={{ color: '#1565C0', fontWeight: 500 }}>Browse files</Box>{' '}or drag and drop
+                          </Typography>
+                          <Typography sx={{ fontSize: '11px', color: '#9ca3af' }}>PDF, DOC, DOCX (max. 5 MB)</Typography>
+                        </Box>
+                      </Box>
+                    </>
+                  );
+                })()}
+              </Box>
+
+              {/* Footer */}
+              {pocWriteMode && (sc.pocStatus === 'Submitted' || sc.pocStatus === 'Approved' || sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review' || sc.pocStatus === 'Closed') ? (
+                /* ── Approved / Work Order / Final Review footer: Close only ── */
+                <Box sx={{ px: 3, py: 2, borderTop: '1px solid #e0e4e7', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                  <Button variant="contained" onClick={closeDrawer} sx={{ bgcolor: '#E0E0E0', color: '#212121', '&:hover': { bgcolor: '#BDBDBD' }, boxShadow: 'none', borderRadius: '6px', fontWeight: 500, px: 3 }}>
+                    Close
+                  </Button>
+                </Box>
+              ) : pocWriteMode ? (
+                /* ── Editable footer: Cancel / Save as draft / Submit ── */
+                <Box sx={{ px: 3, py: 2, borderTop: '1px solid #e0e4e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                  <Button variant="outlined" onClick={closeDrawer} sx={{ borderColor: '#d1d5db', color: '#374151', borderRadius: '6px', fontWeight: 500, px: 3 }}>
+                    Cancel
+                  </Button>
+                  {(() => {
+                    const hasResponse = pocResponse.trim().length > 0;
+                    const hasDate = pocDate.trim().length > 0;
+                    const canSubmit = hasResponse && hasDate;
+                    const canDraft = hasResponse || hasDate;
+                    return (
+                      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                        <Button
+                          variant="text"
+                          disabled={!canDraft}
+                          sx={{ color: '#1565C0', fontWeight: 500, '&.Mui-disabled': { color: '#b0b8c1' } }}
+                          onClick={saveAsDraft}
+                        >
+                          Save as draft
+                        </Button>
+                        <Button
+                          variant="contained"
+                          endIcon={<ArrowForwardIcon />}
+                          disabled={!canSubmit}
+                          onClick={closeDrawer}
+                          sx={{ bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' }, '&.Mui-disabled': { bgcolor: '#e0e4e7', color: '#8492a1' }, borderRadius: '6px', fontWeight: 600, px: 3 }}
+                        >
+                          Submit plan
+                        </Button>
+                      </Box>
+                    );
+                  })()}
+                </Box>
+              ) : (
+                /* ── Non-write-mode footer: Close only ── */
+                <Box sx={{ px: 3, py: 2, borderTop: '1px solid #e0e4e7', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                  <Button variant="contained" onClick={closeDrawer} sx={{ bgcolor: '#E0E0E0', color: '#212121', '&:hover': { bgcolor: '#BDBDBD' }, boxShadow: 'none', borderRadius: '6px', fontWeight: 500, px: 3 }}>
+                    Close
+                  </Button>
+                </Box>
+              )}
+            </>
+          );
+        })()}
+      </Drawer>
+    </Box>
+  );
+}
+
 // ─── Summary Tab ──────────────────────────────────────────────────
 function SummaryTab({ facility, facCitations, facSurveys }: {
   facility: AvirFacility; facCitations: AvirCitation[]; facSurveys: AvirSurvey[];
 }) {
+  if (facility.pocMode) {
+    return <PlanOfCorrectionContent facility={facility} facCitations={facCitations} />;
+  }
   const effDate = effectiveLastSurveyDate(facility.id, facility.lastSurveyDate);
   const windowEnd = toISO(addMonths(new Date(effDate), 15));
   const hasUpcoming = daysUntil(windowEnd) <= 90;
@@ -479,32 +1363,27 @@ export default function FacilityDetail() {
   return (
     <Box>
       <PageHeader
+        bordered
         title={facility.name.replace('Avir at ', '')}
         subtitle={
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.875rem' }}>
-              {facility.state} · {facility.region}
-            </Typography>
-            {mostRecentSurvey && (
-              <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.8rem' }}>
-                Last survey {fmtDate(mostRecentSurvey.date)}{mostRecentSurvey.surveyor ? ` · ${mostRecentSurvey.surveyor}` : ''}
-              </Typography>
-            )}
-          </Box>
+          <Typography sx={{ fontSize: '16px', fontStyle: 'italic', color: '#293036', lineHeight: 1.5, letterSpacing: '-0.176px' }}>
+            {facility.state} • {facility.region}
+          </Typography>
         }
-        backLabel={facilityId ? 'Back to Survey Planning' : 'Back to Communities'}
+        backLabel="Back"
         onBack={() => navigate(-1)}
         tabs={[
           { label: 'Summary', value: 0 },
-          { label: 'Survey History', value: 1 },
-          { label: 'Trends', value: 2 },
+          { label: 'Trends', value: 1 },
+          { label: 'Archive', value: 2 },
         ]}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         actions={
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="contained" color="primary" size="small" startIcon={<UploadFileIcon />}>Upload Survey</Button>
-            <Button variant="contained" color="inherit" size="small" startIcon={<FileDownloadIcon />}>Export</Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button variant="contained" color="inherit" disableElevation startIcon={<UploadFileIcon />}>Upload survey</Button>
+            <Button variant="contained" color="inherit" disableElevation startIcon={<EditNoteIcon />}>Mock survey</Button>
+            <Button variant="contained" color="inherit" disableElevation startIcon={<EventAvailableIcon />} endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}>Site visit</Button>
           </Box>
         }
       />
@@ -516,14 +1395,14 @@ export default function FacilityDetail() {
           facSurveys={facSurveys}
         />
       )}
-      {activeTab === 1 && (
+      {activeTab === 1 && <TrendsTab />}
+      {activeTab === 2 && (
         <SurveyHistoryTab
           facSurveys={facSurveys}
           facCitations={facCitations}
           facilityId={facility.id}
         />
       )}
-      {activeTab === 2 && <TrendsTab />}
     </Box>
   );
 }

@@ -17,6 +17,8 @@ interface Props {
   subtitle?: React.ReactNode;
   backLabel?: string;
   onBack?: () => void;
+  /** Renders with gray bg + bottom border (used on facility/community detail pages) */
+  bordered?: boolean;
 }
 
 export default function PageHeader({
@@ -28,6 +30,7 @@ export default function PageHeader({
   subtitle,
   backLabel,
   onBack,
+  bordered = false,
 }: Props) {
   return (
     <Box
@@ -36,15 +39,19 @@ export default function PageHeader({
         mt: -3,
         mb: 2,
         width: 'calc(100vw - 256px)',
+        ...(bordered && {
+          bgcolor: '#f7f8f9',
+          borderBottom: '1px solid #e0e4e7',
+        }),
       }}
     >
-      <Box sx={{ px: 3, pt: 2, pb: tabs ? 0 : 0 }}>
+      <Box sx={{ px: '22px', pt: '17px', pb: tabs ? 0 : '17px' }}>
         {/* Back link — breadcrumb style per Figma */}
         {backLabel && onBack && (
           <Box
             onClick={onBack}
             sx={{
-              display: 'flex', alignItems: 'center', gap: 0.75, mb: 1, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 0.75, mb: '8px', cursor: 'pointer',
               color: '#5c6874', '&:hover': { color: '#293036' },
             }}
           >
@@ -55,34 +62,29 @@ export default function PageHeader({
           </Box>
         )}
         {/* Title row */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
-            <Typography
-              sx={{
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 700,
-                fontSize: '24px',
-                color: '#000000',
-                letterSpacing: '-0.46px',
-                lineHeight: 1.333,
-              }}
-            >
-              {title}
-            </Typography>
-          </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: subtitle ? 0 : 0 }}>
+          <Typography
+            sx={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 700,
+              fontSize: '24px',
+              color: '#293036',
+              letterSpacing: '-0.456px',
+              lineHeight: '32px',
+            }}
+          >
+            {title}
+          </Typography>
           {actions}
         </Box>
         {subtitle && (
-          <Typography sx={{ color: '#64748B', fontSize: '0.875rem', mt: -1, mb: 0.5 }}>
-            {subtitle}
-          </Typography>
+          <Box sx={{ mt: '4px', mb: 0 }}>{subtitle}</Box>
         )}
-
       </Box>
 
-      {/* Sub-tabs (Level 3) — only if tabs provided */}
+      {/* Tabs */}
       {tabs && (
-        <Box sx={{ px: 3, borderTop: 'none' }}>
+        <Box sx={{ px: '22px' }}>
           <Tabs
             value={activeTab}
             onChange={(_, v) => onTabChange?.(v)}

@@ -1,184 +1,212 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Button, FormControl, InputLabel, Select,
-  MenuItem, TextField, InputAdornment, IconButton,
+  Box, Typography, Paper, Button, Chip,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
-import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import SearchIcon from '@mui/icons-material/Search';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { facilities, regions as avirRegions } from '../data/avir-data';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { facilities, citations } from '../data/avir-data';
+import type { PocStage } from '../data/avir-data';
 import PageHeader from '../components/PageHeader';
-import PageFilters from '../components/PageFilters';
-import { useCommunityFilter } from '../components/CommunityFilter';
 import { fmtDate } from '../utils/formatDate';
+
+const TODAY = new Date('2026-04-26');
+
+function daysUntil(dateStr: string): number {
+  return Math.round((new Date(dateStr).getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+const STAGES: { key: PocStage; label: string; color: string; bg: string }[] = [
+  { key: 'Open',         label: 'Open',         color: '#374151', bg: '#F1F5F9' },
+  { key: 'Submitted',    label: 'Submitted',    color: '#1565C0', bg: '#EFF6FF' },
+  { key: 'Approved',     label: 'Approved',     color: '#065F46', bg: '#D1FAE5' },
+  { key: 'Work Order',   label: 'Work Orders',  color: '#374151', bg: '#F1F5F9' },
+  { key: 'Final Review', label: 'Final Review', color: '#6B21A8', bg: '#F5F3FF' },
+  { key: 'Closed',       label: 'Closed',       color: '#374151', bg: '#F1F5F9' },
+];
+
+// Compute real POC stage counts from citation data for The Meadow
+const meadowCitations = citations.filter((c) => c.facilityId === 'fac-avir-at-the-meadow');
+const meadowStageCounts: Partial<Record<PocStage, number>> = meadowCitations.reduce<Partial<Record<PocStage, number>>>((acc, c) => {
+  const stage = (c.pocStatus || 'Open') as PocStage;
+  acc[stage] = (acc[stage] || 0) + 1;
+  return acc;
+}, {});
 
 export default function Facilities() {
   const navigate = useNavigate();
-  const { passesFilter } = useCommunityFilter();
-  const [dateRange, setDateRange] = useState('all');
-  const [search, setSearch] = useState('');
-  const [regionFilter, setRegionFilter] = useState('');
+  const [sortField, setSortField] = useState<'name' | 'pocDueDate' | 'surveyDate' | 'total'>('pocDueDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-  const filtered = useMemo(() => {
-    return [...facilities]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .filter((f) => {
-        if (!passesFilter(f.id)) return false;
-        if (search && !f.name.toLowerCase().includes(search.toLowerCase())
-          && !f.region.toLowerCase().includes(search.toLowerCase())) return false;
-        if (regionFilter && f.region !== regionFilter) return false;
-        return true;
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
+  };
+
+  const pocFacilities = useMemo(() => {
+    return facilities
+      .filter((f) => f.pocMode)
+      .map((f) => {
+        const counts = f.id === 'fac-avir-at-the-meadow' ? meadowStageCounts : (f.pocStageCounts || {});
+        const total = Object.values(counts).reduce((s, n) => s + (n || 0), 0);
+        const open = counts['Open'] || 0;
+        const pctComplete = total > 0 ? Math.round(((total - open) / total) * 100) : 0;
+        return { ...f, counts, total, pctComplete };
+      })
+      .sort((a, b) => {
+        let cmp = 0;
+        if (sortField === 'name') cmp = a.name.localeCompare(b.name);
+        else if (sortField === 'pocDueDate') cmp = (a.pocDueDate || '').localeCompare(b.pocDueDate || '');
+        else if (sortField === 'surveyDate') cmp = (a.pocSurveyDate || '').localeCompare(b.pocSurveyDate || '');
+        else if (sortField === 'total') cmp = a.total - b.total;
+        return sortDir === 'asc' ? cmp : -cmp;
       });
-  }, [passesFilter, search, regionFilter]);
+  }, [sortField, sortDir]);
 
-  const totalCitations = filtered.reduce((s, f) => s + f.totalCitations, 0);
-
-  const columns: GridColDef[] = [
-    {
-      field: 'name', headerName: 'Community Name', flex: 1, minWidth: 200,
-      renderCell: (p: GridRenderCellParams) => (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036', lineHeight: '16px' }}>
-            {(p.value as string).replace('Avir at ', '')}
-          </Typography>
-          <Typography sx={{ fontWeight: 400, fontSize: '14px', color: '#293036', lineHeight: '16px' }}>{p.row.region}</Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'totalCitations', headerName: 'Total', width: 95, type: 'number', align: 'right', headerAlign: 'right',
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036' }}>{p.value}</Typography>
-      ),
-    },
-    {
-      field: 'totalKTags', headerName: 'K-Tags', width: 95, type: 'number', align: 'right', headerAlign: 'right',
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography sx={{ fontSize: '14px', fontWeight: 400, color: (p.value as number) > 0 ? '#293036' : '#94A3B8' }}>
-          {(p.value as number) || '—'}
-        </Typography>
-      ),
-    },
-    {
-      field: 'totalNTags', headerName: 'N-Tags', width: 95, type: 'number', align: 'right', headerAlign: 'right',
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography sx={{ fontSize: '14px', fontWeight: 400, color: (p.value as number) > 0 ? '#293036' : '#94A3B8' }}>
-          {(p.value as number) || '—'}
-        </Typography>
-      ),
-    },
-    {
-      field: 'totalETags', headerName: 'E-Tags', width: 95, type: 'number', align: 'right', headerAlign: 'right',
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography sx={{ fontSize: '14px', fontWeight: 400, color: (p.value as number) > 0 ? '#293036' : '#94A3B8' }}>
-          {(p.value as number) || '—'}
-        </Typography>
-      ),
-    },
-    {
-      field: 'surveyCount', headerName: 'Surveys', width: 95, type: 'number', align: 'right', headerAlign: 'right',
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{p.value}</Typography>
-      ),
-    },
-    {
-      field: 'lastSurveyDate', headerName: 'Last Survey', width: 120,
-      renderCell: (p: GridRenderCellParams) => (
-        <Typography sx={{ fontSize: '14px', fontWeight: 400, color: p.value ? '#293036' : '#94A3B8' }}>
-          {p.value ? fmtDate(p.value as string) : '—'}
-        </Typography>
-      ),
-    },
-    {
-      field: 'surveyWindow', headerName: 'Survey Window', width: 180, sortable: false,
-      renderCell: (p: GridRenderCellParams) => {
-        const lastDate = p.row.lastSurveyDate as string | undefined;
-        if (!lastDate) return <Typography sx={{ fontSize: '14px', color: '#94A3B8' }}>—</Typography>;
-        const base = new Date(lastDate);
-        const start = new Date(base);
-        start.setMonth(start.getMonth() + 9);
-        const end = new Date(base);
-        end.setMonth(end.getMonth() + 15);
-        const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        return (
-          <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>
-            {fmt(start)} – {fmt(end)}
-          </Typography>
-        );
-      },
-    },
-  ];
+  const headerCell = (label: string, field?: typeof sortField, align: 'left' | 'right' | 'center' = 'left') => {
+    const active = field && sortField === field;
+    return (
+      <TableCell
+        key={label}
+        onClick={field ? () => handleSort(field) : undefined}
+        sx={{
+          fontWeight: 600, fontSize: '13px', color: '#293036',
+          bgcolor: '#e0e4e7', py: '8px', px: 2, whiteSpace: 'nowrap',
+          textAlign: align,
+          cursor: field ? 'pointer' : 'default',
+          userSelect: 'none',
+          '&:hover': field ? { bgcolor: '#d4d8dc' } : {},
+        }}
+      >
+        {label}{active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+      </TableCell>
+    );
+  };
 
   return (
     <Box>
       <PageHeader
-        title="Community Summaries"
+        title="Plan of Corrections"
         actions={
-          <Button variant="contained" color="inherit" size="small" startIcon={<FileDownloadIcon />}>Export</Button>
-        }
-      />
-      <PageFilters
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        extraFilters={
-          <FormControl size="small" variant="filled" sx={{ minWidth: 220, '& .MuiFilledInput-root': { bgcolor: '#fff', '&:hover': { bgcolor: '#fff' }, '&.Mui-focused': { bgcolor: '#fff' } } }}>
-            <InputLabel>Filter by CMS Region</InputLabel>
-            <Select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
-              <MenuItem value="">All regions</MenuItem>
-              {avirRegions.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <Button variant="contained" color="inherit" size="small" disableElevation startIcon={<FileDownloadIcon />}>Export</Button>
         }
       />
 
+      {/* Summary strip */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        {STAGES.map((s) => {
+          const total = pocFacilities.reduce((sum, f) => sum + (f.counts[s.key] || 0), 0);
+          return (
+            <Paper key={s.key} elevation={0} sx={{ flex: 1, p: 1.5, border: '1px solid #e0e4e7', borderRadius: '8px', textAlign: 'center' }}>
+              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#8492a1', mb: 0.5 }}>{s.label}</Typography>
+              <Typography sx={{ fontSize: '22px', fontWeight: 700, color: total > 0 ? '#293036' : '#b0b8c1', lineHeight: 1.1 }}>{total}</Typography>
+              <Typography sx={{ fontSize: '11px', color: '#8492a1', mt: 0.25 }}>across {pocFacilities.length} communities</Typography>
+            </Paper>
+          );
+        })}
+      </Box>
+
       {/* Table */}
-      <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}>
-          <Typography sx={{ fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
-            <Box component="span" sx={{ fontWeight: 700 }}>{filtered.length} communities</Box>
-            <Box component="span" sx={{ fontWeight: 400 }}> - {totalCitations} total citations</Box>
+      <Paper elevation={0} sx={{ border: '1px solid #e0e4e7', borderRadius: '8px', overflow: 'hidden' }}>
+        <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036' }}>
+            {pocFacilities.length} communities in active POC
           </Typography>
-          <TextField size="small" placeholder="Search communities" value={search}
-            onChange={(e) => setSearch(e.target.value)} sx={{ width: 220 }}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
         </Box>
-        <DataGrid
-          rows={filtered}
-          columns={columns}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 15 } },
-            sorting: { sortModel: [{ field: 'totalCitations', sort: 'desc' }] },
-          }}
-          pageSizeOptions={[15, 25, 50, 100]}
-          disableRowSelectionOnClick
-          disableColumnMenu
-          rowHeight={56}
-          columnHeaderHeight={36}
-          onRowClick={(params) => navigate(`/facility/${params.row.id}`)}
-          getRowClassName={(params) => {
-            if (params.row.totalCitations === 0 && params.row.surveyed) return 'def-free-row';
-            return '';
-          }}
-          sx={{
-            border: 'none',
-            borderRadius: '0 !important',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: '#e0e4e7', borderBottom: 'none' },
-            '& .MuiDataGrid-columnHeader': { bgcolor: '#e0e4e7' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, fontSize: '14px', color: '#293036', letterSpacing: '-0.084px', lineHeight: '16px', overflow: 'visible', textOverflow: 'unset' },
-            '& .MuiDataGrid-columnHeaderTitleContainerContent': { overflow: 'visible' },
-            '& .MuiDataGrid-columnSeparator': { display: 'none' },
-            '& .MuiDataGrid-row': { cursor: 'pointer', '&:hover': { bgcolor: '#F0F7FF' } },
-            '& .def-free-row': { bgcolor: '#e3f9ef', '&:hover': { bgcolor: '#c7f2df' } },
-            '& .MuiDataGrid-cell': { fontSize: '14px', color: '#293036', display: 'flex', alignItems: 'center', '& .MuiTypography-root': { fontSize: '14px' } },
-            '& .MuiDataGrid-sortButton': { color: '#293036' },
-            '& .MuiDataGrid-main > *': { borderRadius: '0 !important' },
-            '& .MuiDataGrid-main > div:last-child:not([class*="MuiDataGrid"])': { display: 'none !important' },
-          }}
-          autoHeight
-        />
+        <TableContainer sx={{ bgcolor: '#e0e4e7' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {headerCell('Community', 'name')}
+                {headerCell('Survey date', 'surveyDate', 'right')}
+                {headerCell('POC due', 'pocDueDate', 'right')}
+                {headerCell('Total', 'total', 'right')}
+                {STAGES.map((s) => (
+                  <TableCell key={s.key} sx={{ fontWeight: 600, fontSize: '13px', color: '#293036', bgcolor: '#e0e4e7', py: '8px', px: 2, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    {s.label}
+                  </TableCell>
+                ))}
+                <TableCell sx={{ bgcolor: '#e0e4e7', width: 40, px: 0 }} />
+              </TableRow>
+            </TableHead>
+            <TableBody sx={{ bgcolor: 'white' }}>
+              {pocFacilities.map((f, idx) => {
+                const isLast = idx === pocFacilities.length - 1;
+                const days = f.pocDueDate ? daysUntil(f.pocDueDate) : null;
+                const isOverdue = days !== null && days < 0;
+                const isDueSoon = days !== null && !isOverdue && days <= 7;
+                const dueDateColor = isOverdue ? '#991B1B' : isDueSoon ? '#92400E' : '#293036';
+                const dueDateBg = isOverdue ? '#FEE2E2' : isDueSoon ? '#FFF7ED' : undefined;
+
+                return (
+                  <TableRow
+                    key={f.id}
+                    hover
+                    onClick={() => navigate(`/facility/${f.id}`)}
+                    sx={{
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: '#F0F7FF' },
+                      ...(isLast && { '& td': { borderBottom: 'none' } }),
+                    }}
+                  >
+                    {/* Community */}
+                    <TableCell sx={{ px: 2, py: '12px' }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#293036', lineHeight: 1.2 }}>
+                        {f.name.replace('Avir at ', '')}
+                      </Typography>
+                      <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.25 }}>
+                        {f.state} · {f.region}
+                      </Typography>
+                    </TableCell>
+
+                    {/* Survey date */}
+                    <TableCell sx={{ px: 2, textAlign: 'right' }}>
+                      <Typography sx={{ fontSize: '13px', color: '#293036' }}>{fmtDate(f.pocSurveyDate || '')}</Typography>
+                    </TableCell>
+
+                    {/* POC due */}
+                    <TableCell sx={{ px: 2, textAlign: 'right', bgcolor: dueDateBg }}>
+                      <Typography sx={{ fontSize: '13px', fontWeight: 600, color: dueDateColor }}>
+                        {fmtDate(f.pocDueDate || '')}
+                      </Typography>
+                      {isOverdue && <Typography sx={{ fontSize: '11px', color: '#991B1B' }}>Overdue</Typography>}
+                      {isDueSoon && <Typography sx={{ fontSize: '11px', color: '#92400E' }}>Due soon</Typography>}
+                    </TableCell>
+
+                    {/* Total */}
+                    <TableCell sx={{ px: 2, textAlign: 'right' }}>
+                      <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#293036' }}>{f.total}</Typography>
+                    </TableCell>
+
+                    {/* Stage counts */}
+                    {STAGES.map((s) => {
+                      const count = f.counts[s.key] || 0;
+                      return (
+                        <TableCell key={s.key} sx={{ px: 2, textAlign: 'right' }}>
+                          {count > 0 ? (
+                            <Chip
+                              label={count}
+                              size="small"
+                              sx={{ bgcolor: s.bg, color: s.color, fontWeight: 700, height: 22, fontSize: '0.75rem', minWidth: 28 }}
+                            />
+                          ) : (
+                            <Typography sx={{ fontSize: '13px', color: '#b0b8c1' }}>—</Typography>
+                          )}
+                        </TableCell>
+                      );
+                    })}
+
+                    {/* Arrow */}
+                    <TableCell sx={{ px: 1 }}>
+                      <ChevronRightIcon sx={{ fontSize: 18, color: '#8492a1' }} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Paper>
     </Box>
   );
