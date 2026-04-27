@@ -14,6 +14,7 @@ import TagTypeDetail from './pages/TagTypeDetail';
 import TagDetail from './pages/TagDetail';
 import Trends from './pages/Trends';
 import POCManagement from './pages/POCManagement';
+import WritePoc from './pages/WritePoc';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="/surveys" element={<SurveyManagement />} />
               <Route path="/surveys/:facilityId" element={<FacilityDetail />} />
               <Route path="/facility/:id" element={<FacilityDetail />} />
+              <Route path="/facility/:id/poc/:citationId" element={<WritePoc />} />
               <Route path="/facilities" element={<Facilities />} />
             <Route path="/citations-remix" element={<CitationsRemix />} />
               <Route path="/citations-remix/tags/:type" element={<TagTypeDetail />} />
