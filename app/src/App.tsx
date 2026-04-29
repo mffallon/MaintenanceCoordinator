@@ -15,6 +15,7 @@ import TagDetail from './pages/TagDetail';
 import Trends from './pages/Trends';
 import POCManagement from './pages/POCManagement';
 import WritePoc from './pages/WritePoc';
+import SurveyIndicatorDemo from './pages/SurveyIndicatorDemo';
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="/citations-remix/tags/:type/:tag" element={<TagDetail />} />
               <Route path="/trends" element={<Trends />} />
               <Route path="/poc" element={<POCManagement />} />
+              <Route path="/dev/survey-indicator" element={<SurveyIndicatorDemo />} />
             </Route>
           </Routes>
         </BrowserRouter>

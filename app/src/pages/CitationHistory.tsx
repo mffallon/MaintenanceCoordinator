@@ -68,7 +68,6 @@ export default function CitationHistory() {
       if (regionFilter && r.region !== regionFilter) return false;
       // Quick filter chips
       if (quickFilter === 'K' && r.tagType !== 'K') return false;
-      if (quickFilter === 'N' && r.tagType !== 'N') return false;
       if (quickFilter === 'E' && r.tagType !== 'E') return false;
       if (quickFilter === 'waiver' && !r.isWaiver) return false;
       return true;
@@ -89,7 +88,6 @@ export default function CitationHistory() {
   }, [communityRows, search, tagFilter, statusFilter, regionFilter]);
 
   const kCount = baseFiltered.filter((r) => r.tagType === 'K').length;
-  const nCount = baseFiltered.filter((r) => r.tagType === 'N').length;
   const eCount = baseFiltered.filter((r) => r.tagType === 'E').length;
   const waiverCount = baseFiltered.filter((r) => r.isWaiver).length;
 
@@ -205,13 +203,6 @@ export default function CitationHistory() {
               bgcolor: quickFilter === 'K' ? '#991B1B' : '#FEE2E2',
               color: quickFilter === 'K' ? '#fff' : '#991B1B',
               border: quickFilter === 'K' ? '2px solid #991B1B' : 'none',
-            }} />
-          <Chip label={`N-Tags: ${nCount}`} size="small"
-            onClick={() => toggleQuick('N')}
-            sx={{ cursor: 'pointer', fontWeight: 700,
-              bgcolor: quickFilter === 'N' ? '#1E40AF' : '#DBEAFE',
-              color: quickFilter === 'N' ? '#fff' : '#1E40AF',
-              border: quickFilter === 'N' ? '2px solid #1E40AF' : 'none',
             }} />
           <Chip label={`E-Tags: ${eCount}`} size="small"
             onClick={() => toggleQuick('E')}

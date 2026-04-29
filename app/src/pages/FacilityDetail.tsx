@@ -23,6 +23,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -39,7 +40,7 @@ import PageHeader from '../components/PageHeader';
 import { fmtDate } from '../utils/formatDate';
 import { effectiveLastSurveyDate } from '../utils/surveyWindowOverrides';
 
-const TODAY = new Date('2026-04-05');
+const TODAY = new Date('2026-04-02');
 
 function addMonths(date: Date, months: number): Date {
   const d = new Date(date);
@@ -101,7 +102,6 @@ function SurveyPrepContent({ facility, facCitations, facSurveys }: {
 
   // Citation breakdown
   const kCount = facCitations.filter((c) => c.tagType === 'K').length;
-  const nCount = facCitations.filter((c) => c.tagType === 'N').length;
   const eCount = facCitations.filter((c) => c.tagType === 'E').length;
   const statusCounts = facCitations.reduce<Record<string, number>>((acc, c) => {
     acc[c.status || 'Open'] = (acc[c.status || 'Open'] || 0) + 1; return acc;
@@ -172,7 +172,6 @@ function SurveyPrepContent({ facility, facCitations, facSurveys }: {
           <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5 }}>Prior Citation History</Typography>
           {[
             { label: 'K-Tags (Life Safety)', count: kCount, color: '#DC2626' },
-            { label: 'N-Tags (State)', count: nCount, color: '#2563EB' },
             { label: 'E-Tags (Emergency)', count: eCount, color: '#D97706' },
           ].map(({ label, count, color }) => (
             <Box key={label} sx={{ mb: 1 }}>
@@ -283,7 +282,6 @@ function LatestSurveyContent({ facility, facCitations, facSurveys }: {
   const latestCitations = latestSurvey ? facCitations.filter((c) => c.date === latestSurvey.date) : facCitations;
 
   const kCount = latestCitations.filter((c) => c.tagType === 'K').length;
-  const nCount = latestCitations.filter((c) => c.tagType === 'N').length;
   const eCount = latestCitations.filter((c) => c.tagType === 'E').length;
 
   const statusBreakdown = (tagType: 'K' | 'N' | 'E') =>
@@ -308,7 +306,6 @@ function LatestSurveyContent({ facility, facCitations, facSurveys }: {
       <Box sx={{ display: 'flex', gap: 2, mb: 2.5 }}>
         {([
           { label: 'K-Tags', subtitle: 'Life Safety Code', count: kCount, tagType: 'K' as const, tagColor: '#991B1B', bg: '#FEF2F2', border: '#FECACA' },
-          { label: 'N-Tags (State)', subtitle: 'State Regulations', count: nCount, tagType: 'N' as const, tagColor: '#1E40AF', bg: '#EFF6FF', border: '#BFDBFE' },
           { label: 'E-Tags', subtitle: 'Emergency Preparedness', count: eCount, tagType: 'E' as const, tagColor: '#854D0E', bg: '#FFFBEB', border: '#FDE68A' },
         ]).map((t) => (
           <Paper key={t.label} sx={{ p: 2, flex: 1, borderRadius: 3, border: `1px solid ${t.count > 0 ? t.border : '#E0E4E7'}`, bgcolor: t.count > 0 ? t.bg : '#FAFBFC' }}>
@@ -1083,11 +1080,6 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
                           size="small"
                           sx={{ bgcolor: '#FEF9C3', color: '#854D0E', border: '1px solid #FDE68A', fontWeight: 600, fontSize: '0.7rem', height: 22, borderRadius: '12px' }}
                         />
-                        {(!sc.pocStatus || sc.pocStatus === 'Open') && (
-                          <Button variant="text" size="small" sx={{ color: '#1565C0', fontWeight: 600, fontSize: '0.8rem', px: 1.5, py: 0.5, minWidth: 0, ml: 'auto' }}>
-                            Request waiver
-                          </Button>
-                        )}
                       </Box>
 
                       {/* Correction target */}
@@ -1123,23 +1115,35 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
                           <IconButton size="small" title="Link" sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>
                             <LinkIcon sx={{ fontSize: 16 }} />
                           </IconButton>
+                          <Box sx={{ ml: 'auto' }}>
+                            <Button
+                              size="small"
+                              startIcon={<AutoAwesomeIcon sx={{ fontSize: 14 }} />}
+                              onClick={() => setPocResponse(synthesizePocResponse({ ...sc, severity: sc.severity ?? 'Potential Harm' }))}
+                              sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', bgcolor: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '6px', px: 1.25, py: 0.25, '&:hover': { bgcolor: '#E2E8F0' }, textTransform: 'none' }}
+                            >
+                              Generate
+                            </Button>
+                          </Box>
                         </Box>
                         <TextField multiline minRows={6} fullWidth placeholder="Describe the corrective action the facility will take…" value={pocResponse} onChange={(e) => setPocResponse(e.target.value)}
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: '0 0 4px 4px', alignItems: 'flex-start', '& fieldset': { borderColor: '#d1d5db', borderTop: 'none' }, '&:hover fieldset': { borderColor: '#9ca3af' }, '&.Mui-focused fieldset': { borderColor: '#1565C0' } } }}
                         />
+                        {pocResponse.trim().length > 0 && (
+                          <Button
+                            fullWidth
+                            variant="contained"
+                            size="small"
+                            startIcon={<ContentCopyIcon sx={{ fontSize: 15 }} />}
+                            onClick={() => navigator.clipboard.writeText(pocResponse)}
+                            disableElevation
+                            sx={{ mt: 1, fontSize: '0.8rem', fontWeight: 600, bgcolor: '#1565C0', color: '#fff', textTransform: 'none', '&:hover': { bgcolor: '#0D47A1' } }}
+                          >
+                            Copy response
+                          </Button>
+                        )}
                       </Box>
 
-                      {/* Attach file */}
-                      <Box>
-                        <Typography sx={{ fontSize: '13px', color: '#757575', mb: 0.75 }}>Attach file</Typography>
-                        <Box sx={{ border: '1.5px dashed #d1d5db', borderRadius: '6px', py: 3, px: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, cursor: 'pointer', '&:hover': { bgcolor: '#f9fafb', borderColor: '#9ca3af' } }}>
-                          <InsertDriveFileOutlinedIcon sx={{ fontSize: 30, color: '#9ca3af' }} />
-                          <Typography sx={{ fontSize: '13px', color: '#374151' }}>
-                            <Box component="span" sx={{ color: '#1565C0', fontWeight: 500 }}>Browse files</Box>{' '}or drag and drop
-                          </Typography>
-                          <Typography sx={{ fontSize: '11px', color: '#9ca3af' }}>PDF, DOC, DOCX (max. 5 MB)</Typography>
-                        </Box>
-                      </Box>
                     </>
                   );
                 })()}
@@ -1154,7 +1158,7 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
                   </Button>
                 </Box>
               ) : pocWriteMode ? (
-                /* ── Editable footer: Cancel / Save as draft / Submit ── */
+                /* ── Editable footer: Cancel / Submit plan ── */
                 <Box sx={{ px: 3, py: 2, borderTop: '1px solid #e0e4e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                   <Button variant="outlined" onClick={closeDrawer} sx={{ borderColor: '#d1d5db', color: '#374151', borderRadius: '6px', fontWeight: 500, px: 3 }}>
                     Cancel
@@ -1163,27 +1167,16 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
                     const hasResponse = pocResponse.trim().length > 0;
                     const hasDate = pocDate.trim().length > 0;
                     const canSubmit = hasResponse && hasDate;
-                    const canDraft = hasResponse || hasDate;
                     return (
-                      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                        <Button
-                          variant="text"
-                          disabled={!canDraft}
-                          sx={{ color: '#1565C0', fontWeight: 500, '&.Mui-disabled': { color: '#b0b8c1' } }}
-                          onClick={saveAsDraft}
-                        >
-                          Save as draft
-                        </Button>
-                        <Button
-                          variant="contained"
-                          endIcon={<ArrowForwardIcon />}
-                          disabled={!canSubmit}
-                          onClick={closeDrawer}
-                          sx={{ bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' }, '&.Mui-disabled': { bgcolor: '#e0e4e7', color: '#8492a1' }, borderRadius: '6px', fontWeight: 600, px: 3 }}
-                        >
-                          Submit plan
-                        </Button>
-                      </Box>
+                      <Button
+                        variant="contained"
+                        endIcon={<ArrowForwardIcon />}
+                        disabled={!canSubmit}
+                        onClick={closeDrawer}
+                        sx={{ bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' }, '&.Mui-disabled': { bgcolor: '#e0e4e7', color: '#8492a1' }, borderRadius: '6px', fontWeight: 600, px: 3 }}
+                      >
+                        Submit plan
+                      </Button>
                     );
                   })()}
                 </Box>
@@ -1234,7 +1227,6 @@ function SurveyHistoryTab({ facSurveys, facCitations, facilityId }: {
             <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#293036' }}>Survey Date</TableCell>
             <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#293036' }}>Surveyor</TableCell>
             <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#293036' }}>K-Tags</TableCell>
-            <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#293036' }}>N-Tags</TableCell>
             <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#293036' }}>E-Tags</TableCell>
             <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#293036' }}>Total</TableCell>
             <TableCell sx={{ width: 32 }} />
@@ -1260,9 +1252,6 @@ function SurveyHistoryTab({ facSurveys, facCitations, facilityId }: {
                   <TableCell><Typography variant="caption">{s.surveyor || '—'}</Typography></TableCell>
                   <TableCell align="center">
                     <Typography variant="body2" sx={{ fontWeight: s.kTags > 0 ? 700 : 400, color: s.kTags > 0 ? '#991B1B' : '#64748B' }}>{s.kTags}</Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Typography variant="body2" sx={{ fontWeight: s.nTags > 0 ? 700 : 400, color: s.nTags > 0 ? '#1E40AF' : '#64748B' }}>{s.nTags}</Typography>
                   </TableCell>
                   <TableCell align="center">
                     <Typography variant="body2" sx={{ fontWeight: s.eTags > 0 ? 700 : 400, color: s.eTags > 0 ? '#854D0E' : '#64748B' }}>{s.eTags}</Typography>
@@ -1531,12 +1520,12 @@ function CitationsDetailSection({ facCitations, label = 'Citations Detail' }: { 
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {['K', 'N', 'E'].filter((t) => tagTypeGroups[t]?.length).map((type) => (
+          {['K', 'E'].filter((t) => tagTypeGroups[t]?.length).map((type) => (
             <Box key={type}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Chip label={type === 'K' ? 'K-Tags' : type === 'N' ? 'N-Tags' : 'E-Tags'} size="small" sx={{
-                  bgcolor: type === 'K' ? '#FEE2E2' : type === 'N' ? '#DBEAFE' : '#FEF9C3',
-                  color:   type === 'K' ? '#991B1B' : type === 'N' ? '#1E40AF' : '#854D0E',
+                <Chip label={type === 'K' ? 'K-Tags' : 'E-Tags'} size="small" sx={{
+                  bgcolor: type === 'K' ? '#FEE2E2' : '#FEF9C3',
+                  color:   type === 'K' ? '#991B1B' : '#854D0E',
                   fontWeight: 700,
                 }} />
                 <Typography variant="caption" color="text.secondary">{tagTypeGroups[type].length} citation{tagTypeGroups[type].length !== 1 ? 's' : ''}</Typography>
@@ -1573,7 +1562,7 @@ function CitationsDetailSection({ facCitations, label = 'Citations Detail' }: { 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
                 {([
                   ['Status', selectedCitation.status],
-                  ['Tag Type', selectedCitation.tagType === 'K' ? 'K-Tag (Life Safety)' : selectedCitation.tagType === 'N' ? 'N-Tag (State)' : 'E-Tag (Emergency)'],
+                  ['Tag Type', selectedCitation.tagType === 'K' ? 'K-Tag (Life Safety)' : 'E-Tag (Emergency)'],
                   ['Region', selectedCitation.region],
                   ['Surveyor', selectedCitation.surveyor || '—'],
                   ['Survey Date', fmtDate(selectedCitation.date)],

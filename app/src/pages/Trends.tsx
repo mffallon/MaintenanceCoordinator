@@ -25,7 +25,7 @@ const BENCHMARKS = {
   E: { peers: 3.0, peerTrend: 12, nation: 4.2, nationTrend: 20, myTrend:  8 },
 } as const;
 
-const TAG_COLORS = { K: '#F68E5B', N: '#009FDB', E: '#25A36A' } as const;
+const TAG_COLORS = { K: '#F68E5B', N: '#25A36A', E: '#009FDB' } as const;
 const TAG_LABELS = { K: 'K-Tags', N: 'State', E: 'E-Tags' } as const;
 
 type TagType = 'K' | 'N' | 'E';
@@ -125,6 +125,21 @@ const TAG_ROUTES: Record<TagType, string> = {
   N: '/citations-remix/tags/state',
 };
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const REF = new Date('2026-04-02');
+
+function dateRangeCaption(dateRange: string): string {
+  const fmt = (d: Date) => `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+  const end = fmt(REF);
+  if (dateRange === 'all') return 'All time';
+  if (dateRange === '12m') return `${fmt(new Date(REF.getFullYear() - 1, REF.getMonth(), REF.getDate()))} – ${end}`;
+  if (dateRange === 'ytd') return `${fmt(new Date(REF.getFullYear(), 0, 1))} – ${end}`;
+  if (dateRange === '30d') return `${fmt(new Date(REF.getFullYear(), REF.getMonth(), REF.getDate() - 30))} – ${end}`;
+  if (dateRange === '60d') return `${fmt(new Date(REF.getFullYear(), REF.getMonth(), REF.getDate() - 60))} – ${end}`;
+  if (dateRange === '90d') return `${fmt(new Date(REF.getFullYear(), REF.getMonth(), REF.getDate() - 90))} – ${end}`;
+  return end;
+}
+
 export default function Trends() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
@@ -175,7 +190,7 @@ export default function Trends() {
     }
 
     // Build a fixed 12-month window ending at the ref date
-    const ref = new Date('2026-04-05');
+    const ref = new Date('2026-04-02');
     const months: string[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
@@ -262,6 +277,7 @@ export default function Trends() {
         (!latestOnly || isLatest(c.facilityId, c.date)) &&
         (!trendRegion   || c.region === trendRegion) &&
         (!trendSurveyor || c.surveyor === trendSurveyor) &&
+        c.tagType !== 'N' &&
         (!filterByType || trendTagType === 'all' || c.tagType === trendTagType),
       );
 
@@ -371,13 +387,90 @@ export default function Trends() {
       {/* ── Row 1: Monthly Citations + Category Intensity ─────────────────── */}
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
 
+        {/* K-Tags + E-Tags cards stacked */}
+        <Box sx={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px', order: 2 }}>
+          {(['K', 'E'] as TagType[]).map((type) => {
+            const bench = BENCHMARKS[type];
+            const myVal = cardStats[type];
+            const myTrend = bench.myTrend;
+            const MyTrendIcon = myTrend >= 0 ? TrendingUpIcon : TrendingDownIcon;
+            const myColor = myTrend >= 0 ? '#EF4444' : '#25A36A';
+
+            return (
+              <Paper key={type} elevation={0} sx={{
+                flex: 1, border: '1px solid #e0e4e7', borderRadius: '8px',
+                display: 'flex', flexDirection: 'column', gap: 1,
+                pt: '13px', pb: 2, px: 3,
+              }}>
+                {/* Header */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                    <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: TAG_COLORS[type], flexShrink: 0, alignSelf: 'center' }} />
+                    <Typography sx={{ fontWeight: 700, fontSize: '18px', color: '#293036' }}>{TAG_LABELS[type]}</Typography>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#94A3B8' }}>{dateRangeCaption(dateRange)}</Typography>
+                  </Box>
+                  <Button size="small" variant="text" endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+                    onClick={() => navigate(TAG_ROUTES[type])}
+                    sx={{ color: '#0065BD', fontWeight: 600, fontSize: '0.875rem', px: 1, py: 0.5 }}>
+                    View all
+                  </Button>
+                </Box>
+
+                {/* Portfolio value */}
+                <Box sx={{ px: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', letterSpacing: '-0.176px' }}>Per Survey</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#293036', lineHeight: '32px', letterSpacing: '-0.408px' }}>{myVal}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', alignSelf: 'flex-end', pb: '4px' }}>
+                      <MyTrendIcon sx={{ fontSize: 14, color: myColor }} />
+                      <Typography sx={{ fontSize: '12px', fontWeight: 700, color: myColor }}>
+                        {myTrend >= 0 ? '+' : ''}{myTrend}%
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#525f6c', lineHeight: '16px' }}>{cardStats.count} total surveys</Typography>
+                </Box>
+
+                {/* Peers + Nation sub-stats */}
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {([
+                    { label: 'Peers',  val: bench.peers,  trend: bench.peerTrend,   bgWhenAbove: '#fef1f3' },
+                    { label: 'Nation', val: bench.nation, trend: bench.nationTrend, bgWhenAbove: 'white'   },
+                  ] as const).map(({ label, val, trend, bgWhenAbove }) => {
+                    const BenchIcon = trend >= 0 ? TrendingUpIcon : TrendingDownIcon;
+                    return (
+                      <Box key={label} sx={{
+                        flex: 1, p: 1, borderRadius: '4px',
+                        bgcolor: myVal > val ? bgWhenAbove : 'white',
+                        display: 'flex', flexDirection: 'column', gap: '2px',
+                      }}>
+                        <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036', letterSpacing: '-0.084px', lineHeight: '20px' }}>{label}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography sx={{ fontSize: '20px', fontWeight: 800, color: '#293036', lineHeight: '28px', letterSpacing: '-0.28px' }}>{val}</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <BenchIcon sx={{ fontSize: 16, color: '#293036' }} />
+                            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#293036', lineHeight: '16px' }}>
+                              {trend >= 0 ? '+' : ''}{trend}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#525f6c', lineHeight: '16px' }}>Per survey</Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Paper>
+            );
+          })}
+        </Box>
+
         {/* Monthly Citations bar chart */}
-        <Paper elevation={0} sx={{ flex: 1, border: '1px solid #e0e4e7', borderRadius: '8px', pt: 3, px: 3, pb: 2 }}>
+        <Paper elevation={0} sx={{ flex: 1, border: '1px solid #e0e4e7', borderRadius: '8px', pt: '13px', px: 3, pb: 2 }}>
           <Typography sx={{ fontWeight: 700, fontSize: '18px', color: '#293036', mb: 1 }}>Monthly Citations</Typography>
 
           {/* Tag filter chips */}
           <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
-            {([['all', 'All citations'], ['K', 'K-Tags'], ['E', 'E-Tags'], ['N', 'State']] as [TrendFilter, string][]).map(([val, label]) => (
+            {([['all', 'All citations'], ['K', 'K-Tags'], ['E', 'E-Tags']] as [TrendFilter, string][]).map(([val, label]) => (
               <Chip key={val} label={label} size="small"
                 onClick={() => setChartTagFilter(val)}
                 sx={chipSx(chartTagFilter === val)} />
@@ -411,7 +504,6 @@ export default function Trends() {
               series={[
                 ...(chartTagFilter === 'all' || chartTagFilter === 'K' ? [{ data: monthlyData.map((m) => m.K), label: 'K-Tags', color: TAG_COLORS.K, stack: 'stack' }] : []),
                 ...(chartTagFilter === 'all' || chartTagFilter === 'E' ? [{ data: monthlyData.map((m) => m.E), label: 'E-Tags', color: TAG_COLORS.E, stack: 'stack' }] : []),
-                ...(chartTagFilter === 'all' || chartTagFilter === 'N' ? [{ data: monthlyData.map((m) => m.N), label: 'State',  color: TAG_COLORS.N, stack: 'stack' }] : []),
               ]}
               xAxis={[{ data: monthlyData.map((m) => m.label), scaleType: 'band', categoryGapRatio: 0.2 }]}
               yAxis={[{ label: chartMode === 'per-survey' ? 'Citations per survey' : 'Total citations' }]}
@@ -442,107 +534,15 @@ export default function Trends() {
             </Box>
           )}
         </Paper>
-
-        {/* Category Intensity — placeholder */}
-        <Paper elevation={0} sx={{ width: 340, flexShrink: 0, border: '1px solid #e0e4e7', borderRadius: '8px', p: 3 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '18px', color: '#293036', mb: 2 }}>Category Intensity</Typography>
-          <Box sx={{
-            height: 270, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
-            bgcolor: '#F7F8F9', borderRadius: '8px', border: '1.5px dashed #cbd5e1',
-          }}>
-            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style={{ opacity: 0.22, marginBottom: 12 }}>
-              <polygon points="32,4 60,20 60,44 32,60 4,44 4,20" stroke="#293036" strokeWidth="2" fill="none"/>
-              <polygon points="32,14 50,23 50,41 32,50 14,41 14,23" stroke="#293036" strokeWidth="1.5" fill="none"/>
-              <polygon points="32,24 41,29 41,37 32,42 23,37 23,29" stroke="#293036" strokeWidth="1" fill="none"/>
-              <line x1="32" y1="4"  x2="32" y2="60" stroke="#293036" strokeWidth="1"/>
-              <line x1="4"  y1="20" x2="60" y2="44" stroke="#293036" strokeWidth="1"/>
-              <line x1="4"  y1="44" x2="60" y2="20" stroke="#293036" strokeWidth="1"/>
-            </svg>
-            <Typography sx={{ color: '#94A3B8', fontSize: '13px', fontWeight: 600 }}>Radar chart coming soon</Typography>
-            <Typography sx={{ color: '#94A3B8', fontSize: '12px', mt: 0.5 }}>Portfolio vs peers vs national</Typography>
-          </Box>
-        </Paper>
-      </Box>
-
-      {/* ── Row 2: K / N / E metric cards ────────────────────────────────── */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        {(['K', 'E', 'N'] as TagType[]).map((type) => {
-          const bench = BENCHMARKS[type];
-          const myVal = cardStats[type];
-          const myTrend = bench.myTrend;
-          const MyTrendIcon = myTrend >= 0 ? TrendingUpIcon : TrendingDownIcon;
-          const myColor = myTrend >= 0 ? '#EF4444' : '#25A36A';
-
-          return (
-            <Paper key={type} elevation={0} sx={{
-              flex: 1, border: '1px solid #e0e4e7', borderRadius: '8px',
-              display: 'flex', flexDirection: 'column', gap: 1,
-              pt: '13px', pb: 2, px: 2,
-            }}>
-              {/* Header */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pl: 1 }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '20px', color: '#293036', letterSpacing: '-0.34px' }}>{TAG_LABELS[type]}</Typography>
-                <Button size="small" variant="text" endIcon={<ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
-                  onClick={() => navigate(TAG_ROUTES[type])}
-                  sx={{ color: '#0065BD', fontWeight: 600, fontSize: '0.875rem', px: 1, py: 0.5 }}>
-                  View all
-                </Button>
-              </Box>
-
-              {/* Portfolio value */}
-              <Box sx={{ px: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', letterSpacing: '-0.176px' }}>Per Survey</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#293036', lineHeight: '32px', letterSpacing: '-0.408px' }}>{myVal}</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', alignSelf: 'flex-end', pb: '4px' }}>
-                    <MyTrendIcon sx={{ fontSize: 14, color: myColor }} />
-                    <Typography sx={{ fontSize: '12px', fontWeight: 700, color: myColor }}>
-                      {myTrend >= 0 ? '+' : ''}{myTrend}%
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#525f6c', lineHeight: '16px' }}>{cardStats.count} total surveys</Typography>
-              </Box>
-
-              {/* Peers + Nation sub-stats */}
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {([
-                  { label: 'Peers',  val: bench.peers,  trend: bench.peerTrend,   bgWhenAbove: '#fef1f3' },
-                  { label: 'Nation', val: bench.nation, trend: bench.nationTrend, bgWhenAbove: 'white'   },
-                ] as const).map(({ label, val, trend, bgWhenAbove }) => {
-                  const BenchIcon = trend >= 0 ? TrendingUpIcon : TrendingDownIcon;
-                  return (
-                    <Box key={label} sx={{
-                      flex: 1, p: 1, borderRadius: '4px',
-                      bgcolor: myVal > val ? bgWhenAbove : 'white',
-                      display: 'flex', flexDirection: 'column', gap: '2px',
-                    }}>
-                      <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#293036', letterSpacing: '-0.084px', lineHeight: '20px' }}>{label}</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ fontSize: '20px', fontWeight: 800, color: '#293036', lineHeight: '28px', letterSpacing: '-0.28px' }}>{val}</Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <BenchIcon sx={{ fontSize: 16, color: '#293036' }} />
-                          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#293036', lineHeight: '16px' }}>
-                            {trend >= 0 ? '+' : ''}{trend}%
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#525f6c', lineHeight: '16px' }}>Per survey</Typography>
-                    </Box>
-                  );
-                })}
-              </Box>
-            </Paper>
-          );
-        })}
       </Box>
 
       {/* ── Row 3: Portfolio vs Regional Citations ──────────────────── */}
-      <Paper elevation={0} sx={{ border: '1px solid #e0e4e7', borderRadius: '8px', p: 3 }}>
-        <Box sx={{ mb: 2 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036' }}>
+      <Paper elevation={0} sx={{ border: '1px solid #e0e4e7', borderRadius: '8px', pt: '13px', px: 3, pb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 2 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '18px', color: '#293036' }}>
             Portfolio vs Regional Citations
           </Typography>
+          <Typography sx={{ fontSize: '12px', fontWeight: 400, color: '#94A3B8' }}>{dateRangeCaption(dateRange)}</Typography>
         </Box>
 
         {/* Section-level filters + segment control */}
@@ -576,7 +576,7 @@ export default function Trends() {
           </FormControl>
 
           <Box sx={{ display: 'flex', gap: 0.75 }}>
-            {([['all', 'All citations'], ['K', 'K-Tags'], ['E', 'E-Tags'], ['N', 'State']] as [TrendFilter, string][]).map(([val, label]) => (
+            {([['all', 'All citations'], ['K', 'K-Tags'], ['E', 'E-Tags']] as [TrendFilter, string][]).map(([val, label]) => (
               <Chip key={val} label={label} size="small"
                 onClick={() => setTrendTagType(val)}
                 sx={chipSx(trendTagType === val)} />

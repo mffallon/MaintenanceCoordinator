@@ -2,7 +2,7 @@
  * Returns a predicate that checks if a date string (YYYY-MM-DD) passes the given date range filter.
  * Uses a fixed reference date consistent with the prototype dataset.
  */
-const REF_DATE = new Date('2026-04-05');
+const REF_DATE = new Date('2026-04-02');
 
 export function makeDateFilter(dateRange: string): (dateStr: string) => boolean {
   if (dateRange === 'all') return () => true;

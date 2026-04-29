@@ -15,7 +15,7 @@ import { facilities, surveys, citations, tagDescriptions } from '../data/avir-da
 import { fmtDate } from '../utils/formatDate';
 import { effectiveLastSurveyDate } from '../utils/surveyWindowOverrides';
 
-const TODAY = new Date('2026-04-05');
+const TODAY = new Date('2026-04-02');
 
 function addMonths(date: Date, months: number): Date {
   const d = new Date(date);
@@ -111,7 +111,6 @@ export default function SurveyPrepDetail() {
 
   // Citation type breakdown
   const kCount = facCitations.filter((c) => c.tagType === 'K').length;
-  const nCount = facCitations.filter((c) => c.tagType === 'N').length;
   const eCount = facCitations.filter((c) => c.tagType === 'E').length;
 
   // Tags trending up system-wide — what surveyors are currently targeting
@@ -216,7 +215,6 @@ export default function SurveyPrepDetail() {
           <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5 }}>Prior Citation History</Typography>
           {[
             { label: 'K-Tags (Life Safety)', count: kCount, color: '#DC2626' },
-            { label: 'N-Tags (State)', count: nCount, color: '#2563EB' },
             { label: 'E-Tags (Emergency)', count: eCount, color: '#D97706' },
           ].map(({ label, count, color }) => (
             <Box key={label} sx={{ mb: 1 }}>

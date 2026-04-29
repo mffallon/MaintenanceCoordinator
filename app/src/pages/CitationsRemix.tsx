@@ -34,7 +34,6 @@ interface SurveyRow {
   surveyDate: string;
   surveyor: string;
   kTags: number;
-  stateTags: number;
   eTags: number;
   totalCitations: number;
   isWaiver: boolean;
@@ -76,7 +75,6 @@ export default function CitationsRemix() {
         surveyDate: s.date,
         surveyor: s.surveyor || '—',
         kTags: s.kTags,
-        stateTags: s.nTags,
         eTags: s.eTags,
         totalCitations: s.total,
         isWaiver: s.isWaiver,
@@ -103,11 +101,9 @@ export default function CitationsRemix() {
 
   const tagTypeTotals = useMemo(() => {
     const kTotal = filteredRows.reduce((s, r) => s + r.kTags, 0);
-    const stateTotal = filteredRows.reduce((s, r) => s + r.stateTags, 0);
     const eTotal = filteredRows.reduce((s, r) => s + r.eTags, 0);
     return [
       { type: 'K' as const, label: 'K-Tags', subtitle: 'Life Safety Code', count: kTotal, path: '/citations-remix/tags/k' },
-      { type: 'State' as const, label: 'N-Tags (State)', subtitle: 'State Regulations', count: stateTotal, path: '/citations-remix/tags/state' },
       { type: 'E' as const, label: 'E-Tags', subtitle: 'Emergency Preparedness', count: eTotal, path: '/citations-remix/tags/e' },
     ];
   }, [filteredRows]);
@@ -115,7 +111,7 @@ export default function CitationsRemix() {
   const deficiencyFreeCount = useMemo(() => filteredRows.filter((r) => r.totalCitations === 0 && !r.isPending).length, [filteredRows]);
 
   const prevPeriodFilter = useMemo((): ((dateStr: string) => boolean) | null => {
-    const REF = new Date('2026-04-05');
+    const REF = new Date('2026-04-02');
     const y = REF.getFullYear(); const m = REF.getMonth(); const d = REF.getDate();
     if (dateRange === 'all') return null;
     if (dateRange === '30d') {
@@ -282,7 +278,7 @@ export default function CitationsRemix() {
             Top 5 Tags
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {(['All', 'K', 'N', 'E'] as const).map((f) => (
+            {(['All', 'K', 'E'] as const).map((f) => (
               <Chip
                 key={f}
                 label={f === 'All' ? 'All' : `${f}-Tags`}
@@ -375,7 +371,6 @@ export default function CitationsRemix() {
                   { field: 'facilityName', label: 'Community', align: 'left' as const },
                   { field: 'surveyor', label: 'Surveyor', width: 160, align: 'left' as const },
                   { field: 'kTags', label: 'K-Tags', align: 'right' as const, nowrap: true },
-                  { field: 'stateTags', label: 'N-Tags', align: 'right' as const, nowrap: true },
                   { field: 'eTags', label: 'E-Tags', align: 'right' as const, nowrap: true },
                   { field: 'totalCitations', label: 'Total', align: 'right' as const, nowrap: true },
                 ] as const).map((col) => (
@@ -428,9 +423,6 @@ export default function CitationsRemix() {
                     </TableCell>
                     <TableCell align="right">
                       <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.kTags ? '#293036' : '#94A3B8' }}>{srv.kTags || '—'}</Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.stateTags ? '#293036' : '#94A3B8' }}>{srv.stateTags || '—'}</Typography>
                     </TableCell>
                     <TableCell align="right">
                       <Typography sx={{ fontSize: '14px', fontWeight: 400, color: srv.eTags ? '#293036' : '#94A3B8' }}>{srv.eTags || '—'}</Typography>
@@ -514,14 +506,12 @@ export default function CitationsRemix() {
         const surveyorRows = allRows.filter((r) => r.surveyor === selectedSurveyor);
         const totalSurveys = surveyorRows.length;
         const totalK = surveyorRows.reduce((s, r) => s + r.kTags, 0);
-        const totalState = surveyorRows.reduce((s, r) => s + r.stateTags, 0);
         const totalE = surveyorRows.reduce((s, r) => s + r.eTags, 0);
         const totalCit = surveyorRows.reduce((s, r) => s + r.totalCitations, 0);
         const avgPerSurvey = totalSurveys > 0 ? (totalCit / totalSurveys).toFixed(1) : '0';
         const regionsServed = [...new Set(surveyorRows.map((r) => r.region))];
-        const tagTotal = totalK + totalState + totalE;
+        const tagTotal = totalK + totalE;
         const kPct = tagTotal > 0 ? Math.round((totalK / tagTotal) * 100) : 0;
-        const statePct = tagTotal > 0 ? Math.round((totalState / tagTotal) * 100) : 0;
         const ePct = tagTotal > 0 ? Math.round((totalE / tagTotal) * 100) : 0;
         const catCounts = new Map<string, number>();
         surveyorRows.forEach((sr) => {
@@ -572,7 +562,6 @@ export default function CitationsRemix() {
                 </Box>
                 {[
                   { label: 'K-Tags (Life Safety)', count: totalK, pct: kPct, color: '#DC2626' },
-                  { label: 'State Tags', count: totalState, pct: statePct, color: '#2563EB' },
                   { label: 'E-Tags (Emergency Prep)', count: totalE, pct: ePct, color: '#CA8A04' },
                 ].map((tag) => (
                   <Box key={tag.label} sx={{ mb: 1.5 }}>
@@ -605,7 +594,6 @@ export default function CitationsRemix() {
                         <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', py: 0.75 }}>Date</TableCell>
                         <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', py: 0.75 }}>Community</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', py: 0.75 }}>K</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', py: 0.75 }}>State</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', py: 0.75 }}>E</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', py: 0.75 }}>Total</TableCell>
                       </TableRow>
@@ -617,7 +605,6 @@ export default function CitationsRemix() {
                           <TableCell sx={{ fontSize: '0.75rem', py: 0.75 }}>{fmtDate(sr.surveyDate)}</TableCell>
                           <TableCell sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.facilityName.replace('Avir at ', '')}</TableCell>
                           <TableCell align="right" sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.kTags}</TableCell>
-                          <TableCell align="right" sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.stateTags}</TableCell>
                           <TableCell align="right" sx={{ fontSize: '0.75rem', py: 0.75 }}>{sr.eTags}</TableCell>
                           <TableCell align="right" sx={{ fontSize: '0.75rem', py: 0.75, fontWeight: 700 }}>{sr.totalCitations}</TableCell>
                         </TableRow>
