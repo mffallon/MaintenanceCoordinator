@@ -15,7 +15,7 @@ import { CommunityFilter, useCommunityFilter } from '../components/CommunityFilt
 import { citations } from '../data/avir-data';
 import { fmtDate } from '../utils/formatDate';
 
-const TODAY = new Date('2026-04-05');
+const TODAY = new Date('2026-04-02');
 
 function daysOpen(dateStr: string): number {
   return Math.round((TODAY.getTime() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));

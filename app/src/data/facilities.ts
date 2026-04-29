@@ -84,7 +84,7 @@ function formatISO(d: string): string {
   return date.toISOString().split('T')[0];
 }
 
-const now = new Date();
+const now = new Date('2026-04-02');
 
 const allFacilities: Facility[] = rawFacilities.map((r, i) => {
   const endDate = parseDate(r.windowEnd);

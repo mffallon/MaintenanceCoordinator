@@ -64,7 +64,6 @@ const sideNavItems = [
   { label: 'Survey Overviews', path: '/citations-remix' },
   { label: 'K-Tags', path: '/citations-remix/tags/k', indent: true },
   { label: 'E-Tags', path: '/citations-remix/tags/e', indent: true },
-  { label: 'State Tags', path: '/citations-remix/tags/state', indent: true },
   { label: 'Plan of Corrections', path: '/facilities' },
   { label: 'Upload Survey', path: '/upload' },
 ];
