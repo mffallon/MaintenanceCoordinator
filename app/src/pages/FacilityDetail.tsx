@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Paper, Chip, Button, Divider, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
   ToggleButtonGroup, ToggleButton, Drawer, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AddTaskIcon from '@mui/icons-material/AddTask';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import EditNoteIcon from '@mui/icons-material/EditNote';
+import EditIcon from '@mui/icons-material/Edit';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -24,6 +26,7 @@ import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutl
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -33,6 +36,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import LinearProgress from '@mui/material/LinearProgress';
 import { facilities, citations, surveys, tagDescriptions } from '../data/avir-data';
 import type { AvirCitation, AvirSurvey, AvirFacility, PocStage, CitationSeverity, WorkOrder } from '../data/avir-data';
@@ -414,6 +418,20 @@ const SEVERITY_CORRECTION_HINT: Record<CitationSeverity, string> = {
   'No Harm': 'Recommended correction target within 30 days',
 };
 
+function AiPlanIcon({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+      <mask id="aiplan-mask" style={{ maskType: 'alpha' }} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+        <rect width="24" height="24" fill="#D9D9D9"/>
+      </mask>
+      <g mask="url(#aiplan-mask)">
+        <path d="M19 3C19.55 3 20.0204 3.19622 20.4121 3.58789C20.8038 3.97956 21 4.45 21 5V14.416C20.3875 14.1484 19.7111 14 19 14V5H5V19H14C14 19.7112 14.1493 20.3874 14.417 21H5C4.45 21 3.97956 20.8038 3.58789 20.4121C3.19622 20.0204 3 19.55 3 19V5C3 4.45 3.19622 3.97956 3.58789 3.58789C3.97956 3.19622 4.45 3 5 3H19ZM16 15C15.3137 15.5156 14.7649 16.2038 14.417 17H7V15H16ZM17 11V13H7V11H17ZM17 7V9H7V7H17Z" fill={color}/>
+      </g>
+      <path d="M18.7349 15.9286C18.8016 15.7222 19.1789 15.7191 19.2487 15.9245C19.4577 16.5393 19.7909 17.3141 20.25 17.7656C20.7093 18.2174 21.4911 18.5391 22.1065 18.7381C22.3121 18.8045 22.3151 19.1756 22.1106 19.2452C21.4942 19.4549 20.7096 19.7904 20.25 20.25C19.7905 20.7095 19.4549 21.4942 19.2452 22.1106C19.1756 22.3151 18.8045 22.3121 18.7381 22.1065C18.5391 21.4911 18.2174 20.7093 17.7656 20.25C17.3141 19.7909 16.5393 19.4577 15.9245 19.2487C15.7191 19.1789 15.7222 18.8016 15.9286 18.7349C16.5425 18.5365 17.3143 18.2169 17.7656 17.7656C18.2169 17.3143 18.5365 16.5425 18.7349 15.9286Z" fill={color}/>
+    </svg>
+  );
+}
+
 function PlanOfCorrectionContent({ facility, facCitations }: {
   facility: AvirFacility; facCitations: AvirCitation[];
 }) {
@@ -429,6 +447,15 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
   const [pocWriteMode, setPocWriteMode] = useState(false);
   const [pocDate, setPocDate] = useState('');
   const [pocResponse, setPocResponse] = useState('');
+  const [planGenerated, setPlanGenerated] = useState(false);
+  const [responseCopied, setResponseCopied] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [approveDate, setApproveDate] = useState(todayIso);
+  const [obsExpanded, setObsExpanded] = useState(false);
+  const [obsOverflows, setObsOverflows] = useState(false);
+  const obsTextRef = useRef<HTMLDivElement>(null);
   const [draftIds, setDraftIds] = useState<Set<string>>(new Set());
 
   const closeDrawer = () => { setSelectedCitation(null); setPocWriteMode(false); };
@@ -466,6 +493,31 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
+
+  // Detect whether the observation text overflows 4 lines after citation changes.
+  // We measure in a useEffect (not layout) so the MUI Drawer Portal has had time
+  // to insert its DOM. A rAF gives the browser one frame to finish layout before we read scrollHeight.
+  useEffect(() => {
+    setObsExpanded(false);
+    setObsOverflows(false);
+    const rafId = requestAnimationFrame(() => {
+      if (obsTextRef.current) {
+        const el = obsTextRef.current;
+        // Temporarily remove webkit-line-clamp so we can measure the natural height
+        el.style.display = 'block';
+        el.style.overflow = 'visible';
+        (el.style as CSSStyleDeclaration & { webkitLineClamp: string }).webkitLineClamp = 'unset';
+        const natural = el.scrollHeight;
+        // Restore clamp styles
+        el.style.display = '-webkit-box';
+        el.style.overflow = 'hidden';
+        (el.style as CSSStyleDeclaration & { webkitLineClamp: string }).webkitLineClamp = '4';
+        const LINE_HEIGHT_PX = 16 * 1.5;
+        setObsOverflows(natural > LINE_HEIGHT_PX * 4 + 1);
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [selectedCitation?.id]);
 
   const handleSort = (col: PocSortCol) => {
     if (sortBy === col) { setSortDir((d) => d === 'asc' ? 'desc' : 'asc'); }
@@ -683,7 +735,7 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
           </Box>
 
           {/* Closed POCs link */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 1.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 0.5 }}>
             <Button
               variant="text"
               size="small"
@@ -696,7 +748,7 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
         </Box>
 
         {/* Citations section label */}
-        <Box sx={{ px: 2.5, py: 1.5 }}>
+        <Box sx={{ px: 2.5, pt: 0.5, pb: 1 }}>
           <Typography sx={{ fontWeight: 700, fontSize: '16px', color: '#293036' }}>
             {stageFilter === null ? 'All POCs' :
              stageFilter === 'Final Review' ? openCitations.length + ' ready for review' :
@@ -779,6 +831,7 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
                     setPocWriteMode(true);
                     setPocResponse(c.pocResponse || '');
                     setPocDate(c.pocCompletionDate || '');
+                    setPlanGenerated(!!c.pocResponse);
                   }} sx={{
                     cursor: 'pointer',
                     bgcolor: selectedCitation?.id === c.id ? '#EBF4FF' : 'transparent',
@@ -848,7 +901,7 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
         PaperProps={{
           sx: {
             width: '50vw',
-            maxWidth: 640,
+            maxWidth: 720,
             display: 'flex',
             flexDirection: 'column',
           },
@@ -861,20 +914,9 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
             <>
               {/* Header */}
               <Box sx={{ px: 3, pt: 2.5, pb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e0e4e7', flexShrink: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {pocWriteMode && (
-                    <IconButton size="small" onClick={() => setPocWriteMode(false)} sx={{ color: '#5c6874', mr: 0.5 }}>
-                      <ArrowBackIcon fontSize="small" />
-                    </IconButton>
-                  )}
-                  <Typography sx={{ fontSize: '18px', fontWeight: 700, color: '#1A1A1A' }}>
-                    {pocWriteMode
-                      ? (sc.pocStatus === 'Submitted' || sc.pocStatus === 'Approved' || sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review' || sc.pocStatus === 'Closed'
-                          ? 'Plan of Correction'
-                          : 'Write Plan of Correction')
-                      : 'Citation details'}
-                  </Typography>
-                </Box>
+                <Typography sx={{ fontSize: '18px', fontWeight: 700, color: '#1A1A1A' }}>
+                  {facility.name}
+                </Typography>
                 <IconButton size="small" onClick={closeDrawer} sx={{ color: '#5c6874' }}>
                   <CloseIcon fontSize="small" />
                 </IconButton>
@@ -883,50 +925,51 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
               {/* Scrollable body — single column, stacked */}
               <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
 
-                {/* Facility info */}
-                <Box>
-                  <Typography sx={{ fontSize: '20px', fontWeight: 700, color: '#1A1A1A', lineHeight: 1.2 }}>
-                    {facility.name}
-                  </Typography>
-                  <Typography sx={{ fontSize: '13px', color: '#555', fontStyle: 'italic', mt: 0.5, mb: 1.5 }}>
-                    {facility.state} · {facility.region}
-                  </Typography>
-                </Box>
-
-                <Divider sx={{ borderColor: '#e0e4e7' }} />
-
-                {/* Citation details subheader + meta */}
-                <Box>
-                  <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036', mb: 1.5 }}>
-                    Citation Details
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 4 }}>
-                    <Box>
-                      <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 500, mb: 0.25 }}>Survey date</Typography>
-                      <Typography sx={{ fontSize: '14px', color: '#1A1A1A' }}>{fmtDate(sc.date)}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 500, mb: 0.25 }}>Surveyor</Typography>
-                      <Typography sx={{ fontSize: '14px', color: '#1A1A1A' }}>{sc.surveyor || '—'}</Typography>
-                    </Box>
+                {/* Survey meta */}
+                <Box sx={{ display: 'flex', gap: 3 }}>
+                  <Box>
+                    <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 600, mb: 0.5, lineHeight: '20px' }}>Survey date</Typography>
+                    <Typography sx={{ fontSize: '16px', color: '#1A1A1A', letterSpacing: '-0.176px' }}>{fmtDate(sc.date)}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: '12px', color: '#757575', fontWeight: 600, mb: 0.5, lineHeight: '20px' }}>Surveyor</Typography>
+                    <Typography sx={{ fontSize: '16px', color: '#1A1A1A', letterSpacing: '-0.176px' }}>{sc.surveyor || '—'}</Typography>
                   </Box>
                 </Box>
 
                 {/* Citation card */}
-                <Box sx={{ bgcolor: '#F5F5F5', borderRadius: '8px', p: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1A1A1A', fontFamily: 'monospace' }}>
-                      {sc.tag}
+                <Box sx={{ bgcolor: '#f7f8f9', borderRadius: '8px', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', letterSpacing: '-0.176px' }}>
+                        {sc.tag}
+                      </Typography>
+                      <Chip label={sev.label} size="small" sx={{ bgcolor: sev.bg, color: sev.color, fontWeight: 600, fontSize: '0.7rem', height: 22, borderRadius: '12px', border: `1px solid ${sev.color}33` }} />
+                    </Box>
+                    <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', letterSpacing: '-0.176px' }}>
+                      {sc.description}
                     </Typography>
-                    <Chip label={sev.label} size="small" sx={{ bgcolor: sev.bg, color: sev.color, fontWeight: 600, fontSize: '0.7rem', height: 22, borderRadius: '12px', border: `1px solid ${sev.color}33` }} />
                   </Box>
-                  <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1A1A1A', mb: 1.5 }}>
-                    {sc.description}
-                  </Typography>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 500, color: '#757575', mb: 0.5 }}>Observation</Typography>
-                  <Typography sx={{ fontSize: '13px', color: '#293036', lineHeight: 1.6 }}>
-                    {sc.observation || 'No observation text recorded for this citation.'}
-                  </Typography>
+                  <Box>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#3e4751', mb: 0.5, lineHeight: '20px' }}>Observation</Typography>
+                    {(() => {
+                      const obsIsReadOnly = pocWriteMode && (sc.pocStatus === 'Submitted' || sc.pocStatus === 'Approved' || sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review' || sc.pocStatus === 'Closed');
+                      return (
+                        <>
+                          <div ref={obsIsReadOnly ? obsTextRef : undefined} style={obsIsReadOnly && !obsExpanded ? { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: '16px', color: '#293036', lineHeight: 1.5, letterSpacing: '-0.176px' } : { fontSize: '16px', color: '#293036', lineHeight: 1.5, letterSpacing: '-0.176px' }}>
+                            {sc.observation || 'No observation text recorded for this citation.'}
+                          </div>
+                          {obsIsReadOnly && obsOverflows && (
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+                              <Typography component="span" onClick={() => setObsExpanded(v => !v)} sx={{ fontSize: '13px', color: '#8492a1', cursor: 'pointer', userSelect: 'none', '&:hover': { color: '#5c6874' } }}>
+                                {obsExpanded ? 'Collapse' : 'Expand'}
+                              </Typography>
+                            </Box>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </Box>
                 </Box>
 
                 {/* Actions — shown in detail mode only */}
@@ -997,21 +1040,21 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
                       {/* Response text */}
                       <Box>
                         <Box sx={{ bgcolor: '#F5F5F5', borderRadius: '8px', p: 2 }}>
-                          <Typography sx={{ fontSize: '13px', color: '#293036', lineHeight: 1.7 }}>
+                          <Typography sx={{ fontSize: '16px', color: '#293036', lineHeight: 1.5, letterSpacing: '-0.176px' }}>
                             {sc.pocResponse || '—'}
                           </Typography>
                         </Box>
                       </Box>
 
-                      <Divider sx={{ borderColor: '#e0e4e7' }} />
+                      {sc.pocStatus !== 'Submitted' && <Divider sx={{ borderColor: '#e0e4e7' }} />}
 
-                      {/* Work Order section */}
-                      <Box>
-                        <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036', mb: 1.5 }}>
-                          Work Order
+                      {/* Work Order section — hidden for Submitted state */}
+                      {sc.pocStatus !== 'Submitted' && <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#3e4751', letterSpacing: '-0.176px' }}>
+                          {isWorkOrder && wo ? 'Associated Work' : 'Next actions'}
                         </Typography>
 
-                        {isWorkOrder && wo ? (
+                        {isWorkOrder && wo && (
                           /* ── Attached work order card ── */
                           <Box sx={{
                             bgcolor: woBgColor, borderLeft: `4px solid ${woBorderColor}`,
@@ -1041,106 +1084,124 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
                               </Box>
                             </Box>
                           </Box>
-                        ) : (
-                          /* ── Approved: no WO yet — action buttons ── */
-                          <>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                              <Button startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />} size="small"
-                                sx={{ justifyContent: 'flex-start', px: 1, py: 0.75, color: '#1565C0', fontWeight: 500, fontSize: '13px', textTransform: 'none', borderRadius: '6px', '&:hover': { bgcolor: '#EFF6FF' } }}>
-                                New work order
-                              </Button>
-                            </Box>
-                            <Divider sx={{ my: 1, borderColor: '#e0e4e7' }} />
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                              <Button startIcon={<AttachFileIcon sx={{ fontSize: 16 }} />} size="small"
-                                sx={{ justifyContent: 'flex-start', px: 1, py: 0.75, color: '#293036', fontWeight: 500, fontSize: '13px', textTransform: 'none', borderRadius: '6px', '&:hover': { bgcolor: '#f5f5f5' } }}>
-                                Attach work order
-                              </Button>
-                            </Box>
-                            <Divider sx={{ my: 1, borderColor: '#e0e4e7' }} />
-                            <Button startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 16 }} />} size="small"
-                              sx={{ justifyContent: 'flex-start', px: 1, py: 0.75, color: '#065F46', fontWeight: 600, fontSize: '13px', textTransform: 'none', borderRadius: '6px', '&:hover': { bgcolor: '#D1FAE5' } }}>
-                              Mark as complete
-                            </Button>
-                          </>
                         )}
-                      </Box>
+
+                        {/* Additional / Next actions two-column card */}
+                        {isWorkOrder && wo && (
+                          <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#3e4751', letterSpacing: '-0.176px', mt: 1 }}>
+                            Additional actions
+                          </Typography>
+                        )}
+                        <Box sx={{ border: '1px solid #e0e4e7', borderRadius: '8px', p: 2, display: 'flex', gap: 2 }}>
+                          {/* Work orders column */}
+                          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography sx={{ fontSize: '14px', color: '#3e4751', letterSpacing: '-0.084px' }}>Work orders</Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              <Button fullWidth variant="contained" disableElevation startIcon={<AiPlanIcon size={16} color="currentColor" />}
+                                sx={{ bgcolor: '#f0f2f4', color: '#293036', '&:hover': { bgcolor: '#e0e4e7' }, fontWeight: 600, fontSize: '14px', textTransform: 'none', borderRadius: '6px', px: 1.5 }}>
+                                Create work order
+                              </Button>
+                              <Button fullWidth variant="contained" disableElevation startIcon={<AttachFileIcon sx={{ fontSize: 16 }} />}
+                                sx={{ bgcolor: '#f0f2f4', color: '#293036', '&:hover': { bgcolor: '#e0e4e7' }, fontWeight: 600, fontSize: '14px', textTransform: 'none', borderRadius: '6px', px: 1.5 }}>
+                                Attach existing
+                              </Button>
+                            </Box>
+                          </Box>
+                          {/* Tasks column */}
+                          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography sx={{ fontSize: '14px', color: '#3e4751', letterSpacing: '-0.084px' }}>Tasks</Typography>
+                            <Button fullWidth variant="contained" disableElevation startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+                              sx={{ bgcolor: '#f0f2f4', color: '#293036', '&:hover': { bgcolor: '#e0e4e7' }, fontWeight: 600, fontSize: '14px', textTransform: 'none', borderRadius: '6px', px: 1.5 }}>
+                              Configure tasks
+                            </Button>
+                          </Box>
+                        </Box>
+
+                        {/* Send to final review */}
+                        <Button fullWidth variant="outlined" endIcon={<ChevronRightIcon sx={{ fontSize: 18 }} />}
+                          sx={{ borderColor: '#6EE7B7', color: '#065F46', '&:hover': { bgcolor: '#D1FAE5', borderColor: '#6EE7B7' }, fontWeight: 600, fontSize: '14px', textTransform: 'none', borderRadius: '6px', px: 2 }}>
+                          Send to final review
+                        </Button>
+                      </Box>}
                     </>
                   ) : (
                     /* ── Open/Submitted: editable form ── */
                     <>
                       <Divider sx={{ borderColor: '#e0e4e7' }} />
 
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                        <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036' }}>
-                          Plan of Correction
-                        </Typography>
-                        <Chip
-                          label={`POC due ${fmtDate(computedPocSubmitDue(sc.date))}`}
-                          size="small"
-                          sx={{ bgcolor: '#FEF9C3', color: '#854D0E', border: '1px solid #FDE68A', fontWeight: 600, fontSize: '0.7rem', height: 22, borderRadius: '12px' }}
-                        />
-                      </Box>
+                      <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#293036' }}>
+                        Plan of Correction
+                      </Typography>
 
                       {/* Correction target */}
-                      <Box>
-                        <Typography sx={{ fontSize: '13px', color: '#757575', mb: 0.75 }}>Correction target</Typography>
-                        <TextField type="date" value={pocDate} onChange={(e) => setPocDate(e.target.value)} size="small" sx={{ width: 170 }} InputLabelProps={{ shrink: true }} />
-                        {sc.severity && (
-                          <Typography sx={{ fontSize: '11px', color: '#8492a1', mt: 0.75, lineHeight: 1.4 }}>
-                            {SEVERITY_CORRECTION_HINT[sc.severity]}
+                      {sc.severity && (
+                        <Box sx={{
+                          px: 1.5, py: 1, borderRadius: '6px', borderLeft: '4px solid',
+                          ...(sc.severity === 'IJ' ? {
+                            bgcolor: '#FEF2F2', borderLeftColor: '#DC2626', color: '#7F1D1D',
+                          } : {
+                            bgcolor: '#FFFBEB', borderLeftColor: '#D97706', color: '#78350F',
+                          }),
+                        }}>
+                          <Typography sx={{ fontSize: '13px', fontWeight: 600, lineHeight: 1.5 }}>
+                            {SEVERITY_CORRECTION_HINT[sc.severity]} — POC due {fmtDate(computedPocSubmitDue(sc.date))}
                           </Typography>
-                        )}
-                      </Box>
+                        </Box>
+                      )}
 
                       {/* Facility Response */}
                       <Box>
                         <Typography sx={{ fontSize: '13px', color: '#757575', mb: 0.75 }}>Facility Response</Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, px: 1, py: 0.5, border: '1px solid #d1d5db', borderBottom: '1px solid #e0e4e7', borderRadius: '4px 4px 0 0', bgcolor: '#fafafa' }}>
-                          {[
-                            { icon: <FormatBoldIcon sx={{ fontSize: 16 }} />, label: 'Bold' },
-                            { icon: <FormatItalicIcon sx={{ fontSize: 16 }} />, label: 'Italic' },
-                            { icon: <FormatUnderlinedIcon sx={{ fontSize: 16 }} />, label: 'Underline' },
-                          ].map(({ icon, label }) => (
-                            <IconButton key={label} size="small" title={label} sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>{icon}</IconButton>
-                          ))}
-                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 18, alignSelf: 'center' }} />
-                          {[
-                            { icon: <FormatListBulletedIcon sx={{ fontSize: 16 }} />, label: 'Bullet list' },
-                            { icon: <FormatListNumberedIcon sx={{ fontSize: 16 }} />, label: 'Numbered list' },
-                          ].map(({ icon, label }) => (
-                            <IconButton key={label} size="small" title={label} sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>{icon}</IconButton>
-                          ))}
-                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 18, alignSelf: 'center' }} />
-                          <IconButton size="small" title="Link" sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>
-                            <LinkIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                          <Box sx={{ ml: 'auto' }}>
-                            <Button
-                              size="small"
-                              startIcon={<AutoAwesomeIcon sx={{ fontSize: 14 }} />}
-                              onClick={() => setPocResponse(synthesizePocResponse({ ...sc, severity: sc.severity ?? 'Potential Harm' }))}
-                              sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', bgcolor: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '6px', px: 1.25, py: 0.25, '&:hover': { bgcolor: '#E2E8F0' }, textTransform: 'none' }}
-                            >
-                              Generate
-                            </Button>
-                          </Box>
-                        </Box>
-                        <TextField multiline minRows={6} fullWidth placeholder="Describe the corrective action the facility will take…" value={pocResponse} onChange={(e) => setPocResponse(e.target.value)}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: '0 0 4px 4px', alignItems: 'flex-start', '& fieldset': { borderColor: '#d1d5db', borderTop: 'none' }, '&:hover fieldset': { borderColor: '#9ca3af' }, '&.Mui-focused fieldset': { borderColor: '#1565C0' } } }}
-                        />
-                        {pocResponse.trim().length > 0 && (
+                        {!planGenerated ? (
                           <Button
                             fullWidth
                             variant="contained"
-                            size="small"
-                            startIcon={<ContentCopyIcon sx={{ fontSize: 15 }} />}
-                            onClick={() => navigator.clipboard.writeText(pocResponse)}
+                            startIcon={<AiPlanIcon size={16} />}
+                            onClick={() => {
+                              setPocResponse(synthesizePocResponse({ ...sc, severity: sc.severity ?? 'Potential Harm' }));
+                              setPlanGenerated(true);
+                            }}
                             disableElevation
-                            sx={{ mt: 1, fontSize: '0.8rem', fontWeight: 600, bgcolor: '#1565C0', color: '#fff', textTransform: 'none', '&:hover': { bgcolor: '#0D47A1' } }}
+                            sx={{ fontWeight: 600, textTransform: 'none', borderRadius: '8px', py: 1.25, bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' } }}
                           >
-                            Copy response
+                            Generate plan
                           </Button>
+                        ) : (
+                          <>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, px: 1, py: 0.5, border: '1px solid #d1d5db', borderBottom: '1px solid #e0e4e7', borderRadius: '4px 4px 0 0', bgcolor: '#fafafa' }}>
+                              {[
+                                { icon: <FormatBoldIcon sx={{ fontSize: 16 }} />, label: 'Bold' },
+                                { icon: <FormatItalicIcon sx={{ fontSize: 16 }} />, label: 'Italic' },
+                                { icon: <FormatUnderlinedIcon sx={{ fontSize: 16 }} />, label: 'Underline' },
+                              ].map(({ icon, label }) => (
+                                <IconButton key={label} size="small" title={label} sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>{icon}</IconButton>
+                              ))}
+                              <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 18, alignSelf: 'center' }} />
+                              {[
+                                { icon: <FormatListBulletedIcon sx={{ fontSize: 16 }} />, label: 'Bullet list' },
+                                { icon: <FormatListNumberedIcon sx={{ fontSize: 16 }} />, label: 'Numbered list' },
+                              ].map(({ icon, label }) => (
+                                <IconButton key={label} size="small" title={label} sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>{icon}</IconButton>
+                              ))}
+                              <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 18, alignSelf: 'center' }} />
+                              <IconButton size="small" title="Link" sx={{ color: '#4b5563', borderRadius: '4px', '&:hover': { bgcolor: '#e5e7eb' } }}>
+                                <LinkIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                              <Box sx={{ ml: 'auto' }}>
+                                <Button
+                                  size="small"
+                                  startIcon={<AiPlanIcon size={14} />}
+                                  onClick={() => { setPocResponse(synthesizePocResponse({ ...sc, severity: sc.severity ?? 'Potential Harm' })); setResponseCopied(false); if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }}
+                                  sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', bgcolor: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '6px', px: 1.25, py: 0.25, '&:hover': { bgcolor: '#E2E8F0' }, textTransform: 'none' }}
+                                >
+                                  Regenerate
+                                </Button>
+                              </Box>
+                            </Box>
+                            <TextField multiline minRows={6} fullWidth placeholder="Describe the corrective action the facility will take…" value={pocResponse} onChange={(e) => { setPocResponse(e.target.value); if (responseCopied) { setResponseCopied(false); if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); } }}
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '0 0 4px 4px', alignItems: 'flex-start', '& fieldset': { borderColor: '#d1d5db', borderTop: 'none' }, '&:hover fieldset': { borderColor: '#9ca3af' }, '&.Mui-focused fieldset': { borderColor: '#1565C0' } } }}
+                            />
+                          </>
                         )}
                       </Box>
 
@@ -1150,35 +1211,45 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
               </Box>
 
               {/* Footer */}
-              {pocWriteMode && (sc.pocStatus === 'Submitted' || sc.pocStatus === 'Approved' || sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review' || sc.pocStatus === 'Closed') ? (
-                /* ── Approved / Work Order / Final Review footer: Close only ── */
-                <Box sx={{ px: 3, py: 2, borderTop: '1px solid #e0e4e7', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                  <Button variant="contained" onClick={closeDrawer} sx={{ bgcolor: '#E0E0E0', color: '#212121', '&:hover': { bgcolor: '#BDBDBD' }, boxShadow: 'none', borderRadius: '6px', fontWeight: 500, px: 3 }}>
+              {pocWriteMode && sc.pocStatus === 'Submitted' ? (
+                /* ── Submitted footer: Close + Mark as approved ── */
+                <Box sx={{ px: 3, py: 2, borderTop: '1px solid #e0e4e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                  <Button variant="outlined" onClick={closeDrawer} sx={{ borderColor: '#d1d5db', color: '#374151', borderRadius: '6px', fontWeight: 500, px: 3 }}>
                     Close
                   </Button>
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    onClick={() => { setApproveDate(todayIso); setApproveDialogOpen(true); }}
+                    sx={{ bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' }, borderRadius: '6px', fontWeight: 600, px: 3, textTransform: 'none' }}
+                  >
+                    Mark as approved
+                  </Button>
                 </Box>
+              ) : pocWriteMode && (sc.pocStatus === 'Approved' || sc.pocStatus === 'Work Order' || sc.pocStatus === 'Final Review' || sc.pocStatus === 'Closed') ? (
+                /* ── Approved / Work Order / Final Review: no footer ── */
+                null
               ) : pocWriteMode ? (
                 /* ── Editable footer: Cancel / Submit plan ── */
                 <Box sx={{ px: 3, py: 2, borderTop: '1px solid #e0e4e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                   <Button variant="outlined" onClick={closeDrawer} sx={{ borderColor: '#d1d5db', color: '#374151', borderRadius: '6px', fontWeight: 500, px: 3 }}>
                     Cancel
                   </Button>
-                  {(() => {
-                    const hasResponse = pocResponse.trim().length > 0;
-                    const hasDate = pocDate.trim().length > 0;
-                    const canSubmit = hasResponse && hasDate;
-                    return (
-                      <Button
-                        variant="contained"
-                        endIcon={<ArrowForwardIcon />}
-                        disabled={!canSubmit}
-                        onClick={closeDrawer}
-                        sx={{ bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' }, '&.Mui-disabled': { bgcolor: '#e0e4e7', color: '#8492a1' }, borderRadius: '6px', fontWeight: 600, px: 3 }}
-                      >
-                        Submit plan
-                      </Button>
-                    );
-                  })()}
+                  <Button
+                    variant="contained"
+                    startIcon={responseCopied ? <CheckIcon sx={{ fontSize: 15 }} /> : <ContentCopyIcon sx={{ fontSize: 15 }} />}
+                    disabled={pocResponse.trim().length === 0}
+                    onClick={() => {
+                      navigator.clipboard.writeText(pocResponse);
+                      setResponseCopied(true);
+                      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+                      copiedTimerRef.current = setTimeout(() => setResponseCopied(false), 2000);
+                    }}
+                    disableElevation
+                    sx={{ bgcolor: responseCopied ? '#2e7d32' : '#1565C0', color: '#fff', '&:hover': { bgcolor: responseCopied ? '#1b5e20' : '#0D47A1' }, '&.Mui-disabled': { bgcolor: '#e0e4e7', color: '#8492a1' }, borderRadius: '6px', fontWeight: 600, px: 3, textTransform: 'none', transition: 'background-color 0.2s' }}
+                  >
+                    {responseCopied ? 'Copied' : 'Copy response'}
+                  </Button>
                 </Box>
               ) : (
                 /* ── Non-write-mode footer: Close only ── */
@@ -1192,6 +1263,49 @@ function PlanOfCorrectionContent({ facility, facCitations }: {
           );
         })()}
       </Drawer>
+
+      {/* Mark as approved confirmation dialog */}
+      <Dialog open={approveDialogOpen} onClose={() => setApproveDialogOpen(false)} PaperProps={{ sx: { borderRadius: '12px', minWidth: 360 } }}>
+        <DialogTitle sx={{ fontSize: '16px', fontWeight: 700, color: '#1A1A1A', pb: 1 }}>
+          Approve plan of correction
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '14px', color: '#5c6874', mb: 2 }}>
+            Confirm the date this plan was approved.
+          </Typography>
+          <TextField
+            label="Date approved"
+            type="date"
+            fullWidth
+            value={approveDate}
+            onChange={(e) => setApproveDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setApproveDialogOpen(false)} variant="outlined" sx={{ borderColor: '#d1d5db', color: '#374151', borderRadius: '6px', fontWeight: 500, textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={() => {
+              setApproveDialogOpen(false);
+              if (selectedCitation) {
+                setSelectedCitation({
+                  ...selectedCitation,
+                  pocStatus: 'Approved',
+                  pocCompletionDate: approveDate,
+                });
+              }
+            }}
+            sx={{ bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0D47A1' }, borderRadius: '6px', fontWeight: 600, textTransform: 'none' }}
+          >
+            Confirm approval
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
