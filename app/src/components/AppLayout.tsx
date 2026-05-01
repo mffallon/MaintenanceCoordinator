@@ -57,9 +57,21 @@ const helpItems: DropdownItem[] = [
   { label: 'Contact us', href: '#' },
 ];
 
+// ─── AI Generated icon (document + "AI" badge) ───────────
+export function AiGeneratedIcon({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+      <path d="M18.7402 16.1777C18.835 15.9453 19.165 15.9453 19.2598 16.1777L19.6025 17.0215C19.8568 17.6469 20.3529 18.1437 20.9785 18.3975L21.8252 18.7402C22.0582 18.8347 22.0582 19.1652 21.8252 19.2598L20.9785 19.6035C20.353 19.8574 19.8567 20.3531 19.6025 20.9785L19.2598 21.8223C19.1652 22.055 18.8348 22.055 18.7402 21.8223L18.3965 20.9766C18.1426 20.3523 17.6477 19.8566 17.0234 19.6025L16.1797 19.2598C15.9474 19.1649 15.9482 18.8358 16.1807 18.7412L17.0234 18.3975C17.6478 18.1433 18.1436 17.648 18.3975 17.0234L18.7402 16.1777Z" fill={color}/>
+      <path d="M19 3C19.55 3 20.0204 3.19622 20.4121 3.58789C20.8038 3.97956 21 4.45 21 5V14H19V5H5V19H14V21H5C4.45 21 3.97956 20.8038 3.58789 20.4121C3.19622 20.0204 3 19.55 3 19V5C3 4.45 3.19622 3.97956 3.58789 3.58789C3.97956 3.19622 4.45 3 5 3H19Z" fill={color}/>
+      <path fillRule="evenodd" clipRule="evenodd" d="M14.3555 16H12.543L11.9502 14.1758H9.0625L8.46875 16H6.65625L9.41797 8H11.5977L14.3555 16ZM9.49219 12.8555H11.5225L10.5391 9.82812H10.4766L9.49219 12.8555Z" fill={color}/>
+      <path d="M16.8457 16H15.1543V8H16.8457V16Z" fill={color}/>
+    </svg>
+  );
+}
+
 const sideNavItems = [
   { label: 'Dashboard', path: '/' },
-  { label: 'Trends', path: '/trends' },
+  { label: 'Trends', path: '/trends', icon: 'ai-generated' },
   { label: 'Pre-survey', path: '/surveys' },
   { label: 'Survey Overviews', path: '/citations-remix' },
   { label: 'K-Tags', path: '/citations-remix/tags/k', indent: true },
@@ -427,7 +439,14 @@ export default function AppLayout({
                   }}
                 >
                   <ListItemText
-                    primary={item.label}
+                    primary={
+                      (item as any).icon === 'ai-generated' ? (
+                        <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          {item.label}
+                          <AiGeneratedIcon size={16} color="currentColor" />
+                        </Box>
+                      ) : item.label
+                    }
                     primaryTypographyProps={{
                       fontFamily: '"Inter", sans-serif',
                       fontWeight: isActive ? 600 : 400,
