@@ -5,7 +5,12 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, FormControlLabel, Switch,
   Tabs, Tab, Tooltip,
 } from '@mui/material';
-import { BarChart } from '@mui/x-charts/BarChart';
+import {
+  ChartsContainer, BarPlot,
+  ChartsXAxis, ChartsYAxis, ChartsGrid, ChartsTooltip,
+  BAR_CHART_PLUGINS,
+  useXScale, useYScale,
+} from '@mui/x-charts';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
@@ -141,6 +146,50 @@ function dateRangeCaption(dateRange: string): string {
   return end;
 }
 
+// ─── Custom peer benchmark tick marks drawn inside the chart SVG ─────────────
+// Draws a short horizontal dashed line at the peer value level for each bar.
+// MUI grouped bars start each bar exactly at xScale(label) for the first series.
+// Inner gap between bars ≈ 4.75% of bandwidth (empirically derived from MUI BarPlot internals).
+const BAR_INNER_PAD = 0.0475;
+function PeerTicks({
+  labels, peerK, peerE, showK, showE,
+}: { labels: string[]; peerK: number[]; peerE: number[]; showK: boolean; showE: boolean }) {
+  const xScale = useXScale() as { bandwidth(): number; (v: string): number | undefined };
+  const yScale = useYScale() as (v: number) => number | undefined;
+  const numSeries = (showK ? 1 : 0) + (showE ? 1 : 0);
+  if (numSeries === 0) return null;
+
+  const bw = xScale.bandwidth();
+  const barW = bw * (1 - BAR_INNER_PAD) / numSeries;
+  const gapW = bw * BAR_INNER_PAD;
+
+  return (
+    <g>
+      {labels.map((label, i) => {
+        const bandX = xScale(label);
+        if (bandX == null) return null;
+        // K bar starts exactly at bandX; E bar follows after K bar + inner gap
+        const kX = bandX;
+        const eX = bandX + (showK ? barW + gapW : 0);
+        const kY = yScale(peerK[i]) ?? 0;
+        const eY = yScale(peerE[i]) ?? 0;
+        return (
+          <g key={label}>
+            {showK && (
+              <line x1={kX} x2={kX + barW} y1={kY} y2={kY}
+                stroke="#B8541A" strokeWidth={1.5} strokeDasharray="4 2.5" strokeLinecap="round" />
+            )}
+            {showE && (
+              <line x1={eX} x2={eX + barW} y1={eY} y2={eY}
+                stroke="#0058A3" strokeWidth={1.5} strokeDasharray="4 2.5" strokeLinecap="round" />
+            )}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 export default function Trends() {
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
@@ -223,6 +272,12 @@ export default function Trends() {
       };
     });
   }, [portfolioSurveys, chartMode]);
+
+  // ─── Peer benchmark lines — per-month variation around fixed averages ─────
+  const peerLineData = useMemo(() => monthlyData.map((_, i) => ({
+    K: +(BENCHMARKS.K.peers + Math.sin(i * 1.1) * 0.35 + Math.sin(i * 0.4) * 0.15).toFixed(2),
+    E: +(BENCHMARKS.E.peers + Math.sin(i * 0.9 + 1) * 0.25 + Math.sin(i * 0.5) * 0.10).toFixed(2),
+  })), [monthlyData]);
 
   // ─── Metric card stats ────────────────────────────────────────────────────
   const cardStats = useMemo(() => {
@@ -510,33 +565,69 @@ export default function Trends() {
 
           {monthlyData.length > 0 ? (
             <Box sx={{ mt: 1 }}>
-            <BarChart
-              series={[
-                ...(chartTagFilter === 'all' || chartTagFilter === 'K' ? [{ data: monthlyData.map((m) => m.K), label: 'K-Tags', color: TAG_COLORS.K, stack: 'stack' }] : []),
-                ...(chartTagFilter === 'all' || chartTagFilter === 'E' ? [{ data: monthlyData.map((m) => m.E), label: 'E-Tags', color: TAG_COLORS.E, stack: 'stack' }] : []),
-              ]}
-              xAxis={[{ data: monthlyData.map((m) => m.label), scaleType: 'band', categoryGapRatio: 0.2 }]}
-              yAxis={[{ label: chartMode === 'per-survey' ? 'Citations per survey' : 'Total citations' }]}
-              grid={{ horizontal: true }}
-              height={320}
-              margin={{ left: 38, right: 4, top: 8, bottom: 28 }}
-              slotProps={{
-                legend: {
-                  direction: 'row',
-                  position: { vertical: 'bottom', horizontal: 'center' },
-                  padding: { top: 0, bottom: 0, left: 0, right: 0 },
-                  itemMarkWidth: 12, itemMarkHeight: 12,
-                } as any,
-              }}
-              sx={{
-                '& .MuiChartsAxis-tickLabel': { fontSize: '11px', fill: '#5c6874' },
-                '& .MuiChartsAxis-label':     { fontSize: '12px', fill: '#5c6874' },
-                '& .MuiChartsLegend-label':   { fontSize: '12px', fill: '#293036' },
-                '& .MuiBarElement-root': { stroke: '#fff', strokeWidth: 1 },
-                '& .MuiChartsGrid-line': { stroke: '#cbd5e1', strokeDasharray: '4 4', strokeWidth: 1 },
-                '& .MuiChartsLegend-root': { mt: '-8px' },
-              }}
-            />
+              <ChartsContainer
+                plugins={BAR_CHART_PLUGINS as any}
+                series={[
+                  ...(chartTagFilter === 'all' || chartTagFilter === 'K'
+                    ? [{ type: 'bar' as const, data: monthlyData.map((m) => m.K), label: 'K-Tags', color: TAG_COLORS.K, id: 'k-bar' }] : []),
+                  ...(chartTagFilter === 'all' || chartTagFilter === 'E'
+                    ? [{ type: 'bar' as const, data: monthlyData.map((m) => m.E), label: 'E-Tags', color: TAG_COLORS.E, id: 'e-bar' }] : []),
+                ]}
+                xAxis={[{ data: monthlyData.map((m) => m.label), scaleType: 'band', categoryGapRatio: 0.2 }]}
+                yAxis={[{ label: chartMode === 'per-survey' ? 'Citations per survey' : 'Total citations' }]}
+                height={320}
+                margin={{ left: 38, right: 4, top: 8, bottom: 28 }}
+                sx={{
+                  '& .MuiChartsAxis-tickLabel': { fontSize: '11px', fill: '#5c6874' },
+                  '& .MuiChartsAxis-label':     { fontSize: '12px', fill: '#5c6874' },
+                  '& .MuiBarElement-root': { stroke: '#fff', strokeWidth: 1 },
+                  '& .MuiChartsGrid-line': { stroke: '#cbd5e1', strokeDasharray: '4 4', strokeWidth: 1 },
+                }}
+              >
+                <ChartsGrid horizontal />
+                <BarPlot />
+                <ChartsXAxis />
+                <ChartsYAxis />
+                <PeerTicks
+                  labels={monthlyData.map((m) => m.label)}
+                  peerK={peerLineData.map((p) => p.K)}
+                  peerE={peerLineData.map((p) => p.E)}
+                  showK={chartTagFilter === 'all' || chartTagFilter === 'K'}
+                  showE={chartTagFilter === 'all' || chartTagFilter === 'E'}
+                />
+                <ChartsTooltip />
+              </ChartsContainer>
+              {/* Custom legend */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2.5, mt: 0.5 }}>
+                {(chartTagFilter === 'all' || chartTagFilter === 'K') && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: TAG_COLORS.K, flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: '12px', color: '#293036' }}>K-Tags</Typography>
+                  </Box>
+                )}
+                {(chartTagFilter === 'all' || chartTagFilter === 'E') && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: TAG_COLORS.E, flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: '12px', color: '#293036' }}>E-Tags</Typography>
+                  </Box>
+                )}
+                {(chartTagFilter === 'all' || chartTagFilter === 'K') && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box component="svg" width={24} height={12} sx={{ flexShrink: 0 }}>
+                      <line x1="0" y1="6" x2="24" y2="6" stroke="#B8541A" strokeWidth="1.5" strokeDasharray="4 2.5" strokeLinecap="round" />
+                    </Box>
+                    <Typography sx={{ fontSize: '12px', color: '#293036' }}>K-Tag Peers</Typography>
+                  </Box>
+                )}
+                {(chartTagFilter === 'all' || chartTagFilter === 'E') && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box component="svg" width={24} height={12} sx={{ flexShrink: 0 }}>
+                      <line x1="0" y1="6" x2="24" y2="6" stroke="#0058A3" strokeWidth="1.5" strokeDasharray="4 2.5" strokeLinecap="round" />
+                    </Box>
+                    <Typography sx={{ fontSize: '12px', color: '#293036' }}>E-Tag Peers</Typography>
+                  </Box>
+                )}
+              </Box>
             </Box>
           ) : (
             <Box sx={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
