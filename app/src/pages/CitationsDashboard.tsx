@@ -6,7 +6,6 @@ import {
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PageHeader from '../components/PageHeader';
 import PageFilters from '../components/PageFilters';
 import { useCommunityFilter } from '../components/CommunityFilter';
@@ -16,6 +15,13 @@ import type { AvirSurvey } from '../data/avir-data';
 import { fmtDate } from '../utils/formatDate';
 import SurveyWindowIndicator from '../components/SurveyWindowIndicator';
 import { makeDateFilter } from '../utils/dateFilter';
+
+function fmtSurveyor(name: string): string {
+  if (!name || name === '—') return name;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name;
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+}
 
 // Upcoming survey window data (mirrors SurveyManagement overrides)
 const TODAY_DASH = new Date('2026-04-02');
@@ -46,7 +52,8 @@ const allUpcomingSurveyRows = facilities
     const prevCitations = citations.filter((c) => c.facilityId === f.id).length;
     const lastSurvey = surveys.filter((s) => s.facilityId === f.id).sort((a, b) => b.date.localeCompare(a.date))[0];
     const lastSurveyor = lastSurvey?.surveyor || '—';
-    return { id: f.id, name: f.name, region: f.region, windowStart: windowStartISO, windowEnd: windowEndISO, daysUntilDue: days, status, alerts, prevCitations, lastSurveyor };
+    const surveyType = lastSurvey && lastSurvey.kTags > 0 ? 'Life Safety' : 'Emergency Preparedness';
+    return { id: f.id, name: f.name, region: f.region, windowStart: windowStartISO, windowEnd: windowEndISO, daysUntilDue: days, status, alerts, prevCitations, lastSurveyor, surveyType, lastSurveyDate: effectiveLastSurveyDate(f.id, f.lastSurveyDate) };
   })
   .filter((r) => r.daysUntilDue <= 90)
   .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
@@ -95,7 +102,7 @@ function UpcomingSurveysPanel() {
                   <ArrowDownwardIcon sx={{ fontSize: 16, color: '#293036' }} />
                 </Box>
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 210 }}>Timeline</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, whiteSpace: 'nowrap', textAlign: 'center', width: '1px' }}>Timeline (Months since survey)</TableCell>
               <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2 }}>Community</TableCell>
               <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 150 }}>Surveyor</TableCell>
               <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: '#293036', bgcolor: '#e0e4e7', letterSpacing: '-0.084px', py: '6px', px: 2, width: 130 }} align="right">Prev. Citations</TableCell>
@@ -129,9 +136,10 @@ function UpcomingSurveysPanel() {
                       </>
                     )}
                   </TableCell>
-                  <TableCell sx={{ px: 2, py: 1, width: 210 }}>
+                  <TableCell sx={{ px: 2, py: 1 }}>
                     <SurveyWindowIndicator
                       monthsSinceLastSurvey={9 - r.daysUntilDue / 30.4375}
+                      lastSurveyDate={r.lastSurveyDate}
                     />
                   </TableCell>
                   <TableCell>
@@ -141,7 +149,11 @@ function UpcomingSurveysPanel() {
                     <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.region}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.lastSurveyor}</Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{fmtSurveyor(r.lastSurveyor)}</Typography>
+                    <Chip label={r.surveyType} size="small" sx={{ fontSize: '11px', height: 18, fontWeight: 500, mt: '3px',
+                      bgcolor: r.surveyType === 'Life Safety' ? '#FEE0C8' : '#C8E9F7',
+                      color: r.surveyType === 'Life Safety' ? '#7C2D06' : '#0A5276',
+                    }} />
                   </TableCell>
                   <TableCell align="right">
                     <Typography sx={{ fontSize: '14px', fontWeight: 400, color: '#293036' }}>{r.prevCitations}</Typography>
@@ -314,7 +326,9 @@ export default function CitationsDashboard() {
       <PageHeader
         title="Citations Dashboard"
         actions={
-          <Button variant="contained" color="inherit" startIcon={<UploadFileIcon />} size="medium">Upload survey</Button>
+          <Typography sx={{ fontWeight: 300, fontSize: '16px', color: '#293036', letterSpacing: '-0.176px' }}>
+            Test Corporation
+          </Typography>
         }
       />
       <PageFilters />

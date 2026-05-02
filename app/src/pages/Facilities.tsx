@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Button, Chip,
+  Box, Typography, Paper, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -182,14 +182,21 @@ export default function Facilities() {
                     {/* Stage counts */}
                     {STAGES.map((s) => {
                       const count = f.counts[s.key] || 0;
+                      // Closed items aren't actionable, so don't flag them as overdue
+                      const cellOverdue = isOverdue && count > 0 && s.key !== 'Closed';
                       return (
-                        <TableCell key={s.key} sx={{ px: 2, textAlign: 'right' }}>
+                        <TableCell
+                          key={s.key}
+                          sx={{
+                            px: 2,
+                            textAlign: 'right',
+                            bgcolor: cellOverdue ? '#FEE2E2' : undefined,
+                          }}
+                        >
                           {count > 0 ? (
-                            <Chip
-                              label={count}
-                              size="small"
-                              sx={{ bgcolor: s.bg, color: s.color, fontWeight: 700, height: 22, fontSize: '0.75rem', minWidth: 28 }}
-                            />
+                            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: cellOverdue ? '#991B1B' : '#293036' }}>
+                              {count}
+                            </Typography>
                           ) : (
                             <Typography sx={{ fontSize: '13px', color: '#b0b8c1' }}>—</Typography>
                           )}

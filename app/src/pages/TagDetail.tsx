@@ -6,6 +6,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch,
 } from '@mui/material';
+import { LineChart } from '@mui/x-charts';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -27,11 +28,13 @@ const typeLabels: Record<string, string> = {
   e: 'E-Tags',
 };
 
+const REGION_LINE_COLORS = ['#2563EB', '#D97706', '#16A34A', '#9333EA', '#DC2626', '#0891B2', '#CA8A04', '#BE185D'];
+
 export default function TagDetail() {
   const { type, tag } = useParams<{ type: string; tag: string }>();
   const navigate = useNavigate();
   const { passesFilter } = useCommunityFilter();
-  const [dateRange, setDateRange] = useState('ytd');
+  const [dateRange, setDateRange] = useState('12m');
   const [regionFilter, setRegionFilter] = useState('');
   const [latestOnly, setLatestOnly] = useState(true);
   const [drawerCitation, setDrawerCitation] = useState<typeof filteredCitations[number] | null>(null);
@@ -82,6 +85,46 @@ export default function TagDetail() {
   [tag]);
 
   const totalCount = filteredCitations.length;
+
+  // ─── Monthly counts of THIS tag per region (last 12 months) ──────────────
+  const chartData = useMemo(() => {
+    const ref = new Date('2026-04-02');
+    const months: { ym: string; label: string }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+      months.push({
+        ym:    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: new Date(d.getFullYear(), d.getMonth(), 15)
+                 .toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      });
+    }
+    // Tag citations in scope (community + tag + not waiver)
+    const inScope = citations.filter((c) =>
+      c.tag === tag &&
+      passesFilter(c.facilityId) &&
+      !waiverFacilityDates.has(`${c.facilityId}__${c.date}`)
+    );
+    const byRegion = new Map<string, number[]>();
+    for (const c of inScope) {
+      const ym = c.date.slice(0, 7);
+      const idx = months.findIndex((m) => m.ym === ym);
+      if (idx === -1) continue;
+      if (!byRegion.has(c.region)) byRegion.set(c.region, new Array(12).fill(0));
+      byRegion.get(c.region)![idx] += 1;
+    }
+    // Peer average uses ALL regions (not narrowed by regionFilter)
+    const allRegionData = [...byRegion.values()];
+    const peerAvg = months.map((_, i) => {
+      if (allRegionData.length === 0) return 0;
+      return +(allRegionData.reduce((s, d) => s + d[i], 0) / allRegionData.length).toFixed(2);
+    });
+    let regionLines = [...byRegion.entries()]
+      .map(([region, data]) => ({ region, data, total: data.reduce((s, n) => s + n, 0) }))
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total);
+    if (regionFilter) regionLines = regionLines.filter((r) => r.region === regionFilter);
+    return { months, regionLines, peerAvg };
+  }, [tag, passesFilter, waiverFacilityDates, regionFilter]);
 
   return (
     <Box>
@@ -158,6 +201,69 @@ export default function TagDetail() {
           </Button>
         }
       />
+
+      {/* Citations by Region — Last 12 Months (line chart) */}
+      {chartData.regionLines.length > 0 && (
+        <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', p: 2 }}>
+          <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#293036', mb: 1.5, letterSpacing: '-0.176px' }}>
+            Citations by Region — Last 12 Months
+          </Typography>
+          <LineChart
+            series={[
+              ...chartData.regionLines.map((r, i) => ({
+                data: r.data,
+                label: r.region,
+                color: REGION_LINE_COLORS[i % REGION_LINE_COLORS.length],
+                showMark: true,
+                curve: 'linear' as const,
+                id: `region-${i}`,
+                valueFormatter: (v: number | null) => v == null ? '' : `${v} citation${v === 1 ? '' : 's'}`,
+              })),
+              {
+                data: chartData.peerAvg,
+                label: 'Peer average',
+                color: '#64748B',
+                showMark: false,
+                curve: 'linear' as const,
+                id: 'peer-avg',
+                valueFormatter: (v: number | null) => v == null ? '' : v.toFixed(2),
+              },
+            ]}
+            xAxis={[{ data: chartData.months.map((m) => m.label), scaleType: 'point' }]}
+            grid={{ horizontal: true }}
+            height={260}
+            margin={{ left: 40, right: 12, top: 12, bottom: 28 }}
+            hideLegend
+            sx={{
+              '& .MuiChartsLegend-root': { display: 'none' },
+              '& .MuiLineElement-series-peer-avg': { strokeDasharray: '5 4' },
+              '& .MuiChartsAxis-tickLabel': { fontSize: '11px', fill: '#64748B' },
+              '& .MuiChartsGrid-line': { stroke: '#e8ecef', strokeWidth: 1 },
+            }}
+          />
+          {/* Custom legend */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, justifyContent: 'center', mt: 1 }}>
+            {chartData.regionLines.map((r, i) => (
+              <Box key={r.region} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{
+                  width: 12, height: 12, borderRadius: '2px',
+                  bgcolor: REGION_LINE_COLORS[i % REGION_LINE_COLORS.length],
+                  flexShrink: 0,
+                }} />
+                <Typography sx={{ fontSize: '12px', color: '#525f6c' }}>
+                  {r.region.replace(/^Region\s+\d+\s*-\s*/, '')}
+                </Typography>
+              </Box>
+            ))}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box component="svg" width={20} height={10} sx={{ flexShrink: 0 }}>
+                <line x1="0" y1="5" x2="20" y2="5" stroke="#64748B" strokeWidth="2" strokeDasharray="4 3" strokeLinecap="round" />
+              </Box>
+              <Typography sx={{ fontSize: '12px', color: '#525f6c', fontStyle: 'italic' }}>Peer average</Typography>
+            </Box>
+          </Box>
+        </Paper>
+      )}
 
       {/* Citations Table */}
       <Paper elevation={0} sx={{ mb: 2, borderRadius: '8px', border: '1px solid #e0e4e7', overflow: 'hidden' }}>
