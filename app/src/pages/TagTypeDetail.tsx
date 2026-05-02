@@ -328,8 +328,13 @@ export default function TagTypeDetail() {
         onDateRangeChange={setDateRange}
         extraFilters={
           <FormControl size="small" variant="filled" sx={{ minWidth: 220, '& .MuiFilledInput-root': { bgcolor: '#fff', '&:hover': { bgcolor: '#fff' }, '&.Mui-focused': { bgcolor: '#fff' } } }}>
-            <InputLabel>CMS Region</InputLabel>
-            <Select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
+            <InputLabel shrink>CMS Region</InputLabel>
+            <Select
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              displayEmpty
+              renderValue={(v) => v ? (v as string) : 'All regions'}
+            >
               <MenuItem value="">All regions</MenuItem>
               {regions.map((r) => (
                 <MenuItem key={r} value={r}>{r}</MenuItem>
@@ -454,7 +459,8 @@ export default function TagTypeDetail() {
             '& .MuiDataGrid-row:hover': { bgcolor: '#F0F7FF' },
             '& .MuiDataGrid-cell': { fontSize: '14px', color: '#293036', display: 'flex', alignItems: 'center', fontFeatureSettings: "'lnum' 1, 'tnum' 1", letterSpacing: '-0.084px', '& .MuiTypography-root': { fontSize: '14px' } },
             '& .totals-row': { bgcolor: '#F0F2F4', fontWeight: 700, borderBottom: '2px solid #C0C8D0', '&:hover': { bgcolor: '#F0F2F4' } },
-            '& .totals-row .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#F0F2F4' },
+            '& .totals-row .MuiDataGrid-cell': { bgcolor: '#F0F2F4', borderBottom: '2px solid #C0C8D0' },
+            '& .totals-row .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#F0F2F4', borderBottom: '2px solid #C0C8D0' },
             '& .def-free-row': { bgcolor: '#e3f9ef', '&:hover': { bgcolor: '#c7f2df' } },
             '& .def-free-row .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#e3f9ef' },
             '& .def-free-row:hover .MuiDataGrid-cell--pinnedLeft': { bgcolor: '#c7f2df' },
