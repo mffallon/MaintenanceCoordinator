@@ -20,8 +20,8 @@ const theme = createTheme({
     h6: { fontWeight: 700, letterSpacing: -0.2 },
     subtitle1: { fontWeight: 600 },
     subtitle2: { fontWeight: 600 },
-    body2: { fontSize: 13 },
-    caption: { fontSize: 11.5, color: '#64748B' },
+    body2: { fontSize: 13, lineHeight: 1.25 },
+    caption: { fontSize: 11.5, color: '#64748B', lineHeight: 1.2 },
     button: { textTransform: 'none', fontWeight: 600 }
   },
   shape: { borderRadius: 12 },

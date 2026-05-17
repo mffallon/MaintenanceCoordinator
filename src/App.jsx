@@ -4,8 +4,8 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions } from './data.js';
-import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress } from '@mui/material';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList } from './data.js';
+import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow } from '@mui/material';
 
 const Icon = ({ name, size = 20, color, sx }) => (
   <span
@@ -14,6 +14,33 @@ const Icon = ({ name, size = 20, color, sx }) => (
   >
     {name}
   </span>
+);
+
+const TelsLogo = ({ height = 22 }) => (
+  <svg
+    height={height}
+    viewBox="0 0 107 21"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ display: 'block' }}
+    aria-label="TELS"
+  >
+    <g clipPath="url(#tels_clip)">
+      <path d="M38.3052 4.19954V0.273926H55.1971V4.20024H49.1375V20.276H44.3754V4.19954H38.3052Z" fill="white"/>
+      <path d="M56.8535 20.276V0.273926H70.7883V4.20024H61.6837V8.3027H70.076V12.2381H61.6837V16.3497H70.7883V20.276H56.8535Z" fill="white"/>
+      <path d="M73.0991 20.276V0.273926H77.9293V16.3497H86.2437V20.276H73.0991Z" fill="white"/>
+      <path d="M98.8296 6.26954C98.7644 5.55304 98.4767 4.99515 97.9665 4.59445C97.4556 4.19445 96.7286 3.99445 95.7854 3.99445C95.1609 3.99445 94.6402 4.07585 94.224 4.23866C93.8079 4.40146 93.4956 4.62462 93.2872 4.90743C93.0788 5.19024 92.9714 5.51445 92.9651 5.87936C92.9517 6.17901 93.0121 6.44287 93.1454 6.67024C93.2788 6.89831 93.4738 7.09831 93.7307 7.27024C93.9875 7.44287 94.2984 7.59445 94.6626 7.72427C95.0268 7.8548 95.4366 7.96848 95.8921 8.06603L97.6093 8.4569C98.5981 8.67164 99.4717 8.95796 100.23 9.31655C100.988 9.67445 101.625 10.1004 102.143 10.5951C102.66 11.0899 103.051 11.6597 103.318 12.3046C103.585 12.9488 103.722 13.6716 103.728 14.4723C103.721 15.7355 103.402 16.8197 102.771 17.7243C102.141 18.6288 101.235 19.3222 100.053 19.8043C98.8724 20.2864 97.45 20.5264 95.7847 20.5264C94.1195 20.5264 92.6556 20.2766 91.4128 19.7748C90.17 19.2737 89.2044 18.5116 88.5145 17.4899C87.8247 16.4681 87.4703 15.1755 87.4507 13.6134H92.0759C92.1152 14.2583 92.2872 14.7951 92.5931 15.2246C92.8991 15.6541 93.3202 15.9797 93.857 16.2015C94.3938 16.4225 95.0163 16.5341 95.7258 16.5341C96.3763 16.5341 96.9307 16.4457 97.3896 16.2702C97.8479 16.0941 98.2009 15.8499 98.4486 15.5376C98.6956 15.2253 98.8226 14.8674 98.8289 14.4639C98.8226 14.0864 98.7054 13.7622 98.478 13.492C98.25 13.2218 97.9005 12.9874 97.4289 12.7888C96.9574 12.5902 96.3567 12.4064 95.6282 12.2373L93.5398 11.7495C91.8093 11.3523 90.4465 10.7095 89.4507 9.82041C88.4556 8.93199 87.9609 7.72989 87.9672 6.21199C87.9609 4.9755 88.2921 3.89129 88.9623 2.96006C89.6324 2.02954 90.5595 1.30392 91.7433 0.782518C92.9272 0.261816 94.2767 0.00146484 95.7931 0.00146484C97.3419 0.00146484 98.6865 0.263219 99.8282 0.78743C100.97 1.31164 101.856 2.04568 102.488 2.98954C103.119 3.9341 103.441 5.02673 103.453 6.27094H98.8282L98.8296 6.26954Z" fill="white"/>
+      <path d="M27.327 18.9951V19.1593H26.9361V20.2751H26.7431V19.1593H26.3516V18.9951H27.3263H27.327ZM28.5663 20.2751L28.5144 19.5039C28.5088 19.4035 28.5144 19.2807 28.5123 19.1551H28.5024C28.4688 19.2744 28.4309 19.4098 28.393 19.5228L28.1256 20.2589H27.9789L27.7179 19.5039C27.6842 19.4014 27.6526 19.2744 27.6238 19.1551H27.6133C27.6112 19.2786 27.6133 19.3874 27.6077 19.5039L27.5593 20.2751H27.3719L27.4723 18.9951H27.7263L27.9789 19.6898C28.0105 19.7867 28.0351 19.8926 28.0674 20.0119H28.0744C28.1031 19.8926 28.1326 19.7803 28.1642 19.6863L28.4147 18.9944H28.6674L28.7635 20.2744L28.5663 20.2751Z" fill="white"/>
+      <path d="M14.8716 0.273163H5.83158C5.83158 0.273163 5.94877 0.296321 6.13333 0.340531C7.34246 0.629654 7.83649 1.81492 7.23439 3.23316L0 20.276H8.32281C10.4112 20.276 12.8232 18.5826 13.7095 16.4942L18.1656 5.99667C19.5074 2.83527 18.0323 0.273163 14.8716 0.273163Z" fill="white"/>
+      <path d="M26.2504 0.273193C24.162 0.273193 21.75 1.96653 20.8637 4.05495L14.896 18.1139C14.456 19.1497 13.3606 20.0156 12.2981 20.2269C12.136 20.2592 12.0356 20.276 12.0356 20.276H22.3009C24.3893 20.276 26.8013 18.5827 27.6876 16.4942L33.6553 2.4353C34.0953 1.39951 35.1907 0.533544 36.2532 0.322316C36.4153 0.290035 36.5156 0.273193 36.5156 0.273193H26.2497H26.2504Z" fill="white"/>
+      <path d="M104.924 20.2746C104.204 20.2746 103.623 19.6914 103.623 18.9707C103.623 18.25 104.204 17.6689 104.924 17.6689C105.644 17.6689 106.229 18.2486 106.229 18.9707C106.229 19.6928 105.646 20.2746 104.924 20.2746ZM104.924 17.8851C104.324 17.8851 103.839 18.3707 103.839 18.9721C103.839 19.5735 104.324 20.0612 104.924 20.0612C105.525 20.0612 106.013 19.5728 106.013 18.9721C106.013 18.37 105.525 17.8851 104.924 17.8851ZM104.357 18.2914H104.976C105.322 18.2914 105.439 18.5068 105.439 18.6584C105.439 18.8851 105.276 19.0486 105.039 19.0626V19.0696C105.159 19.1118 105.246 19.2325 105.364 19.4205L105.535 19.6921H105.258L105.133 19.4739C104.958 19.1581 104.89 19.0984 104.717 19.0984H104.581V19.6921H104.356L104.357 18.2914ZM104.905 18.9026C105.08 18.9026 105.197 18.8353 105.197 18.6907C105.197 18.5637 105.094 18.483 104.945 18.483H104.581V18.9026H104.905Z" fill="white"/>
+    </g>
+    <defs>
+      <clipPath id="tels_clip">
+        <rect width="106.227" height="20.5235" fill="white"/>
+      </clipPath>
+    </defs>
+  </svg>
 );
 
 const toneColor = (theme, tone) => {
@@ -27,7 +54,63 @@ const toneColor = (theme, tone) => {
   return m[tone] || m.default;
 };
 
-const NOW_HOUR = 9.5;
+function getInitials(name) {
+  if (!name) return '';
+  const paren = /\(([^)]+)\)/.exec(name);
+  const base = paren ? paren[1] : name;
+  return base
+    .split(/\s+/)
+    .map((w) => w.replace(/[^A-Za-z]/g, '')[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+function assetInfo(item) {
+  const t = (item?.title || '').toLowerCase();
+  if (t.includes('boiler')) return { name: 'Boiler #2', desc: 'Gas-fired · Mech Room B · installed 2018' };
+  if (t.includes('fire panel')) return { name: 'Fire Alarm Panel 3', desc: 'Addressable · Bldg A West Wing' };
+  if (t.includes('generator')) return { name: 'Standby Generator', desc: 'Diesel 150kW · Generator Yard' };
+  if (t.includes('hvac') || t.includes('recommission')) return { name: 'Unit 214 HVAC', desc: 'Split system · 3 repeat failures / 90d' };
+  if (t.includes('filter')) return { name: 'Floor 3 AHU', desc: 'Air handler · quarterly filter PM' };
+  if (t.includes('paint') || t.includes('117')) return { name: 'Unit 117', desc: 'Move-in turn · resident-ready prep' };
+  return { name: item?.location || 'Asset', desc: 'General maintenance asset' };
+}
+
+function formatDur(d) {
+  if (!d) return d;
+  const h = /^(\d+(?:\.\d+)?)h$/.exec(d.trim());
+  const m = /^(\d+)m$/.exec(d.trim());
+  let mins;
+  if (h) mins = Math.round(parseFloat(h[1]) * 60);
+  else if (m) mins = parseInt(m[1], 10);
+  else return d;
+  const hh = Math.floor(mins / 60);
+  const mm = mins % 60;
+  if (hh && mm) return `${hh}h ${mm}m`;
+  if (hh) return `${hh}h`;
+  return `${mm}m`;
+}
+
+function TimeLabel({ value, size = 13, color = '#0F172A', weight = 700 }) {
+  const m = /^(\d{1,2}:\d{2})\s*(AM|PM)?$/i.exec((value || '').trim());
+  const t = m ? m[1] : value;
+  const ap = m && m[2] ? m[2].toUpperCase() : '';
+  return (
+    <Typography
+      component="span"
+      sx={{ fontSize: size, fontWeight: weight, color, whiteSpace: 'nowrap', lineHeight: 1.2 }}
+    >
+      {t}
+      {ap && (
+        <span style={{ color: '#94A3B8', fontWeight: 600, fontSize: size - 1 }}>{ap}</span>
+      )}
+    </Typography>
+  );
+}
+
+const NOW_HOUR = 8;
 
 function parseShift(shift) {
   const m = /^(\d+)([ap])–(\d+)([ap])$/i.exec(shift);
@@ -53,11 +136,23 @@ function parseTime(t) {
 }
 
 function parseDur(d) {
-  const h = /^(\d+(?:\.\d+)?)h$/.exec(d);
-  if (h) return Number(h[1]);
-  const m = /^(\d+)m$/.exec(d);
-  if (m) return Number(m[1]) / 60;
-  return 0;
+  if (!d) return 0;
+  let total = 0;
+  const h = /(\d+(?:\.\d+)?)\s*h/.exec(d);
+  if (h) total += parseFloat(h[1]);
+  const m = /(\d+)\s*m/.exec(d);
+  if (m) total += parseInt(m[1], 10) / 60;
+  return total;
+}
+
+function scheduledHours(tasks) {
+  return (tasks || [])
+    .filter((t) => t.kind !== 'Break')
+    .reduce((sum, t) => sum + parseDur(t.dur), 0);
+}
+
+function fmtHours(h) {
+  return Number.isInteger(h) ? `${h}` : h.toFixed(1);
 }
 
 function DayBar({ shift, tasks }) {
@@ -78,6 +173,19 @@ function DayBar({ shift, tasks }) {
           overflow: 'hidden'
         }}
       >
+        {Array.from({ length: Math.max(0, span - 1) }, (_, k) => k + 1).map((h) => (
+          <Box
+            key={`tick-${h}`}
+            sx={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `${(h / span) * 100}%`,
+              width: '1px',
+              bgcolor: 'rgba(15,23,42,0.07)'
+            }}
+          />
+        ))}
         {tasks.map((t, i) => {
           const start = parseTime(t.time);
           const dur = parseDur(t.dur);
@@ -153,15 +261,15 @@ const toneBg = (tone) => {
   return m[tone] || m.default;
 };
 
-function TopBar({ onNotif }) {
+function TopBar({ onNotif, onMenu, onAdd, menuOpen }) {
   return (
     <AppBar
       position="fixed"
       elevation={0}
       sx={{
-        bgcolor: '#0F172A',
+        bgcolor: '#004C9A',
         color: '#fff',
-        borderBottom: '1px solid #1E293B',
+        borderBottom: '1px solid rgba(41,48,54,0.15)',
         left: '50%',
         transform: 'translateX(-50%)',
         width: { xs: '100vw', sm: 390 },
@@ -169,40 +277,68 @@ function TopBar({ onNotif }) {
         zIndex: 1100
       }}
     >
-      <Toolbar sx={{ minHeight: 56, px: 1.5, gap: 1 }}>
+      <Box
+        sx={{
+          height: 44,
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          px: 2.5,
+          pt: 'env(safe-area-inset-top)'
+        }}
+      >
+        <Typography
+          sx={{ fontSize: 15, fontWeight: 700, letterSpacing: 0.2, width: 54 }}
+        >
+          8:00
+        </Typography>
         <Box
           sx={{
-            width: 32, height: 32, borderRadius: '8px',
-            bgcolor: '#1E293B', display: 'grid', placeItems: 'center'
-          }}
-        >
-          <Icon name="hub" size={20} color="#60A5FA" />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle2" sx={{ lineHeight: 1.1, fontWeight: 700 }}>
-            Connected Community
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', lineHeight: 1.2 }}>
-            {community.name} · {community.shift}
-          </Typography>
-        </Box>
-        <Chip
-          size="small"
-          icon={<Icon name="auto_awesome" size={14} color="#34D399" sx={{ ml: 0.5 }} />}
-          label={community.aiStatus}
-          sx={{
-            bgcolor: 'rgba(52,211,153,0.12)',
-            color: '#34D399',
-            border: '1px solid rgba(52,211,153,0.3)',
-            height: 24,
-            '.MuiChip-label': { px: 0.75, fontSize: 11 }
+            position: 'absolute',
+            left: '50%',
+            top: 8,
+            transform: 'translateX(-50%)',
+            width: 110,
+            height: 30,
+            bgcolor: '#000',
+            borderRadius: 999
           }}
         />
-        <IconButton onClick={onNotif} sx={{ color: '#E2E8F0', ml: 0.5 }} size="small">
-          <Badge color="error" badgeContent={3} overlap="circular">
-            <Icon name="notifications" size={22} />
-          </Badge>
-        </IconButton>
+        <Stack direction="row" alignItems="center" spacing={0.625} sx={{ width: 54, justifyContent: 'flex-end' }}>
+          <Icon name="signal_cellular_alt" size={16} color="#fff" />
+          <Icon name="wifi" size={16} color="#fff" />
+          <Icon name="battery_full" size={18} color="#fff" sx={{ transform: 'rotate(90deg)' }} />
+        </Stack>
+      </Box>
+      <Toolbar sx={{ minHeight: 56, px: 1, gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0, pl: 1, display: 'flex', alignItems: 'center' }}>
+          <TelsLogo height={22} />
+        </Box>
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+          <IconButton onClick={onAdd} sx={{ color: '#fff', p: 1.25 }}>
+            <Icon name="add" size={24} />
+          </IconButton>
+          <IconButton onClick={onNotif} sx={{ color: '#fff', p: 1.25 }}>
+            <Badge color="error" badgeContent={3} overlap="circular">
+              <Icon name="notifications" size={24} />
+            </Badge>
+          </IconButton>
+          <Box
+            onClick={onMenu}
+            role="button"
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 0.5,
+              px: 1.25, py: 1, borderRadius: 1, cursor: 'pointer',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' }
+            }}
+          >
+            <Icon name={menuOpen ? 'close' : 'menu'} size={24} color="#fff" />
+            <Typography sx={{ fontWeight: 600, fontSize: 16, color: '#fff', letterSpacing: '-0.18px' }}>
+              Menu
+            </Typography>
+          </Box>
+        </Stack>
       </Toolbar>
     </AppBar>
   );
@@ -320,33 +456,71 @@ function AIBanner({ onReview, onAccept }) {
   );
 }
 
-function WeatherCard() {
-  return (
-    <Box sx={{ px: 1.5, pt: 1.25 }}>
-      <Card variant="outlined" sx={{ borderColor: '#BAE6FD', bgcolor: '#F0F9FF' }}>
+function WeatherCard({ bare }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  const card = (
+      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#fff' }}>
         <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} alignItems="flex-start">
             <Box
               sx={{
                 width: 32, height: 32, borderRadius: '10px',
-                bgcolor: '#E0F2FE', display: 'grid', placeItems: 'center'
+                bgcolor: '#E0F2FE', display: 'grid', placeItems: 'center', flexShrink: 0
               }}
             >
               <Icon name="ac_unit" size={20} color="#0369A1" />
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: '#075985' }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: '#075985', lineHeight: 1.25 }}>
                 {weather.headline}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#0C4A6E' }}>
+              <Typography variant="caption" sx={{ color: '#0C4A6E', display: 'block', lineHeight: 1.2, mt: 0.25 }}>
                 {weather.body}
               </Typography>
             </Box>
+            <IconButton size="small" onClick={() => setDismissed(true)} sx={{ color: '#0369A1', m: -0.5 }}>
+              <Icon name="close" size={18} />
+            </IconButton>
+          </Stack>
+          <Divider sx={{ my: 1, borderColor: '#E2E8F0' }} />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Icon name="undo" size={16} color="#0369A1" />}
+              sx={{
+                color: '#0369A1', borderColor: '#7DD3FC',
+                '&:hover': { borderColor: '#0369A1', bgcolor: 'transparent' }
+              }}
+            >
+              Undo elevation
+            </Button>
+            <Button
+              size="small"
+              startIcon={<Icon name="add_comment" size={16} color="#0369A1" />}
+              sx={{ color: '#0369A1' }}
+            >
+              Add context
+            </Button>
+            <Box sx={{ flex: 1 }} />
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => setDismissed(true)}
+              sx={{
+                bgcolor: '#0369A1', color: '#fff',
+                '&:hover': { bgcolor: '#075985' }
+              }}
+            >
+              OK
+            </Button>
           </Stack>
         </CardContent>
       </Card>
-    </Box>
   );
+  if (bare) return card;
+  return <Box sx={{ px: 1.5, pt: 1.25 }}>{card}</Box>;
 }
 
 function TaskCard({ task, onReason, onReview }) {
@@ -394,9 +568,27 @@ function TaskCard({ task, onReason, onReview }) {
                 sx={{ height: 22, '.MuiChip-label': { px: 0.5, fontSize: 11 } }}
               />
             </Stack>
-            <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#475569' }}>
-              {task.reason}
-            </Typography>
+            <Stack
+              direction="row"
+              spacing={0.5}
+              alignItems="flex-start"
+              sx={{ mt: 0.75 }}
+            >
+              {task.elevated && (
+                <Box
+                  sx={{
+                    display: 'grid', placeItems: 'center',
+                    width: 16, height: 16, borderRadius: '5px',
+                    bgcolor: '#FEF3C7', flexShrink: 0, mt: '1px'
+                  }}
+                >
+                  <Icon name="keyboard_double_arrow_up" size={12} color="#B45309" />
+                </Box>
+              )}
+              <Typography variant="caption" sx={{ color: '#475569' }}>
+                {task.reason}
+              </Typography>
+            </Stack>
           </Box>
           <Stack alignItems="flex-end" spacing={0.5}>
             <IconButton
@@ -475,40 +667,123 @@ function ReviewCard({ item, onApprove, onOverride }) {
         </Stack>
         <Box
           sx={{
-            bgcolor: '#F8FAFC', borderRadius: 1.5, p: 1, mb: 1,
+            bgcolor: '#F8FAFC', borderRadius: 1.5, p: 1,
             border: '1px solid #E2E8F0'
           }}
         >
           <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
             <Icon name="auto_awesome" size={14} color="#4338CA" />
             <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-              AI Recommendation
+              {item.recommendations ? 'AI Recommendations' : 'AI Recommendation'}
             </Typography>
           </Stack>
-          <Typography variant="body2" sx={{ fontSize: 12.5, mb: 0.5 }}>
-            {item.recommended}
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#64748B' }}>
-            Tradeoff: {item.tradeoff}
-          </Typography>
+          {item.recommendations ? (
+            <Stack spacing={1} sx={{ mt: 0.5 }}>
+              {item.recommendations.map((rec, i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    bgcolor: '#fff',
+                    border: '1px solid',
+                    borderColor: i === 0 ? '#A5B4FC' : '#E2E8F0',
+                    borderRadius: 1.5,
+                    p: 1
+                  }}
+                >
+                  <Chip
+                    size="small"
+                    label={rec.label}
+                    sx={{
+                      height: 18, fontSize: 10, mb: 0.5,
+                      bgcolor: i === 0 ? '#EEF2FF' : '#F1F5F9',
+                      color: i === 0 ? '#4338CA' : '#475569',
+                      '.MuiChip-label': { px: 0.75 }
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ fontSize: 12.5, mb: 0.5, lineHeight: 1.1 }}>
+                    {rec.body}
+                  </Typography>
+                  {rec.why && (
+                    <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
+                      <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+                      <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.15 }}>
+                        <Box component="span" sx={{ fontWeight: 700, color: '#4338CA' }}>Why: </Box>
+                        {rec.why}
+                      </Typography>
+                    </Stack>
+                  )}
+                  <Typography variant="caption" sx={{ color: '#64748B', lineHeight: 1.1, display: 'block', mb: 0.75 }}>
+                    Tradeoff: {rec.tradeoff}
+                  </Typography>
+                  <Button
+                    size="small"
+                    fullWidth
+                    variant={i === 0 ? 'contained' : 'outlined'}
+                    onClick={() => onApprove(item)}
+                  >
+                    {i === 0 ? 'Approve recommended' : 'Approve this instead'}
+                  </Button>
+                </Box>
+              ))}
+              <Stack direction="row" spacing={1} sx={{ pt: 0.25 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => onOverride(item)}
+                  fullWidth
+                >
+                  Override
+                </Button>
+                <IconButton
+                  size="small"
+                  sx={{ border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff' }}
+                >
+                  <Icon name="add_comment" size={18} />
+                </IconButton>
+              </Stack>
+            </Stack>
+          ) : (
+            <>
+              <Typography variant="body2" sx={{ fontSize: 12.5, mb: 0.5, lineHeight: 1.1 }}>
+                {item.recommended}
+              </Typography>
+              {item.why && (
+                <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
+                  <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+                  <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.15 }}>
+                    <Box component="span" sx={{ fontWeight: 700, color: '#4338CA' }}>Why: </Box>
+                    {item.why}
+                  </Typography>
+                </Stack>
+              )}
+              <Typography variant="caption" sx={{ color: '#64748B', lineHeight: 1.1, display: 'block' }}>
+                Tradeoff: {item.tradeoff}
+              </Typography>
+              <Divider sx={{ my: 1 }} />
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="contained" onClick={() => onApprove(item)} fullWidth>
+                  Approve
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => onOverride(item)}
+                  fullWidth
+                >
+                  Override
+                </Button>
+                <IconButton
+                  size="small"
+                  sx={{ border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff' }}
+                >
+                  <Icon name="add_comment" size={18} />
+                </IconButton>
+              </Stack>
+            </>
+          )}
         </Box>
-        <Stack direction="row" spacing={1}>
-          <Button size="small" variant="contained" onClick={() => onApprove(item)} fullWidth>
-            Approve
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            onClick={() => onOverride(item)}
-            fullWidth
-          >
-            Override
-          </Button>
-          <IconButton size="small" sx={{ border: '1px solid #E2E8F0', borderRadius: 1.5 }}>
-            <Icon name="add_comment" size={18} />
-          </IconButton>
-        </Stack>
       </CardContent>
     </Card>
   );
@@ -605,7 +880,7 @@ function ContextSheet({ open, task, onClose, onResolve }) {
               <Typography variant="body2" sx={{ color: '#78350F', mb: 1 }}>
                 Given that, I’d <b>hold the in-house assignment</b> and dispatch
                 Apex Mechanical for {task?.title || 'this task'}, then re-sequence
-                Jake’s afternoon PM to tomorrow. This protects the move-in window
+                Jacob’s afternoon PM to tomorrow. This protects the move-in window
                 without overloading the team.
               </Typography>
               <Typography variant="caption" sx={{ color: '#92400E' }}>
@@ -731,7 +1006,7 @@ function ReasoningSheet({ open, task, onClose, onFeedback }) {
           <ReasonRow
             icon="balance"
             label="Tradeoff made"
-            body="Deferred a Tier-4 PM by 24 hrs to free Jake’s afternoon capacity for unit-turn risk."
+            body="Deferred a Low PM by 24 hrs to free Jacob’s afternoon capacity for unit-turn risk."
             tone="default"
           />
           <ReasonRow
@@ -814,7 +1089,11 @@ function ReasonRow({ icon, label, body, tone }) {
   );
 }
 
-function OverrideSheet({ open, onClose, onChoose }) {
+function OverrideSheet({ open, item, onClose, onChoose }) {
+  const subject = item?.kind || item?.title || 'this recommendation';
+  const rec =
+    item?.recommendations ? item.recommendations[0]?.body
+    : item?.recommended || item?.reason || null;
   return (
     <Drawer
       anchor="bottom"
@@ -835,11 +1114,32 @@ function OverrideSheet({ open, onClose, onChoose }) {
           <Avatar sx={{ bgcolor: '#FEF3C7', color: '#92400E', width: 36, height: 36 }}>
             <Icon name="model_training" size={20} color="#92400E" />
           </Avatar>
-          <Typography variant="subtitle1">Override recorded</Typography>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle1" sx={{ lineHeight: 1.2 }}>Override recorded</Typography>
+            <Typography variant="caption">{subject}</Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose} sx={{ color: '#64748B', m: -0.5 }}>
+            <Icon name="close" size={20} />
+          </IconButton>
         </Stack>
+        {rec && (
+          <Box
+            sx={{
+              bgcolor: '#F8FAFC', border: '1px solid #E2E8F0',
+              borderRadius: 1.5, p: 1, mb: 1.5
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+              AI had recommended
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 12.5, textDecoration: 'line-through', color: '#94A3B8' }}>
+              {rec}
+            </Typography>
+          </Box>
+        )}
         <Typography variant="body2" sx={{ color: '#475569', mb: 1.5 }}>
-          You reassigned <b>Jake to Unit 214</b> and moved <b>PM filter replacement</b> to
-          tomorrow. Should I treat this as one-time or remember the rule?
+          You overrode the AI’s call here. Should I treat this as a one-time
+          exception or remember it as a rule for similar situations?
         </Typography>
         <Stack spacing={1}>
           <Button
@@ -865,13 +1165,37 @@ function OverrideSheet({ open, onClose, onChoose }) {
   );
 }
 
-function TodayTab({ openReason, openOverride }) {
+function TodayTab({ openReason, openOverride, onApprove }) {
   return (
     <>
-      <Box sx={{ mt: 1.5 }}>
-        <AIBanner onAccept={openOverride} onReview={() => {}} />
+      <Box sx={{ px: 1.5, pt: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Needs Your Review
+            </Typography>
+            <Typography variant="caption">
+              Exceptions the AI flagged for your call
+            </Typography>
+          </Box>
+          <Chip
+            size="small"
+            label={`${reviews.length} open`}
+            sx={{ bgcolor: '#FEE2E2', color: '#991B1B' }}
+          />
+        </Stack>
+        <Stack spacing={1.25} sx={{ mb: 0.5 }}>
+          <WeatherCard bare />
+          {reviews.map((r) => (
+            <ReviewCard
+              key={r.id}
+              item={r}
+              onApprove={onApprove}
+              onOverride={openOverride}
+            />
+          ))}
+        </Stack>
       </Box>
-      <WeatherCard />
 
       <Box sx={{ px: 1.5, pt: 1.75 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
@@ -904,7 +1228,7 @@ function ReviewsTab({ openOverride }) {
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
         <Box>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Needs MD Review
+Needs Your Review
           </Typography>
           <Typography variant="caption">
             Exceptions the AI flagged for your call
@@ -993,6 +1317,219 @@ function QueueTab({ openReason, openOverride }) {
   );
 }
 
+function TagChip({ label }) {
+  const map = {
+    Regulatory: 'verified_user',
+    Logs: 'assignment',
+    Maintenance: 'build',
+    'Requires Doc': 'description'
+  };
+  return (
+    <Chip
+      size="small"
+      icon={<Icon name={map[label] || 'label'} size={12} sx={{ ml: 0.5 }} />}
+      label={label}
+      variant="outlined"
+      sx={{
+        height: 22, borderColor: '#CBD5E1', color: '#475569',
+        '.MuiChip-label': { px: 0.625, fontSize: 11 }
+      }}
+    />
+  );
+}
+
+function TaskListRow({ task }) {
+  const overdue = task.status === 'overdue';
+  const completed = task.status === 'completed';
+  const skipped = task.status === 'skipped';
+  const visual = completed
+    ? { icon: 'check_circle', fg: '#16A34A', bg: '#DCFCE7' }
+    : skipped
+      ? { icon: 'warning', fg: '#B45309', bg: '#FEF3C7' }
+      : overdue
+        ? { icon: 'error', fg: '#DC2626', bg: '#FEE2E2' }
+        : { icon: 'schedule', fg: '#0369A1', bg: '#E0F2FE' };
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              bgcolor: visual.bg, display: 'grid', placeItems: 'center', mt: 0.25
+            }}
+          >
+            <Icon name={visual.icon} size={18} color={visual.fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+              {task.category}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600, lineHeight: 1.25,
+                color: overdue ? '#DC2626' : (completed || skipped) ? '#94A3B8' : '#0F172A',
+                textDecoration: completed ? 'line-through' : 'none',
+                textDecorationColor: '#CBD5E1'
+              }}
+            >
+              {task.title}
+            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.25 }}>
+              <Typography
+                variant="caption"
+                sx={{ color: overdue ? '#DC2626' : '#64748B', fontWeight: overdue ? 700 : 500 }}
+              >
+                {task.due}
+              </Typography>
+              <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>{task.cadence}</Typography>
+            </Stack>
+            {task.note && (
+              <Typography variant="caption" sx={{ display: 'block', color: '#94A3B8', mt: 0.25 }}>
+                {task.note}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
+              <Icon name="person" size={14} color="#94A3B8" />
+              <Typography variant="caption" sx={{ color: task.assignee ? '#475569' : '#94A3B8' }}>
+                {task.assignee || 'Unassigned'}
+              </Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+              {task.tags.map((t) => <TagChip key={t} label={t} />)}
+            </Stack>
+          </Box>
+          <Icon name="chevron_right" size={20} color="#94A3B8" />
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TasksTab() {
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [showSkipped, setShowSkipped] = useState(false);
+  const overdue = tasksList.filter((t) => t.status === 'overdue');
+  const upcoming = tasksList.filter((t) => t.status === 'open');
+  const skipped = tasksList.filter((t) => t.status === 'skipped');
+  const completed = tasksList.filter((t) => t.status === 'completed');
+  const open = [...overdue, ...upcoming];
+  return (
+    <Box sx={{ px: 1.5, pt: 1.5 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Tasks due this month
+          </Typography>
+          <Typography variant="caption">
+            PM & regulatory · {open.length} open
+          </Typography>
+        </Box>
+        <Chip
+          size="small"
+          label={`${overdue.length} overdue`}
+          sx={{ bgcolor: '#FEE2E2', color: '#991B1B' }}
+        />
+      </Stack>
+
+      <Card variant="outlined" sx={{ borderColor: '#FDE68A', mb: 1, bgcolor: '#FFFBEB' }}>
+        <CardContent
+          sx={{ p: 1.25, '&:last-child': { pb: 1.25 }, cursor: 'pointer' }}
+          onClick={() => setShowSkipped((v) => !v)}
+        >
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Box
+              sx={{
+                width: 28, height: 28, borderRadius: '50%',
+                bgcolor: '#FEF3C7', display: 'grid', placeItems: 'center'
+              }}
+            >
+              <Icon name="warning" size={16} color="#B45309" />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                Skipped
+              </Typography>
+              <Typography variant="caption">
+                {skipped.length} skipped — may still be overdue
+              </Typography>
+            </Box>
+            <Icon
+              name={showSkipped ? 'expand_less' : 'expand_more'}
+              size={22}
+              color="#92400E"
+            />
+          </Stack>
+          <Collapse in={showSkipped}>
+            <Stack spacing={1} sx={{ mt: 1.25 }}>
+              {skipped.map((t) => <TaskListRow key={t.id} task={t} />)}
+            </Stack>
+          </Collapse>
+        </CardContent>
+      </Card>
+
+      <Card
+        variant="outlined"
+        sx={{ borderColor: '#E2E8F0', mb: 1.5, bgcolor: '#F8FAFC' }}
+      >
+        <CardContent
+          sx={{ p: 1.25, '&:last-child': { pb: 1.25 }, cursor: 'pointer' }}
+          onClick={() => setShowCompleted((v) => !v)}
+        >
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Box
+              sx={{
+                width: 28, height: 28, borderRadius: '50%',
+                bgcolor: '#DCFCE7', display: 'grid', placeItems: 'center'
+              }}
+            >
+              <Icon name="check_circle" size={16} color="#16A34A" />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                Completed
+              </Typography>
+              <Typography variant="caption">
+                {completed.length} done this month
+              </Typography>
+            </Box>
+            <Icon
+              name={showCompleted ? 'expand_less' : 'expand_more'}
+              size={22}
+              color="#64748B"
+            />
+          </Stack>
+          <Collapse in={showCompleted}>
+            <Stack spacing={1} sx={{ mt: 1.25 }}>
+              {completed.map((t) => <TaskListRow key={t.id} task={t} />)}
+            </Stack>
+          </Collapse>
+        </CardContent>
+      </Card>
+
+      {overdue.length > 0 && (
+        <>
+          <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+            OVERDUE · {overdue.length}
+          </Typography>
+          <Stack spacing={1} sx={{ mb: 1.5 }}>
+            {overdue.map((t) => <TaskListRow key={t.id} task={t} />)}
+          </Stack>
+        </>
+      )}
+
+      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+        OPEN · {upcoming.length}
+      </Typography>
+      <Stack spacing={1}>
+        {upcoming.map((t) => <TaskListRow key={t.id} task={t} />)}
+      </Stack>
+    </Box>
+  );
+}
+
 function WorkOrderSheet({ open, item, status, onClose, onReschedule }) {
   if (!item) return null;
   const woId = `WO-${String((item.title || '').length * 37 % 9000 + 1000).padStart(4, '0')}`;
@@ -1047,10 +1584,9 @@ function WorkOrderSheet({ open, item, status, onClose, onReschedule }) {
         <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.25 }}>
           <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Stack divider={<Divider />} spacing={1}>
-              <DetailRow icon="schedule" label="Scheduled" value={`${item.time} · ${item.dur}`} />
+              <DetailRow icon="schedule" label="Scheduled" value={`${item.time} · ${formatDur(item.dur)}`} />
               <DetailRow icon="place" label="Location" value={item.location} />
-              <DetailRow icon="person" label="Assignee" value={item.assignee || 'Jake R.'} />
-              <DetailRow icon="trending_up" label="KPI" value={item.kpi || 'PM Comp. · Resident Sat.'} />
+              <DetailRow icon="person" label="Assignee" value={item.assignee || 'Jacob B.'} />
             </Stack>
           </CardContent>
         </Card>
@@ -1075,6 +1611,15 @@ function WorkOrderSheet({ open, item, status, onClose, onReschedule }) {
         </Typography>
         <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.25 }}>
           <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Box sx={{ mb: 0.75 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {assetInfo(item).name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B' }}>
+                {assetInfo(item).desc}
+              </Typography>
+            </Box>
+            <Divider sx={{ mb: 0.75 }} />
             <Stack spacing={0.75}>
               <HistoryRow when="Apr 28" what="Last serviced · cleared in 1.2h" />
               <HistoryRow when="Mar 14" what="HVAC fault — vendor dispatch" tone="warning" />
@@ -1089,10 +1634,10 @@ function WorkOrderSheet({ open, item, status, onClose, onReschedule }) {
         <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.5 }}>
           <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
             <Stack spacing={0.75}>
-              <ActivityRow who="AI" when="7:02 AM" body="Sequenced as part of Jake’s morning route." />
-              <ActivityRow who="Jake R." when="7:30 AM" body="Picked up parts from shop." />
+              <ActivityRow who="AI" when="7:02 AM" body="Sequenced as part of Jacob’s morning route." />
+              <ActivityRow who="Jacob B." when="7:30 AM" body="Picked up parts from shop." />
               {status === 'completed' && (
-                <ActivityRow who="Jake R." when="—" body="Marked complete." tone="success" />
+                <ActivityRow who="Jacob B." when="—" body="Marked complete." tone="success" />
               )}
             </Stack>
           </CardContent>
@@ -1168,7 +1713,7 @@ function ActivityRow({ who, when, body, tone }) {
   return (
     <Stack direction="row" spacing={1} alignItems="flex-start">
       <Avatar sx={{ width: 20, height: 20, fontSize: 9, bgcolor: who === 'AI' ? '#EEF2FF' : '#E2E8F0', color: who === 'AI' ? '#4338CA' : '#0F172A' }}>
-        {who === 'AI' ? <Icon name="auto_awesome" size={11} color="#4338CA" /> : who.split(' ').map((n) => n[0]).join('')}
+        {who === 'AI' ? <Icon name="auto_awesome" size={11} color="#4338CA" /> : getInitials(who)}
       </Avatar>
       <Box sx={{ flex: 1 }}>
         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -1211,7 +1756,7 @@ function RescheduleOption({ opt, selected, onPick, hideTech }) {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }}>
               <Typography variant="body2" sx={{ fontWeight: 700 }}>{opt.when}</Typography>
-              <Typography variant="caption">· {opt.dur}</Typography>
+              <Typography variant="caption">· {formatDur(opt.dur)}</Typography>
             </Stack>
             <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
               <Chip
@@ -1331,7 +1876,7 @@ function RescheduleSheet({ open, item, onClose, onConfirm }) {
               <Box key={tech}>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75, px: 0.25 }}>
                   <Avatar sx={{ bgcolor: '#E2E8F0', color: '#0F172A', width: 24, height: 24, fontSize: 11 }}>
-                    {tech.split(' ').map((n) => n[0]).join('')}
+                    {getInitials(tech)}
                   </Avatar>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{tech}</Typography>
                   <Typography variant="caption">· {opts.length} opening{opts.length > 1 ? 's' : ''}</Typography>
@@ -1372,6 +1917,7 @@ function TimelineItem({ item }) {
   const dur = parseDur(item.dur);
   const completed = start != null && dur > 0 && start + dur <= NOW_HOUR;
   const inProgress = start != null && dur > 0 && start < NOW_HOUR && start + dur > NOW_HOUR;
+  const aiTouched = item.aiTouched || !!item.suggestion || (item.note && /\bAI\b/.test(item.note));
   const status = completed ? 'completed' : inProgress ? 'in-progress' : 'queued';
   const stop = (e) => e.stopPropagation();
 
@@ -1385,10 +1931,8 @@ function TimelineItem({ item }) {
       >
         <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Box sx={{ width: 56, flexShrink: 0 }}>
-              <Typography sx={{ fontSize: 12, color: '#94A3B8', fontWeight: 600 }}>
-                {item.time}
-              </Typography>
+            <Box sx={{ width: 58, flexShrink: 0 }}>
+              <TimeLabel value={item.time} size={12} color="#94A3B8" weight={600} />
             </Box>
             <Box
               sx={{
@@ -1447,21 +1991,19 @@ function TimelineItem({ item }) {
     >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box sx={{ width: 56, flexShrink: 0 }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{item.time}</Typography>
-            <Typography variant="caption">{item.dur}</Typography>
-          </Box>
-          <Box
-            sx={{
-              width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
-              bgcolor: toneBg(item.tone), display: 'grid', placeItems: 'center'
-            }}
-          >
-            <Icon name={item.icon} size={18} />
+          <Box sx={{ width: 58, flexShrink: 0 }}>
+            <TimeLabel value={item.time} size={13} />
+            <Typography variant="caption" sx={{ display: 'block' }}>{formatDur(item.dur)}</Typography>
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" spacing={0.5} alignItems="center">
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+              {aiTouched && (
+                <Icon name="auto_awesome" size={13} color="#4338CA" />
+              )}
+              <Typography
+                variant="caption"
+                sx={{ color: aiTouched ? '#4338CA' : '#64748B', fontWeight: 600 }}
+              >
                 {item.kind}
               </Typography>
               {inProgress && (
@@ -1572,7 +2114,8 @@ function TimelineItem({ item }) {
 
 function TeamMemberSheet({ open, member, onClose }) {
   if (!member) return null;
-  const pct = member.capacity ? Math.min(120, (member.load / member.capacity) * 100) : 0;
+  const loadHrs = scheduledHours(member.tasks);
+  const pct = member.capacity ? Math.min(120, (loadHrs / member.capacity) * 100) : 0;
   const tone =
     member.status === 'Over capacity' ? 'error'
     : member.status === 'Has capacity' ? 'success'
@@ -1596,14 +2139,14 @@ function TeamMemberSheet({ open, member, onClose }) {
       <Box sx={{ p: 2, pb: 1 }}>
         <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 1 }}>
           <Avatar sx={{ bgcolor: '#E2E8F0', color: '#0F172A', width: 40, height: 40, fontSize: 14 }}>
-            {member.name.split(' ').map((n) => n[0]).join('')}
+            {getInitials(member.name)}
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" sx={{ lineHeight: 1.1, fontWeight: 700 }}>
               {member.name}
             </Typography>
             <Typography variant="caption">
-              {member.role} · {member.shift}
+              {member.shift}
             </Typography>
           </Box>
           <IconButton size="small" onClick={onClose}>
@@ -1623,7 +2166,7 @@ function TeamMemberSheet({ open, member, onClose }) {
                 }}
               />
               <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                {member.load} / {member.capacity} hrs
+                {fmtHours(loadHrs)} / {member.capacity} hrs
               </Typography>
             </Stack>
             <DayBar shift={member.shift} tasks={member.tasks} />
@@ -1632,7 +2175,7 @@ function TeamMemberSheet({ open, member, onClose }) {
                 {member.shift}
               </Typography>
               <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 600 }}>
-                Now · 9:30 AM
+                Now · 8:00 AM
               </Typography>
             </Stack>
           </Box>
@@ -1662,37 +2205,154 @@ function TeamMemberSheet({ open, member, onClose }) {
   );
 }
 
+function CalendarSheet({ open, value, onClose, onPick }) {
+  const [cursor, setCursor] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
+  const monthName = cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const firstDay = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getDay();
+  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const isSel = (d) =>
+    d &&
+    value.getFullYear() === cursor.getFullYear() &&
+    value.getMonth() === cursor.getMonth() &&
+    value.getDate() === d;
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{ sx: { borderTopLeftRadius: 20, borderTopRightRadius: 20, pb: 'env(safe-area-inset-bottom)' } }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ p: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+          <IconButton
+            size="small"
+            onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}
+          >
+            <Icon name="chevron_left" size={20} />
+          </IconButton>
+          <Typography variant="subtitle1">{monthName}</Typography>
+          <IconButton
+            size="small"
+            onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}
+          >
+            <Icon name="chevron_right" size={20} />
+          </IconButton>
+        </Stack>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((w, i) => (
+            <Typography key={i} variant="caption" sx={{ textAlign: 'center', color: '#94A3B8', fontWeight: 700, py: 0.5 }}>
+              {w}
+            </Typography>
+          ))}
+          {cells.map((d, i) => (
+            <Box
+              key={i}
+              onClick={() => d && onPick(new Date(cursor.getFullYear(), cursor.getMonth(), d))}
+              sx={{
+                aspectRatio: '1', display: 'grid', placeItems: 'center',
+                borderRadius: '50%', cursor: d ? 'pointer' : 'default',
+                bgcolor: isSel(d) ? '#0F172A' : 'transparent',
+                color: isSel(d) ? '#fff' : '#0F172A',
+                fontWeight: isSel(d) ? 700 : 500,
+                '&:hover': d ? { bgcolor: isSel(d) ? '#0F172A' : '#F1F5F9' } : {}
+              }}
+            >
+              {d && <Typography variant="body2" sx={{ color: 'inherit', fontWeight: 'inherit' }}>{d}</Typography>}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </Drawer>
+  );
+}
+
 function ScheduleTab() {
   const [view, setView] = useState('my');
   const [openMember, setOpenMember] = useState(null);
+  const [date, setDate] = useState(new Date(2025, 4, 16));
+  const [calOpen, setCalOpen] = useState(false);
+  const today = new Date(2025, 4, 16);
+  const isToday = date.toDateString() === today.toDateString();
+  const shiftDay = (n) => setDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + n));
+  const longLabel = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const shortLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   return (
     <Box sx={{ px: 1.5, pt: 1.5 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Schedule
-          </Typography>
-          <Typography variant="caption">
-            {view === 'my' ? 'Your day · Fri, May 16' : 'Team coverage · Day shift'}
-          </Typography>
-        </Box>
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={view}
-          onChange={(_, v) => v && setView(v)}
-          sx={{
-            '.MuiToggleButton-root': {
-              px: 1.25, py: 0.25, fontSize: 12, fontWeight: 600,
-              textTransform: 'none', border: '1px solid #E2E8F0'
-            },
-            '.Mui-selected': { bgcolor: '#0F172A !important', color: '#fff !important' }
-          }}
+      <Box sx={{ mb: 1.25 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+          Schedule
+        </Typography>
+      </Box>
+
+      <Stack
+        direction="row"
+        alignItems="center"
+        sx={{
+          mb: 1.5, bgcolor: '#fff', border: '1px solid #E2E8F0',
+          borderRadius: 2, px: 0.5, py: 0.5
+        }}
+      >
+        <IconButton size="small" onClick={() => shiftDay(-1)}>
+          <Icon name="chevron_left" size={20} color="#475569" />
+        </IconButton>
+        <Stack
+          direction="row"
+          spacing={0.75}
+          alignItems="center"
+          justifyContent="center"
+          onClick={() => setCalOpen(true)}
+          sx={{ flex: 1, cursor: 'pointer', py: 0.25 }}
         >
-          <ToggleButton value="my">My Day</ToggleButton>
-          <ToggleButton value="team">Team</ToggleButton>
-        </ToggleButtonGroup>
+          <Icon name="calendar_today" size={16} color="#0F172A" />
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {isToday ? `Today · ${shortLabel}` : longLabel}
+          </Typography>
+          <Icon name="expand_more" size={16} color="#94A3B8" />
+        </Stack>
+        <IconButton size="small" onClick={() => shiftDay(1)}>
+          <Icon name="chevron_right" size={20} color="#475569" />
+        </IconButton>
       </Stack>
+
+      <CalendarSheet
+        open={calOpen}
+        value={date}
+        onClose={() => setCalOpen(false)}
+        onPick={(d) => { setDate(d); setCalOpen(false); }}
+      />
+
+      <ToggleButtonGroup
+        size="small"
+        exclusive
+        fullWidth
+        value={view}
+        onChange={(_, v) => v && setView(v)}
+        sx={{
+          mb: 1.5,
+          bgcolor: '#F1F5F9',
+          border: '1px solid #CBD5E1',
+          borderRadius: 2,
+          p: 0.5,
+          '.MuiToggleButton-root': {
+            flex: 1, py: 0.625, fontSize: 13, fontWeight: 600,
+            textTransform: 'none', border: 'none', borderRadius: '8px !important',
+            color: '#475569'
+          },
+          '.Mui-selected': {
+            bgcolor: '#fff !important', color: '#0F172A !important',
+            boxShadow: '0 1px 3px rgba(15,23,42,0.12)'
+          }
+        }}
+      >
+        <ToggleButton value="my">My Day</ToggleButton>
+        <ToggleButton value="team">Team</ToggleButton>
+      </ToggleButtonGroup>
 
       {view === 'my' ? (
         <Stack spacing={1}>
@@ -1713,7 +2373,8 @@ function ScheduleTab() {
       ) : (
         <Stack spacing={1}>
           {team.map((p) => {
-            const pct = p.capacity ? Math.min(120, (p.load / p.capacity) * 100) : 0;
+            const loadHrs = scheduledHours(p.tasks);
+            const pct = p.capacity ? Math.min(120, (loadHrs / p.capacity) * 100) : 0;
             const tone =
               p.status === 'Over capacity' ? 'error'
               : p.status === 'Has capacity' ? 'success'
@@ -1729,13 +2390,9 @@ function ScheduleTab() {
                   onClick={() => setOpenMember(p)}
                 >
                   <Stack direction="row" spacing={1.25} alignItems="center">
-                    <Avatar sx={{ bgcolor: '#E2E8F0', color: '#0F172A', width: 36, height: 36, fontSize: 13 }}>
-                      {p.name.split(' ').map((n) => n[0]).join('')}
-                    </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Stack direction="row" alignItems="center" spacing={0.75}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{p.name}</Typography>
-                        <Typography variant="caption">· {p.role}</Typography>
                       </Stack>
                       <Stack direction="row" alignItems="center" spacing={0.75}>
                         <Typography variant="caption">{p.shift}</Typography>
@@ -1756,14 +2413,9 @@ function ScheduleTab() {
                       {p.capacity > 0 && (
                         <Box sx={{ mt: 0.75 }}>
                           <DayBar shift={p.shift} tasks={p.tasks} />
-                          <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.25 }}>
-                            <Typography variant="caption" sx={{ color: '#64748B' }}>
-                              {p.load} / {p.capacity} hrs scheduled
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 600 }}>
-                              Now · 9:30 AM
-                            </Typography>
-                          </Stack>
+                          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25 }}>
+                            {fmtHours(loadHrs)} / {p.capacity} hrs scheduled
+                          </Typography>
                         </Box>
                       )}
                     </Box>
@@ -1786,9 +2438,9 @@ function ScheduleTab() {
 
 function SettingsTab() {
   const rows = [
-    { i: 'manage_accounts', t: 'Account', s: 'Maintenance Director · Cedar Ridge' },
+    { i: 'manage_accounts', t: 'Account', s: 'Mike F. · Maintenance Director' },
     { i: 'auto_awesome', t: 'AI behavior', s: 'Level 3 Delegator · Exception oversight' },
-    { i: 'notifications_active', t: 'Alerts', s: 'Tier 1 push · Tier 2 digest' },
+    { i: 'notifications_active', t: 'Alerts', s: 'Critical push · High digest' },
     { i: 'rule', t: 'Learned rules', s: '7 active · 2 awaiting confirmation' },
     { i: 'support_agent', t: 'Preferred vendors', s: '4 configured' }
   ];
@@ -1825,12 +2477,21 @@ export default function App() {
   const [tab, setTab] = useState(0);
   const [reasonTask, setReasonTask] = useState(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideItem, setOverrideItem] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [snack, setSnack] = useState(null);
 
   const openReason = (t) => setReasonTask(t);
   const closeReason = () => setReasonTask(null);
-  const openOverride = () => setOverrideOpen(true);
+  const openOverride = (item) => { setOverrideItem(item || null); setOverrideOpen(true); };
   const closeOverride = () => setOverrideOpen(false);
+
+  const handleApprove = (item) => {
+    const what =
+      item?.recommendations ? item.recommendations[0]?.body
+      : item?.recommended || 'recommendation';
+    setSnack(`Approved · ${what}`);
+  };
 
   const handleFeedback = (kind) => {
     closeReason();
@@ -1858,19 +2519,24 @@ export default function App() {
         minHeight: { xs: '100vh', sm: '100dvh' },
         bgcolor: '#F1F5F9',
         position: 'relative',
-        pt: 7,
+        pt: 'calc(100px + env(safe-area-inset-top))',
         pb: 9,
         boxShadow: { sm: '0 0 60px rgba(15,23,42,0.12)' },
         overflowX: 'hidden'
       }}
     >
-      <TopBar onNotif={() => setSnack('3 new alerts')} />
+      <TopBar
+        onNotif={() => { setTab(0); setSnack('3 items need your review'); }}
+        onMenu={() => setMenuOpen((v) => !v)}
+        menuOpen={menuOpen}
+        onAdd={() => setSnack('New work order request — not in this prototype')}
+      />
 
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} />}
-      {tab === 1 && <QueueTab openReason={openReason} openOverride={openOverride} />}
-      {tab === 2 && <ScheduleTab />}
-      {tab === 3 && <ReviewsTab openOverride={openOverride} />}
-      {tab === 4 && <KPIsTab />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} />}
+      {tab === 1 && <ScheduleTab />}
+      {tab === 2 && <TasksTab />}
+      {tab === 3 && <KPIsTab />}
+      {tab === 4 && <SettingsTab />}
 
       <Paper
         elevation={0}
@@ -1888,32 +2554,86 @@ export default function App() {
       >
         <BottomNavigation
           showLabels
-          value={tab}
+          value={tab > 2 ? false : tab}
           onChange={(_, v) => setTab(v)}
           sx={{ height: 60 }}
         >
           <BottomNavigationAction
-            label="Today"
-            icon={<Icon name="today" size={22} />}
-          />
-          <BottomNavigationAction
-            label="Queue"
-            icon={<Icon name="list_alt" size={22} />}
+            label="Dispatch"
+            icon={<Icon name="bolt" size={22} />}
           />
           <BottomNavigationAction
             label="Schedule"
             icon={<Icon name="calendar_month" size={22} />}
           />
           <BottomNavigationAction
-            label="Risks"
-            icon={<Icon name="report" size={22} />}
-          />
-          <BottomNavigationAction
-            label="KPIs"
-            icon={<Icon name="monitoring" size={22} />}
+            label="Tasks"
+            icon={<Icon name="checklist" size={22} />}
           />
         </BottomNavigation>
       </Paper>
+
+      <Drawer
+        anchor="top"
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        transitionDuration={180}
+        sx={{ zIndex: 1090 }}
+        slotProps={{
+          backdrop: {
+            sx: { top: 'calc(100px + env(safe-area-inset-top))', bgcolor: 'rgba(15,23,42,0.45)' }
+          }
+        }}
+        PaperProps={{
+          sx: {
+            width: '100%',
+            top: 'calc(100px + env(safe-area-inset-top))',
+            bgcolor: '#004C9A',
+            color: '#fff',
+            borderBottomLeftRadius: 20,
+            borderBottomRightRadius: 20
+          }
+        }}
+      >
+        <Box sx={{ p: 1.5, pt: 2, pb: 2.5 }}>
+          {[
+            { label: 'Dispatch', icon: 'bolt', tab: 0 },
+            { label: 'Schedule', icon: 'calendar_month', tab: 1 },
+            { label: 'Tasks', icon: 'checklist', tab: 2 },
+            { label: 'KPIs', icon: 'monitoring', tab: 3 },
+            { label: 'Settings', icon: 'tune', tab: 4 }
+          ].map((m, i) => {
+            const active = tab === m.tab;
+            return (
+              <Grow
+                key={m.label}
+                in={menuOpen}
+                timeout={200}
+                style={{ transitionDelay: menuOpen ? `${40 + i * 35}ms` : '0ms', transformOrigin: 'top' }}
+              >
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  alignItems="center"
+                  onClick={() => { setTab(m.tab); setMenuOpen(false); }}
+                  sx={{
+                    px: 1.5, py: 1.5, borderRadius: 2, cursor: 'pointer',
+                    bgcolor: active ? 'rgba(255,255,255,0.16)' : 'transparent',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.10)' }
+                  }}
+                >
+                  <Icon name={m.icon} size={22} color="#fff" />
+                  <Typography
+                    sx={{ fontSize: 16, fontWeight: active ? 700 : 600, color: '#fff', letterSpacing: '-0.18px' }}
+                  >
+                    {m.label}
+                  </Typography>
+                </Stack>
+              </Grow>
+            );
+          })}
+        </Box>
+      </Drawer>
 
       <ReasoningSheet
         open={Boolean(reasonTask)}
@@ -1923,17 +2643,25 @@ export default function App() {
       />
       <OverrideSheet
         open={overrideOpen}
+        item={overrideItem}
         onClose={closeOverride}
         onChoose={handleOverrideChoice}
       />
 
       <Snackbar
         open={Boolean(snack)}
-        autoHideDuration={2400}
+        autoHideDuration={2600}
         onClose={() => setSnack(null)}
         message={snack}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{ mb: 9 }}
+        sx={{
+          mb: 10,
+          zIndex: 1400,
+          '& .MuiSnackbarContent-root': {
+            bgcolor: '#0F172A', color: '#fff', fontWeight: 600,
+            borderRadius: 2, minWidth: 'auto'
+          }
+        }}
       />
     </Box>
   );
