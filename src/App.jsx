@@ -4,7 +4,7 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList } from './data.js';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity } from './data.js';
 import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow } from '@mui/material';
 
 const Icon = ({ name, size = 20, color, sx }) => (
@@ -155,13 +155,58 @@ function fmtHours(h) {
   return Number.isInteger(h) ? `${h}` : h.toFixed(1);
 }
 
-function DayBar({ shift, tasks }) {
-  const s = parseShift(shift);
-  if (!s) return null;
-  const span = s.end - s.start;
-  const nowPct = Math.max(0, Math.min(100, ((NOW_HOUR - s.start) / span) * 100));
+// Derive the capacity status from the real ordered workload so the chip,
+// the bar, and the fit-split always agree.
+function loadStatus(loadHrs, capacity) {
+  if (!capacity) return { label: 'Out today', tone: 'default' };
+  if (loadHrs > capacity + 1e-6) return { label: 'Over capacity', tone: 'error' };
+  if (loadHrs >= capacity - 0.75) return { label: 'On track', tone: 'info' };
+  return { label: 'Has capacity', tone: 'success' };
+}
+
+const TONE_RANK = { error: 0, warning: 1, info: 2, default: 3, success: 4 };
+
+function taskPriority(t) {
+  if (t.kind === 'Break') return 1.5;
+  return TONE_RANK[t.tone] ?? 3;
+}
+
+function orderByPriority(tasks) {
+  return (tasks || [])
+    .map((t, i) => ({ t, i }))
+    .sort((a, b) => taskPriority(a.t) - taskPriority(b.t) || a.i - b.i)
+    .map((x) => x.t);
+}
+
+// Order by priority, then walk the cumulative work clock to flag what
+// realistically fits inside the shift capacity (breaks don't count toward work).
+function withFit(tasks, capacity) {
+  let acc = 0;
+  return orderByPriority(tasks).map((t) => {
+    const d = t.kind === 'Break' ? 0 : parseDur(t.dur);
+    const startAcc = acc;
+    acc += d;
+    const fits = !capacity || t.kind === 'Break' || startAcc < capacity - 1e-6;
+    return { ...t, _fits: fits, _cum: acc };
+  });
+}
+
+function DayBar({ tasks, capacity }) {
+  const cap = capacity || 8;
+  const ordered = withFit(tasks, cap);
+  const totalWork = ordered.reduce(
+    (s, t) => s + (t.kind === 'Break' ? 0 : parseDur(t.dur)),
+    0
+  );
+  const scale = Math.max(cap, totalWork) || 1;
+  const capPct = (cap / scale) * 100;
+  const toneMap = {
+    error: '#DC2626', warning: '#D97706', info: '#0EA5E9',
+    success: '#16A34A', default: '#94A3B8'
+  };
   const BAR_H = 10;
   const OVERHANG = 8;
+  let offset = 0;
   return (
     <Box sx={{ position: 'relative', height: BAR_H + OVERHANG * 2, py: `${OVERHANG}px` }}>
       <Box
@@ -173,79 +218,44 @@ function DayBar({ shift, tasks }) {
           overflow: 'hidden'
         }}
       >
-        {Array.from({ length: Math.max(0, span - 1) }, (_, k) => k + 1).map((h) => (
-          <Box
-            key={`tick-${h}`}
-            sx={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: `${(h / span) * 100}%`,
-              width: '1px',
-              bgcolor: 'rgba(15,23,42,0.07)'
-            }}
-          />
-        ))}
-        {tasks.map((t, i) => {
-          const start = parseTime(t.time);
-          const dur = parseDur(t.dur);
-          if (start == null || !dur) return null;
-          const left = ((start - s.start) / span) * 100;
-          const width = (dur / span) * 100;
-          if (left + width < 0 || left > 100) return null;
-          const completed = start + dur <= NOW_HOUR;
-          const inProgress = start < NOW_HOUR && start + dur > NOW_HOUR;
-          const toneMap = {
-            error: '#DC2626', warning: '#D97706', info: '#0EA5E9',
-            success: '#16A34A', default: '#94A3B8'
-          };
+        {ordered.map((t, i) => {
+          const dur = t.kind === 'Break' ? 0 : parseDur(t.dur);
+          if (!dur) return null;
+          const left = (offset / scale) * 100;
+          const width = (dur / scale) * 100;
+          offset += dur;
           const base = toneMap[t.tone] || toneMap.default;
-          const fill = completed ? '#CBD5E1' : inProgress ? '#2563EB' : 'transparent';
-          const stroke = completed ? '#CBD5E1' : inProgress ? '#2563EB' : base;
           return (
             <Box
               key={i}
               sx={{
                 position: 'absolute',
                 top: 0,
-                left: `${Math.max(0, left)}%`,
-                width: `${Math.min(100 - Math.max(0, left), width)}%`,
+                left: `${left}%`,
+                width: `${width}%`,
                 height: '100%',
-                bgcolor: fill,
-                border: completed || inProgress ? 'none' : `1.5px solid ${stroke}`,
-                borderRadius: 3
+                bgcolor: t._fits ? base : 'transparent',
+                opacity: t._fits ? 0.9 : 1,
+                border: t._fits ? 'none' : '1.5px dashed #DC2626',
+                boxSizing: 'border-box'
               }}
             />
           );
         })}
       </Box>
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: `${nowPct}%`,
-          width: 0,
-          borderLeft: '2px dotted #0F172A',
-          zIndex: 2
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: `calc(${nowPct}% - 4px)`,
-          width: 8, height: 4, bgcolor: '#0F172A', borderRadius: 1, zIndex: 3
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: `calc(${nowPct}% - 4px)`,
-          width: 8, height: 4, bgcolor: '#0F172A', borderRadius: 1, zIndex: 3
-        }}
-      />
+      {capPct < 100 && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: `${capPct}%`,
+            width: 0,
+            borderLeft: '2px dotted #0F172A',
+            zIndex: 2
+          }}
+        />
+      )}
     </Box>
   );
 }
@@ -320,9 +330,7 @@ function TopBar({ onNotif, onMenu, onAdd, menuOpen }) {
             <Icon name="add" size={24} />
           </IconButton>
           <IconButton onClick={onNotif} sx={{ color: '#fff', p: 1.25 }}>
-            <Badge color="error" badgeContent={3} overlap="circular">
-              <Icon name="notifications" size={24} />
-            </Badge>
+            <Icon name="notifications" size={24} />
           </IconButton>
           <Box
             onClick={onMenu}
@@ -530,7 +538,10 @@ function TaskCard({ task, onReason, onReview }) {
     : task.status === 'On track' ? 'success'
     : 'default';
   return (
-    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+    <Card
+      variant="outlined"
+      sx={{ borderColor: '#A5B4FC', borderWidth: 1.5, bgcolor: '#FCFCFF' }}
+    >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1} alignItems="flex-start">
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1165,7 +1176,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
   );
 }
 
-function TodayTab({ openReason, openOverride, onApprove }) {
+function TodayTab({ openReason, openOverride, onApprove, onAiLog }) {
   return (
     <>
       <Box sx={{ px: 1.5, pt: 2 }}>
@@ -1204,7 +1215,11 @@ function TodayTab({ openReason, openOverride, onApprove }) {
           </Typography>
           <Chip
             size="small"
+            clickable
+            onClick={onAiLog}
             icon={<Icon name="auto_awesome" size={12} color="#4338CA" sx={{ ml: 0.5 }} />}
+            deleteIcon={<Icon name="history" size={14} color="#4338CA" />}
+            onDelete={onAiLog}
             label="AI sequenced"
             sx={{ height: 22, bgcolor: '#EEF2FF', color: '#4338CA' }}
           />
@@ -1584,7 +1599,7 @@ function WorkOrderSheet({ open, item, status, onClose, onReschedule }) {
         <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.25 }}>
           <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Stack divider={<Divider />} spacing={1}>
-              <DetailRow icon="schedule" label="Scheduled" value={`${item.time} · ${formatDur(item.dur)}`} />
+              <DetailRow icon="schedule" label="Est. duration" value={formatDur(item.dur)} />
               <DetailRow icon="place" label="Location" value={item.location} />
               <DetailRow icon="person" label="Assignee" value={item.assignee || 'Jacob B.'} />
             </Stack>
@@ -1913,87 +1928,40 @@ function TimelineItem({ item }) {
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const start = parseTime(item.time);
-  const dur = parseDur(item.dur);
-  const completed = start != null && dur > 0 && start + dur <= NOW_HOUR;
-  const inProgress = start != null && dur > 0 && start < NOW_HOUR && start + dur > NOW_HOUR;
   const aiTouched = item.aiTouched || !!item.suggestion || (item.note && /\bAI\b/.test(item.note));
-  const status = completed ? 'completed' : inProgress ? 'in-progress' : 'queued';
+  const status = 'queued';
   const stop = (e) => e.stopPropagation();
-
-  if (completed) {
-    return (
-      <>
-      <Card
-        variant="outlined"
-        sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC', cursor: 'pointer' }}
-        onClick={() => setDetailsOpen(true)}
-      >
-        <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Box sx={{ width: 58, flexShrink: 0 }}>
-              <TimeLabel value={item.time} size={12} color="#94A3B8" weight={600} />
-            </Box>
-            <Box
-              sx={{
-                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                bgcolor: '#DCFCE7', display: 'grid', placeItems: 'center'
-              }}
-            >
-              <Icon name="check" size={14} color="#16A34A" />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography
-                variant="body2"
-                noWrap
-                sx={{
-                  color: '#94A3B8',
-                  textDecoration: 'line-through',
-                  textDecorationColor: '#CBD5E1',
-                  fontSize: 12.5
-                }}
-              >
-                {item.title}
-              </Typography>
-            </Box>
-            <Typography variant="caption" sx={{ color: '#16A34A', fontWeight: 700, flexShrink: 0 }}>
-              Done
-            </Typography>
-          </Stack>
-        </CardContent>
-      </Card>
-      <WorkOrderSheet
-        open={detailsOpen}
-        item={item}
-        status={status}
-        onClose={() => setDetailsOpen(false)}
-        onReschedule={() => { setDetailsOpen(false); setRescheduleOpen(true); }}
-      />
-      <RescheduleSheet
-        open={rescheduleOpen}
-        item={item}
-        onClose={() => setRescheduleOpen(false)}
-        onConfirm={(opt) => { setConfirmation(opt); setRescheduleOpen(false); }}
-      />
-      </>
-    );
-  }
+  const isBreak = item.kind === 'Break';
+  const overflow = item._fits === false;
+  const toneColor = {
+    error: '#DC2626', warning: '#D97706', info: '#0EA5E9',
+    success: '#16A34A', default: '#94A3B8'
+  }[item.tone] || '#94A3B8';
 
   return (
     <Card
       variant="outlined"
       sx={{
-        borderColor: inProgress ? '#0F172A' : '#E2E8F0',
-        borderWidth: inProgress ? 1.5 : 1,
+        borderColor: aiTouched ? '#A5B4FC' : '#E2E8F0',
+        borderWidth: aiTouched ? 1.5 : 1,
+        bgcolor: aiTouched ? '#FCFCFF' : isBreak ? '#F8FAFC' : '#fff',
+        opacity: overflow ? 0.6 : 1,
         cursor: 'pointer'
       }}
       onClick={() => setDetailsOpen(true)}
     >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box sx={{ width: 58, flexShrink: 0 }}>
-            <TimeLabel value={item.time} size={13} />
-            <Typography variant="caption" sx={{ display: 'block' }}>{formatDur(item.dur)}</Typography>
+          <Box sx={{ width: 52, flexShrink: 0, textAlign: 'center' }}>
+            <Box
+              sx={{
+                width: 8, height: 8, borderRadius: '50%', mx: 'auto', mb: 0.5,
+                bgcolor: isBreak ? '#CBD5E1' : toneColor
+              }}
+            />
+            <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#0F172A' }}>
+              {formatDur(item.dur)}
+            </Typography>
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" spacing={0.5} alignItems="center">
@@ -2006,12 +1974,12 @@ function TimelineItem({ item }) {
               >
                 {item.kind}
               </Typography>
-              {inProgress && (
+              {overflow && (
                 <Chip
                   size="small"
-                  label="In progress"
+                  label="Exceeds shift"
                   sx={{
-                    height: 16, fontSize: 10, bgcolor: '#0F172A', color: '#fff',
+                    height: 16, fontSize: 10, bgcolor: '#FEE2E2', color: '#B91C1C',
                     '.MuiChip-label': { px: 0.625 }
                   }}
                 />
@@ -2115,12 +2083,12 @@ function TimelineItem({ item }) {
 function TeamMemberSheet({ open, member, onClose }) {
   if (!member) return null;
   const loadHrs = scheduledHours(member.tasks);
-  const pct = member.capacity ? Math.min(120, (loadHrs / member.capacity) * 100) : 0;
-  const tone =
-    member.status === 'Over capacity' ? 'error'
-    : member.status === 'Has capacity' ? 'success'
-    : member.status === 'Out today' ? 'default'
-    : 'info';
+  const ordered = withFit(member.tasks, member.capacity);
+  const fitItems = ordered.filter((t) => t._fits);
+  const overItems = ordered.filter((t) => !t._fits);
+  const overHrs = overItems.reduce((s, t) => s + parseDur(t.dur), 0);
+  const st = loadStatus(loadHrs, member.capacity);
+  const tone = st.tone;
   return (
     <Drawer
       anchor="bottom"
@@ -2158,7 +2126,7 @@ function TeamMemberSheet({ open, member, onClose }) {
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
               <Chip
                 size="small"
-                label={member.status}
+                label={st.label}
                 sx={{
                   height: 20, fontSize: 11,
                   bgcolor: toneBg(tone), color: '#0F172A',
@@ -2166,18 +2134,15 @@ function TeamMemberSheet({ open, member, onClose }) {
                 }}
               />
               <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                {fmtHours(loadHrs)} / {member.capacity} hrs
+                {fmtHours(loadHrs)}h planned / {member.capacity}h shift
               </Typography>
             </Stack>
-            <DayBar shift={member.shift} tasks={member.tasks} />
-            <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-              <Typography variant="caption" sx={{ color: '#64748B' }}>
-                {member.shift}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 600 }}>
-                Now · 8:00 AM
-              </Typography>
-            </Stack>
+            <DayBar tasks={member.tasks} capacity={member.capacity} />
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5 }}>
+              {overHrs > 0
+                ? `${fmtHours(overHrs)}h won’t fit in an ${member.capacity}h shift`
+                : `Fits within the ${member.capacity}h shift · ordered by priority`}
+            </Typography>
           </Box>
         )}
       </Box>
@@ -2195,9 +2160,22 @@ function TeamMemberSheet({ open, member, onClose }) {
           </Card>
         ) : (
           <Stack spacing={1}>
-            {member.tasks.map((t, i) => (
-              <TimelineItem key={i} item={t} />
+            {fitItems.map((t, i) => (
+              <TimelineItem key={`f-${i}`} item={t} />
             ))}
+            {overItems.length > 0 && (
+              <>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ pt: 0.5 }}>
+                  <Icon name="error" size={15} color="#DC2626" />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C' }}>
+                    Won’t fit in an {member.capacity}h shift — reassign or defer
+                  </Typography>
+                </Stack>
+                {overItems.map((t, i) => (
+                  <TimelineItem key={`o-${i}`} item={t} />
+                ))}
+              </>
+            )}
           </Stack>
         )}
       </Box>
@@ -2361,12 +2339,12 @@ function ScheduleTab() {
               <Stack direction="row" spacing={1} alignItems="center">
                 <Icon name="auto_awesome" size={16} color="#4338CA" />
                 <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
-                  AI sequenced your day around 2 approvals and 1 walkthrough
+                  AI ordered your day by priority — top items first
                 </Typography>
               </Stack>
             </CardContent>
           </Card>
-          {mdSchedule.map((item) => (
+          {orderByPriority(mdSchedule).map((item) => (
             <TimelineItem key={item.id} item={item} />
           ))}
         </Stack>
@@ -2374,12 +2352,8 @@ function ScheduleTab() {
         <Stack spacing={1}>
           {team.map((p) => {
             const loadHrs = scheduledHours(p.tasks);
-            const pct = p.capacity ? Math.min(120, (loadHrs / p.capacity) * 100) : 0;
-            const tone =
-              p.status === 'Over capacity' ? 'error'
-              : p.status === 'Has capacity' ? 'success'
-              : p.status === 'Out today' ? 'default'
-              : 'info';
+            const st = loadStatus(loadHrs, p.capacity);
+            const tone = st.tone;
             return (
               <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
                 <CardContent
@@ -2399,7 +2373,7 @@ function ScheduleTab() {
                         <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
                         <Chip
                           size="small"
-                          label={p.status}
+                          label={st.label}
                           sx={{
                             height: 18, fontSize: 10,
                             bgcolor: toneBg(tone), color: '#0F172A',
@@ -2412,9 +2386,11 @@ function ScheduleTab() {
                       </Stack>
                       {p.capacity > 0 && (
                         <Box sx={{ mt: 0.75 }}>
-                          <DayBar shift={p.shift} tasks={p.tasks} />
+                          <DayBar tasks={p.tasks} capacity={p.capacity} />
                           <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25 }}>
-                            {fmtHours(loadHrs)} / {p.capacity} hrs scheduled
+                            {loadHrs > p.capacity
+                              ? `${fmtHours(loadHrs)}h planned · ${fmtHours(loadHrs - p.capacity)}h over an ${p.capacity}h shift`
+                              : `${fmtHours(loadHrs)}h planned · fits in ${p.capacity}h shift`}
                           </Typography>
                         </Box>
                       )}
@@ -2473,12 +2449,228 @@ function SettingsTab() {
   );
 }
 
+const AI_ACTION_ICON = {
+  Elevated: 'keyboard_double_arrow_up',
+  Prioritized: 'low_priority',
+  Sequenced: 'sort',
+  Assigned: 'person_add',
+  Batched: 'dynamic_feed',
+  Rescheduled: 'event_repeat',
+  Snoozed: 'snooze',
+  Dispatched: 'support_agent',
+  'Auto-closed': 'task_alt'
+};
+
+function AiActivitySheet({ open, onClose }) {
+  const [actioned, setActioned] = useState({});
+  const items = aiActivity;
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '90vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ p: 2, pb: 1 }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px',
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="auto_awesome" size={20} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ lineHeight: 1.15, fontWeight: 700 }}>
+              AI activity
+            </Typography>
+            <Typography variant="caption">
+              Last 24 hours · {items.length} actions · newest first
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+      <Box sx={{ px: 2, pb: 2, overflowY: 'auto' }}>
+        <Stack spacing={0}>
+          {items.map((a, idx) => {
+            const tColor = {
+              error: '#DC2626', warning: '#D97706', info: '#0EA5E9',
+              success: '#16A34A', default: '#64748B'
+            }[a.tone] || '#64748B';
+            const done = a.status === 'completed';
+            const last = idx === items.length - 1;
+            const act = actioned[a.id];
+            return (
+              <Stack key={a.id} direction="row" spacing={1.25} alignItems="stretch">
+                {/* timeline rail */}
+                <Stack alignItems="center" sx={{ width: 22, flexShrink: 0 }}>
+                  <Box
+                    sx={{
+                      width: 22, height: 22, borderRadius: '50%', mt: 0.25,
+                      bgcolor: done ? '#DCFCE7' : '#EEF2FF',
+                      display: 'grid', placeItems: 'center'
+                    }}
+                  >
+                    <Icon
+                      name={done ? 'check' : AI_ACTION_ICON[a.action] || 'auto_awesome'}
+                      size={13}
+                      color={done ? '#16A34A' : '#4338CA'}
+                    />
+                  </Box>
+                  {!last && (
+                    <Box sx={{ flex: 1, width: '2px', bgcolor: '#E2E8F0', my: 0.25 }} />
+                  )}
+                </Stack>
+
+                <Box sx={{ flex: 1, minWidth: 0, pb: last ? 0 : 1.5 }}>
+                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                      {a.ago}
+                    </Typography>
+                    <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                      {a.clock}
+                    </Typography>
+                  </Stack>
+                  <Card
+                    variant="outlined"
+                    sx={{
+                      borderColor: '#A5B4FC', borderWidth: 1.5, bgcolor: '#FCFCFF'
+                    }}
+                  >
+                    <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        alignItems="center"
+                        flexWrap="wrap"
+                        useFlexGap
+                        sx={{ mb: 0.5 }}
+                      >
+                        <Chip
+                          size="small"
+                          label={a.action}
+                          sx={{
+                            height: 18, fontSize: 10, fontWeight: 700,
+                            bgcolor: toneBg(a.tone), color: '#0F172A',
+                            '.MuiChip-label': { px: 0.75 }
+                          }}
+                        />
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          icon={<Icon name="person" size={11} color="#475569" sx={{ ml: 0.5 }} />}
+                          label={`${a.assignee} · ${a.when}`}
+                          sx={{
+                            height: 18, fontSize: 10, fontWeight: 600,
+                            borderColor: '#CBD5E1', color: '#334155',
+                            '.MuiChip-label': { px: 0.5 }
+                          }}
+                        />
+                        {a.status === 'in-progress' && (
+                          <Chip
+                            size="small"
+                            label="In progress"
+                            sx={{
+                              height: 18, fontSize: 10, bgcolor: '#0F172A', color: '#fff',
+                              '.MuiChip-label': { px: 0.625 }
+                            }}
+                          />
+                        )}
+                        {done && (
+                          <Typography variant="caption" sx={{ color: '#16A34A', fontWeight: 700 }}>
+                            Completed
+                          </Typography>
+                        )}
+                      </Stack>
+                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                        {a.title}
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: '#475569' }}>
+                        {a.detail}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                        <Icon name="place" size={12} color="#94A3B8" />
+                        <Typography variant="caption">{a.target}</Typography>
+                      </Stack>
+
+                      {!done && (
+                        act ? (
+                          <Box
+                            sx={{
+                              mt: 1, p: 0.875, borderRadius: 1.5,
+                              bgcolor: '#F0FDF4', border: '1px solid #BBF7D0',
+                              display: 'flex', alignItems: 'center', gap: 0.75
+                            }}
+                          >
+                            <Icon name="check_circle" size={15} color="#16A34A" />
+                            <Typography variant="caption" sx={{ flex: 1, color: '#166534', fontWeight: 600 }}>
+                              {act}
+                            </Typography>
+                            <Button
+                              size="small"
+                              onClick={() => setActioned((s) => { const n = { ...s }; delete n[a.id]; return n; })}
+                              sx={{ minWidth: 0, px: 0.75, fontSize: 12 }}
+                            >
+                              Undo
+                            </Button>
+                          </Box>
+                        ) : (
+                          <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                            {[
+                              { k: 'reschedule', icon: 'event_repeat', label: 'Reschedule', msg: 'Rescheduled to tomorrow AM' },
+                              { k: 'reassign', icon: 'swap_horiz', label: 'Reassign', msg: 'Reassignment requested' },
+                              { k: 'snooze', icon: 'snooze', label: 'Snooze', msg: 'Snoozed 1 hr' }
+                            ].map((b) => (
+                              <Button
+                                key={b.k}
+                                size="small"
+                                variant="outlined"
+                                startIcon={<Icon name={b.icon} size={14} />}
+                                onClick={() => setActioned((s) => ({ ...s, [a.id]: b.msg }))}
+                                sx={{
+                                  flex: 1, py: 0.375, fontSize: 11.5,
+                                  borderColor: '#CBD5E1', color: '#334155',
+                                  '.MuiButton-startIcon': { mr: 0.375 }
+                                }}
+                              >
+                                {b.label}
+                              </Button>
+                            ))}
+                          </Stack>
+                        )
+                      )}
+                    </CardContent>
+                  </Card>
+                </Box>
+              </Stack>
+            );
+          })}
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState(0);
   const [reasonTask, setReasonTask] = useState(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideItem, setOverrideItem] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [aiLogOpen, setAiLogOpen] = useState(false);
   const [snack, setSnack] = useState(null);
 
   const openReason = (t) => setReasonTask(t);
@@ -2532,7 +2724,7 @@ export default function App() {
         onAdd={() => setSnack('New work order request — not in this prototype')}
       />
 
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onAiLog={() => setAiLogOpen(true)} />}
       {tab === 1 && <ScheduleTab />}
       {tab === 2 && <TasksTab />}
       {tab === 3 && <KPIsTab />}
@@ -2560,7 +2752,16 @@ export default function App() {
         >
           <BottomNavigationAction
             label="Dispatch"
-            icon={<Icon name="bolt" size={22} />}
+            icon={
+              <Badge
+                color="error"
+                badgeContent={reviews.length + 1}
+                overlap="circular"
+                sx={{ '.MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}
+              >
+                <Icon name="bolt" size={22} />
+              </Badge>
+            }
           />
           <BottomNavigationAction
             label="Schedule"
@@ -2600,10 +2801,11 @@ export default function App() {
             { label: 'Dispatch', icon: 'bolt', tab: 0 },
             { label: 'Schedule', icon: 'calendar_month', tab: 1 },
             { label: 'Tasks', icon: 'checklist', tab: 2 },
+            { label: 'AI activity', icon: 'auto_awesome', action: 'aiLog' },
             { label: 'KPIs', icon: 'monitoring', tab: 3 },
             { label: 'Settings', icon: 'tune', tab: 4 }
           ].map((m, i) => {
-            const active = tab === m.tab;
+            const active = m.tab != null && tab === m.tab;
             return (
               <Grow
                 key={m.label}
@@ -2615,7 +2817,11 @@ export default function App() {
                   direction="row"
                   spacing={1.5}
                   alignItems="center"
-                  onClick={() => { setTab(m.tab); setMenuOpen(false); }}
+                  onClick={() => {
+                    if (m.action === 'aiLog') setAiLogOpen(true);
+                    else setTab(m.tab);
+                    setMenuOpen(false);
+                  }}
                   sx={{
                     px: 1.5, py: 1.5, borderRadius: 2, cursor: 'pointer',
                     bgcolor: active ? 'rgba(255,255,255,0.16)' : 'transparent',
@@ -2647,6 +2853,7 @@ export default function App() {
         onClose={closeOverride}
         onChoose={handleOverrideChoice}
       />
+      <AiActivitySheet open={aiLogOpen} onClose={() => setAiLogOpen(false)} />
 
       <Snackbar
         open={Boolean(snack)}

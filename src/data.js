@@ -219,12 +219,6 @@ export const tiers = [
 
 export const mdSchedule = [
   {
-    id: 'md-1', time: '8:00 AM', dur: '30m', kind: 'Standup',
-    title: 'Morning huddle · Maintenance team',
-    location: 'Shop floor', icon: 'groups', tone: 'info',
-    note: 'AI pre-loaded today’s Critical sequencing for review.'
-  },
-  {
     id: 'md-2', time: '9:15 AM', dur: '20m', kind: 'Approval',
     title: 'Approve vendor dispatch · Apex Mechanical',
     location: 'Unit 214 turn', icon: 'support_agent', tone: 'warning',
@@ -266,9 +260,6 @@ export const team = [
     id: 'tm-1', name: 'Marco D.', role: 'Lead Tech', shift: '8a–5p',
     capacity: 8, load: 7.5, status: 'On-site',
     tasks: [
-      { time: '7:30 AM', dur: '15m', kind: 'Standup', title: 'Shift handoff w/ overnight tech',
-        location: 'Shop floor', icon: 'groups', tone: 'info',
-        note: 'No overnight events. Fire panel alert opened 11 min ago.' },
       { time: '8:00 AM', dur: '90m', kind: 'Critical', title: 'Fire panel trouble signal — West Wing',
         location: 'Bldg A · Panel 3', icon: 'local_fire_department', tone: 'error',
         note: 'Survey window opens Monday — AI elevated to Critical.' },
@@ -316,7 +307,12 @@ export const team = [
           primary: 'Reschedule',
           secondary: 'Keep on today',
           action: 'reschedule'
-        } }
+        } },
+      { time: '1:00 PM', dur: '1h 30m', kind: 'High', title: 'RTU-4 compressor fault diagnosis',
+        location: 'Roof · RTU-4', icon: 'hvac', tone: 'warning',
+        note: 'Resident comfort complaints on Floor 4.' },
+      { time: '3:00 PM', dur: '1h 30m', kind: 'PM', title: 'Cooling tower water-treatment check',
+        location: 'Roof · Cooling tower', icon: 'water_drop', tone: 'default', note: '' }
     ]
   },
   {
@@ -604,4 +600,87 @@ export const tasksList = [
   { id: 'tk-25', category: 'HVAC (RTU)', title: 'Clean / change air filter and verify unit operation',
     status: 'completed', due: 'Completed Thu, May 15', cadence: 'Monthly', eta: '1h 30m',
     assignee: 'Bruce Wayne', note: null, tags: ['Maintenance'] }
+];
+
+// Last 24h of autonomous AI scheduling/prioritization decisions, newest first.
+// status: 'in-progress' | 'queued' | 'completed' — non-completed can still be
+// modified by the Maintenance Director (reschedule / reassign / snooze).
+export const aiActivity = [
+  {
+    id: 'ai-1', ago: '11 min ago', clock: '7:49 AM', action: 'Elevated', tone: 'error',
+    title: 'Fire panel trouble signal — West Wing',
+    detail: 'Raised to Critical — survey window opens Monday; 8-hr resolution target.',
+    assignee: 'Marco D.', when: 'This morning',
+    target: 'Bldg A · Panel 3', status: 'in-progress'
+  },
+  {
+    id: 'ai-2', ago: '34 min ago', clock: '7:26 AM', action: 'Elevated', tone: 'error',
+    title: 'Boiler #2 pre-freeze inspection',
+    detail: 'Elevated by weather signal — overnight low 22°F forecast.',
+    assignee: 'Jacob B.', when: 'This morning',
+    target: 'Mech Room B', status: 'queued'
+  },
+  {
+    id: 'ai-3', ago: '1 hr ago', clock: '7:02 AM', action: 'Assigned', tone: 'warning',
+    title: 'Generator visual inspection + logbook',
+    detail: 'Overdue weekly check — assigned to Sasha P. (had capacity today).',
+    assignee: 'Sasha P.', when: 'This afternoon',
+    target: 'Emergency Power Generators', status: 'queued'
+  },
+  {
+    id: 'ai-4', ago: '1 hr ago', clock: '6:58 AM', action: 'Prioritized', tone: 'warning',
+    title: 'Unit 214 HVAC recommission',
+    detail: 'Bumped to High — move-in 10 AM tomorrow; vendor backup recommended.',
+    assignee: 'Unassigned', when: 'This morning',
+    target: 'Unit 214', status: 'in-progress'
+  },
+  {
+    id: 'ai-5', ago: '2 hrs ago', clock: '6:05 AM', action: 'Batched', tone: 'default',
+    title: '4 overdue food-safety & water logs',
+    detail: 'Grouped onto Diane K.’s afternoon route to minimize travel.',
+    assignee: 'Diane K.', when: 'This afternoon',
+    target: 'Floors 1–3', status: 'queued'
+  },
+  {
+    id: 'ai-6', ago: '3 hrs ago', clock: '5:14 AM', action: 'Rescheduled', tone: 'default',
+    title: 'Quarterly filter replacement — Floor 3',
+    detail: 'Deferred to relieve Jacob’s overload — no PM Comp. impact before May 31.',
+    assignee: 'Jacob B.', when: 'Sat AM',
+    target: 'Floor 3 common', status: 'queued'
+  },
+  {
+    id: 'ai-7', ago: '6 hrs ago', clock: '2:30 AM', action: 'Sequenced', tone: 'info',
+    title: 'Tomorrow’s critical path pre-loaded',
+    detail: 'Ordered 31 work orders by risk and capacity for your review.',
+    assignee: 'Whole team', when: 'Today',
+    target: 'All buildings', status: 'completed'
+  },
+  {
+    id: 'ai-8', ago: '9 hrs ago', clock: '11:48 PM', action: 'Assigned', tone: 'default',
+    title: 'Emergency lighting spot check — East Wing',
+    detail: 'Routed to Marco D. on his Bldg B pass — zero added travel.',
+    assignee: 'Marco D.', when: 'This morning',
+    target: 'Bldg B', status: 'completed'
+  },
+  {
+    id: 'ai-9', ago: '14 hrs ago', clock: '6:20 PM', action: 'Snoozed', tone: 'default',
+    title: 'Corridor C ceiling-tile replacement',
+    detail: 'Low-risk cosmetic PM — held 24h while crew cleared move-in load.',
+    assignee: 'Diane K.', when: 'Tomorrow AM',
+    target: 'Corridor C', status: 'queued'
+  },
+  {
+    id: 'ai-10', ago: '19 hrs ago', clock: '1:05 PM', action: 'Dispatched', tone: 'warning',
+    title: 'Apex Mechanical — Unit 214 vendor hold',
+    detail: 'Pre-staged vendor request pending your approval (3 repeat failures/90d).',
+    assignee: 'Apex Mechanical', when: 'Tomorrow AM',
+    target: 'Unit 214', status: 'in-progress'
+  },
+  {
+    id: 'ai-11', ago: '23 hrs ago', clock: '9:12 AM', action: 'Auto-closed', tone: 'success',
+    title: 'Fire extinguisher monthly initials',
+    detail: 'AI confirmed logbook upload to TELS and closed the task.',
+    assignee: 'Marco D.', when: 'Yesterday AM',
+    target: 'All floors', status: 'completed'
+  }
 ];
