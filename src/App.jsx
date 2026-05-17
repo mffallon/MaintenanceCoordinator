@@ -654,6 +654,14 @@ function TierSection({ tier, onReason, onReview }) {
 }
 
 function ReviewCard({ item, onApprove, onOverride }) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const submit = (kind) => {
+    setNoteOpen(false);
+    setNote('');
+    if (kind === 'approve') onApprove(item);
+    else onOverride(item);
+  };
   return (
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -748,7 +756,14 @@ function ReviewCard({ item, onApprove, onOverride }) {
                 </Button>
                 <IconButton
                   size="small"
-                  sx={{ border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff' }}
+                  onClick={() => setNoteOpen((v) => !v)}
+                  sx={{
+                    border: '1px solid',
+                    borderColor: noteOpen ? '#4338CA' : '#CBD5E1',
+                    borderRadius: 1.5,
+                    bgcolor: noteOpen ? '#EEF2FF' : '#fff',
+                    color: noteOpen ? '#4338CA' : 'inherit'
+                  }}
                 >
                   <Icon name="add_comment" size={18} />
                 </IconButton>
@@ -787,13 +802,64 @@ function ReviewCard({ item, onApprove, onOverride }) {
                 </Button>
                 <IconButton
                   size="small"
-                  sx={{ border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff' }}
+                  onClick={() => setNoteOpen((v) => !v)}
+                  sx={{
+                    border: '1px solid',
+                    borderColor: noteOpen ? '#4338CA' : '#CBD5E1',
+                    borderRadius: 1.5,
+                    bgcolor: noteOpen ? '#EEF2FF' : '#fff',
+                    color: noteOpen ? '#4338CA' : 'inherit'
+                  }}
                 >
                   <Icon name="add_comment" size={18} />
                 </IconButton>
               </Stack>
             </>
           )}
+          <Collapse in={noteOpen} unmountOnExit>
+            <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed #CBD5E1' }}>
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.75 }}>
+                <Icon name="add_comment" size={14} color="#4338CA" />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+                  Add context for this decision
+                </Typography>
+              </Stack>
+              <TextField
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. Apex is booked today — try in-house first, escalate if not cleared by noon."
+                multiline
+                minRows={2}
+                fullWidth
+                size="small"
+                sx={{ mb: 1, '.MuiInputBase-root': { fontSize: 13, bgcolor: '#fff' } }}
+              />
+              <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.75 }}>
+                Apply this note, then decide:
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  fullWidth
+                  disabled={!note.trim()}
+                  onClick={() => submit('approve')}
+                >
+                  Approve with note
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  fullWidth
+                  disabled={!note.trim()}
+                  onClick={() => submit('override')}
+                >
+                  Override / decline
+                </Button>
+              </Stack>
+            </Box>
+          </Collapse>
         </Box>
       </CardContent>
     </Card>
@@ -1176,7 +1242,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
   );
 }
 
-function TodayTab({ openReason, openOverride, onApprove, onAiLog }) {
+function TodayTab({ openReason, openOverride, onApprove, onPriorities }) {
   return (
     <>
       <Box sx={{ px: 1.5, pt: 2 }}>
@@ -1210,28 +1276,30 @@ function TodayTab({ openReason, openOverride, onApprove, onAiLog }) {
 
       <Box sx={{ px: 1.5, pt: 1.75 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Priority Queue
-          </Typography>
+          <Box>
+            <Stack direction="row" spacing={0.625} alignItems="center">
+              <Icon name="auto_awesome" size={15} color="#4338CA" />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                AI Activity
+              </Typography>
+            </Stack>
+            <Typography variant="caption">
+              Last 24 hours · {aiActivity.length} actions · newest first
+            </Typography>
+          </Box>
           <Chip
             size="small"
             clickable
-            onClick={onAiLog}
-            icon={<Icon name="auto_awesome" size={12} color="#4338CA" sx={{ ml: 0.5 }} />}
-            deleteIcon={<Icon name="history" size={14} color="#4338CA" />}
-            onDelete={onAiLog}
-            label="AI sequenced"
-            sx={{ height: 22, bgcolor: '#EEF2FF', color: '#4338CA' }}
+            onClick={onPriorities}
+            icon={<Icon name="low_priority" size={13} color="#475569" sx={{ ml: 0.5 }} />}
+            label="Review priorities"
+            sx={{
+              height: 24, bgcolor: '#fff', color: '#334155',
+              border: '1px solid #CBD5E1', fontWeight: 600
+            }}
           />
         </Stack>
-        {tiers.map((tier) => (
-          <TierSection
-            key={tier.id}
-            tier={tier}
-            onReason={openReason}
-            onReview={openOverride}
-          />
-        ))}
+        <AiActivityList />
       </Box>
     </>
   );
@@ -2461,48 +2529,10 @@ const AI_ACTION_ICON = {
   'Auto-closed': 'task_alt'
 };
 
-function AiActivitySheet({ open, onClose }) {
+function AiActivityList() {
   const [actioned, setActioned] = useState({});
   const items = aiActivity;
   return (
-    <Drawer
-      anchor="bottom"
-      open={open}
-      onClose={onClose}
-      PaperProps={{
-        sx: {
-          borderTopLeftRadius: 20, borderTopRightRadius: 20,
-          maxHeight: '90vh', pb: 'env(safe-area-inset-bottom)'
-        }
-      }}
-    >
-      <Box sx={{ pt: 1 }}>
-        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
-      </Box>
-      <Box sx={{ p: 2, pb: 1 }}>
-        <Stack direction="row" spacing={1.25} alignItems="center">
-          <Box
-            sx={{
-              width: 36, height: 36, borderRadius: '10px',
-              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
-            }}
-          >
-            <Icon name="auto_awesome" size={20} color="#4338CA" />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ lineHeight: 1.15, fontWeight: 700 }}>
-              AI activity
-            </Typography>
-            <Typography variant="caption">
-              Last 24 hours · {items.length} actions · newest first
-            </Typography>
-          </Box>
-          <IconButton size="small" onClick={onClose}>
-            <Icon name="close" size={20} />
-          </IconButton>
-        </Stack>
-      </Box>
-      <Box sx={{ px: 2, pb: 2, overflowY: 'auto' }}>
         <Stack spacing={0}>
           {items.map((a, idx) => {
             const tColor = {
@@ -2659,6 +2689,103 @@ function AiActivitySheet({ open, onClose }) {
             );
           })}
         </Stack>
+  );
+}
+
+function AiActivitySheet({ open, onClose }) {
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '90vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ p: 2, pb: 1 }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px',
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="auto_awesome" size={20} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ lineHeight: 1.15, fontWeight: 700 }}>
+              AI activity
+            </Typography>
+            <Typography variant="caption">
+              Last 24 hours · {aiActivity.length} actions · newest first
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+      <Box sx={{ px: 2, pb: 2, overflowY: 'auto' }}>
+        <AiActivityList />
+      </Box>
+    </Drawer>
+  );
+}
+
+function PriorityQueueSheet({ open, onClose, onReason, onReview }) {
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '90vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ p: 2, pb: 1 }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px',
+              bgcolor: '#F1F5F9', display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="low_priority" size={20} color="#0F172A" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ lineHeight: 1.15, fontWeight: 700 }}>
+              Priority Queue
+            </Typography>
+            <Typography variant="caption">
+              AI-sequenced — review or reprioritize today’s work
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+      <Box sx={{ px: 1.5, pb: 2, overflowY: 'auto' }}>
+        {tiers.map((tier) => (
+          <TierSection
+            key={tier.id}
+            tier={tier}
+            onReason={onReason}
+            onReview={onReview}
+          />
+        ))}
       </Box>
     </Drawer>
   );
@@ -2671,6 +2798,7 @@ export default function App() {
   const [overrideItem, setOverrideItem] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [aiLogOpen, setAiLogOpen] = useState(false);
+  const [priorityOpen, setPriorityOpen] = useState(false);
   const [snack, setSnack] = useState(null);
 
   const openReason = (t) => setReasonTask(t);
@@ -2724,7 +2852,7 @@ export default function App() {
         onAdd={() => setSnack('New work order request — not in this prototype')}
       />
 
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onAiLog={() => setAiLogOpen(true)} />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} />}
       {tab === 1 && <ScheduleTab />}
       {tab === 2 && <TasksTab />}
       {tab === 3 && <KPIsTab />}
@@ -2854,6 +2982,12 @@ export default function App() {
         onChoose={handleOverrideChoice}
       />
       <AiActivitySheet open={aiLogOpen} onClose={() => setAiLogOpen(false)} />
+      <PriorityQueueSheet
+        open={priorityOpen}
+        onClose={() => setPriorityOpen(false)}
+        onReason={openReason}
+        onReview={openOverride}
+      />
 
       <Snackbar
         open={Boolean(snack)}
