@@ -38,13 +38,13 @@ export const readiness = [
 
 export const aiBanner = {
   title: 'Unit 214 turn is at risk',
-  body: 'HVAC backlog and low ready-room inventory may impact tomorrow’s 10 AM move-in.',
+  body: 'HVAC backlog + low ready-room stock threatens tomorrow’s 10 AM move-in — lost first-month revenue and a family escalation if it slips.',
   confidence: 'High confidence'
 };
 
 export const weather = {
   headline: 'Cold snap expected tonight · 22°F low',
-  body: 'AI elevated boiler checks and freeze-risk inspections to Critical.'
+  body: 'AI raised boiler + freeze-risk inspections to Critical — a freeze burst means resident heat loss and a major emergency repair bill.'
 };
 
 export const tiers = [
@@ -62,7 +62,7 @@ export const tiers = [
         eta: '45m',
         status: 'In progress',
         kpi: 'Life Safety',
-        reason: 'Panel trouble flagged 11 min ago; survey window opens Monday.',
+        reason: 'Flagged 11 min ago. Open trouble signal = citable life-safety deficiency; state survey window opens Monday.',
         reasoning: true
       },
       {
@@ -73,7 +73,7 @@ export const tiers = [
         eta: '1h 15m',
         status: 'Queued',
         kpi: 'Operational Continuity',
-        reason: 'Elevated by weather signal — overnight low 22°F.',
+        reason: 'Elevated by weather signal — 22°F overnight low. A freeze burst risks resident heat loss + a major repair bill.',
         elevated: true,
         reasoning: true
       }
@@ -396,8 +396,9 @@ export const reviews = [
     summary:
       'Fire panel trouble and boiler pre-freeze inspection both hit Critical within the same hour.',
     recommended: 'Hold Jacob B. on Boiler #2; route Marco to fire panel first.',
-    why: 'Fire panel is a life-safety system with a survey window opening Monday — higher regulatory exposure than the boiler, which has an 8-hr thermal buffer before the overnight low hits.',
-    tradeoff: 'Pushes one Low PM to tomorrow morning.'
+    why: 'Fire panel is a life-safety system with a state survey window opening Monday — an open trouble signal is a citable deficiency. The boiler has an 8-hr thermal buffer before the overnight low hits.',
+    tradeoff: 'Defers one Low PM to tomorrow AM — no PM Comp. or survey impact (due May 31).',
+    confidence: 'High · life-safety rule, 4 similar calls upheld this quarter'
   },
   {
     id: 'rv-2',
@@ -407,7 +408,8 @@ export const reviews = [
       'Unit 214 HVAC has 3 repeat failures in 90 days; in-house ETA risks the 10 AM move-in.',
     recommended: 'Dispatch Apex Mechanical (preferred vendor, 2-hr response).',
     why: 'Asset history shows 3 repeat HVAC failures in 90 days — a pattern in-house repair hasn’t resolved. Apex is the preferred vendor with a 2-hr SLA, the only path that protects the 10 AM move-in.',
-    tradeoff: '$640 vendor cost vs. delayed move-in + resident-sat hit.',
+    tradeoff: '$640 vendor spend vs. a missed move-in: lost first-month revenue, family escalation, and a unit not survey-ready.',
+    confidence: 'High · within approved vendor budget; repeat-failure threshold met',
     vendor: true
   },
   {
@@ -415,19 +417,20 @@ export const reviews = [
     kind: 'Staffing overload',
     icon: 'groups',
     summary:
-      'Jacob B. is sequenced for 9.5 hrs of work today (1.5 hrs over capacity).',
+      'Jacob B. is sequenced 1.5 hrs over capacity — that’s unplanned overtime cost and burnout risk if left as-is.',
+    confidence: 'High · capacity math from today’s assigned durations',
     recommendations: [
       {
         label: 'Recommended',
-        body: 'Reassign Floor 3 filter PM to Diane K. — 5/8 hrs, has capacity.',
-        why: 'Diane has the most open time on the team today and is already routed through Floor 3, so the reassignment adds zero travel and keeps the PM on schedule.',
-        tradeoff: 'Keeps the PM today; Diane cross-trains on the AHU. No KPI impact.'
+        body: 'Reassign Floor 3 filter PM to Diane K. — has 2.2 hrs open today.',
+        why: 'Diane has the most open time on the team and is already routed through Floor 3, so the reassignment adds zero travel and keeps the PM on schedule.',
+        tradeoff: 'Avoids 1.5 hrs OT; PM stays on today. Diane cross-trains on the AHU. No KPI impact.'
       },
       {
         label: 'Alternative',
         body: 'Move PM filter replacement to Saturday AM.',
         why: 'It’s a deferrable PM with no compliance deadline this week — the lowest-risk item to move when everyone is at capacity.',
-        tradeoff: 'No PM Comp. impact unless it slips past month-end (May 31).'
+        tradeoff: 'Avoids OT today; no PM Comp. impact unless it slips past month-end (May 31).'
       }
     ]
   }
@@ -684,3 +687,73 @@ export const aiActivity = [
     target: 'All floors', status: 'completed'
   }
 ];
+
+// Day 30 — Trust Maturity. The AI is calibrated to this building's patterns;
+// MD shifts from inspecting every call to monitoring exceptions.
+export const calibration = {
+  headline: 'AI is calibrated to Cedar Ridge operations',
+  sub: 'Tuned to your building’s patterns over the last 30 days',
+  acceptance: 82,
+  // 30-day window: Apr 16 → May 16, 2025. series = weekly-ish samples.
+  rangeStart: 'Apr 16',
+  rangeEnd: 'May 16',
+  stats: [
+    {
+      icon: 'thumb_up', label: 'Recommendations accepted', value: '82%', trend: '+11 pts', tone: 'success',
+      unit: '%', start: 71, current: 82,
+      detail: 'Share of AI recommendations you approved without changes.',
+      series: [71, 72, 74, 73, 76, 78, 80, 81, 82],
+      days: [1,2,0,1,2,1,2,0,2,3,1,2,2,1,3,2,3,2,1,3,2,3,3,2,3,3,2,3,3,3]
+    },
+    {
+      icon: 'model_training', label: 'Override rules learned', value: '6', trend: 'this month', tone: 'info',
+      unit: '', start: 0, current: 6,
+      detail: 'Override patterns the AI generalized into reusable rules.',
+      series: [0, 0, 1, 2, 2, 3, 4, 5, 6],
+      days: [0,0,0,0,3,0,0,0,0,0,3,0,0,0,0,0,3,0,0,0,3,0,0,0,0,3,0,0,0,3]
+    },
+    {
+      icon: 'history_toggle_off', label: 'WO aging reduced', value: '14%', trend: 'vs. Day 1', tone: 'success',
+      unit: '%', start: 0, current: 14,
+      detail: 'Reduction in average work-order age vs. the Day 1 baseline.',
+      series: [0, 2, 3, 5, 7, 9, 11, 13, 14],
+      days: [0,1,0,1,1,2,1,1,2,1,2,2,1,2,2,2,2,3,2,2,3,2,3,2,3,3,2,3,3,3]
+    },
+    {
+      icon: 'meeting_room', label: 'Unit-turn readiness', value: '+9%', trend: '67% → 76%', tone: 'success',
+      unit: '%', start: 67, current: 76,
+      detail: 'Percent of units inspection-ready on the target date.',
+      series: [67, 68, 68, 70, 71, 73, 74, 75, 76],
+      days: [1,1,2,1,1,2,1,2,1,2,2,1,2,2,2,1,2,2,3,2,2,3,2,3,2,3,3,2,3,3]
+    },
+    {
+      icon: 'event_repeat', label: 'PM completion trend', value: '82 → 88%', trend: 'projected EOM', tone: 'success',
+      unit: '%', start: 82, current: 88,
+      detail: 'Preventive-maintenance completion, projected to end of month.',
+      series: [82, 82, 83, 84, 85, 85, 86, 87, 88],
+      days: [2,3,2,3,2,3,3,2,3,3,2,3,3,3,2,3,3,3,2,3,3,3,3,2,3,3,3,3,3,3]
+    },
+    {
+      icon: 'pattern', label: 'Repeat-issue patterns', value: '3 found', trend: 'HVAC · Memory Care East', tone: 'warning',
+      unit: '', start: 0, current: 3,
+      detail: 'Recurring asset-failure clusters surfaced for vendor review.',
+      series: [0, 0, 1, 1, 1, 2, 2, 3, 3],
+      days: [0,0,0,2,0,0,0,0,2,0,0,0,0,0,2,0,0,3,0,0,0,2,0,0,3,0,0,2,0,3]
+    }
+  ],
+  patterns: [
+    'Recurring HVAC faults detected in Memory Care East — vendor review suggested.',
+    'Move-in HVAC consistently supersedes PM filter swaps — rule learned.',
+    'Quick-win batching on afternoon routes cuts travel ~18%.'
+  ]
+};
+
+// Day 30 — AI has already rebalanced the team from learned history.
+// keyed by team member id.
+export const day30TeamNotes = {
+  'tm-1': 'Held on life-safety rounds — fastest fire-panel resolution history.',
+  'tm-2': 'Protected for HVAC issues ahead of tonight’s cold-snap risk.',
+  'tm-3': 'Assigned Unit 214 — faster unit-turn completion than team avg.',
+  'tm-4': 'Quick wins batched after PM block — lowest detour cost.',
+  'tm-5': 'Out (PTO) — load auto-redistributed across team.'
+};

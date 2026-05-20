@@ -4,8 +4,14 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity } from './data.js';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes } from './data.js';
 import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow } from '@mui/material';
+
+// Trust Maturity Mode — the relationship evolves over time.
+// 'day1' = original prototype, unchanged. 'day30' = calibrated. 'day180' = placeholder.
+const ModeContext = React.createContext('day1');
+const useMode = () => React.useContext(ModeContext);
+const HEADER_OFFSET = 'calc(100px + env(safe-area-inset-top))';
 
 const Icon = ({ name, size = 20, color, sx }) => (
   <span
@@ -271,7 +277,71 @@ const toneBg = (tone) => {
   return m[tone] || m.default;
 };
 
-function TopBar({ onNotif, onMenu, onAdd, menuOpen }) {
+const TRUST_MODES = [
+  { id: 'day1', n: '1', disabled: false },
+  { id: 'day30', n: '30', disabled: false },
+  { id: 'day180', n: '180', disabled: true }
+];
+
+// Compact day-mode control that sits in the status-bar row,
+// in place of the device "activity island".
+function TrustModeBar({ mode, onMode }) {
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={0.5}
+      sx={{
+        bgcolor: 'rgba(255,255,255,0.16)',
+        borderRadius: 999,
+        pl: 0.875,
+        pr: 0.375,
+        py: 0.25
+      }}
+    >
+      <Typography
+        sx={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)', mr: 0.125 }}
+      >
+        Day:
+      </Typography>
+      {TRUST_MODES.map((m) => {
+        const active = mode === m.id;
+        return (
+          <Box
+            key={m.id}
+            role="button"
+            aria-disabled={m.disabled}
+            onClick={() => !m.disabled && onMode(m.id)}
+            sx={{
+              minWidth: 22,
+              px: 0.625,
+              py: 0.125,
+              borderRadius: 999,
+              textAlign: 'center',
+              cursor: m.disabled ? 'default' : 'pointer',
+              opacity: m.disabled ? 0.4 : 1,
+              bgcolor: active ? '#fff' : 'transparent',
+              transition: 'background-color .15s'
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                lineHeight: 1.4,
+                color: active ? '#004C9A' : '#fff'
+              }}
+            >
+              {m.n}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+}
+
+function TopBar({ onNotif, onMenu, onAdd, menuOpen, mode, onMode }) {
   return (
     <AppBar
       position="fixed"
@@ -280,10 +350,9 @@ function TopBar({ onNotif, onMenu, onAdd, menuOpen }) {
         bgcolor: '#004C9A',
         color: '#fff',
         borderBottom: '1px solid rgba(41,48,54,0.15)',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: { xs: '100vw', sm: 390 },
-        maxWidth: '100%',
+        left: 0,
+        right: 0,
+        width: '100%',
         zIndex: 1100
       }}
     >
@@ -307,14 +376,12 @@ function TopBar({ onNotif, onMenu, onAdd, menuOpen }) {
           sx={{
             position: 'absolute',
             left: '50%',
-            top: 8,
-            transform: 'translateX(-50%)',
-            width: 110,
-            height: 30,
-            bgcolor: '#000',
-            borderRadius: 999
+            top: 6,
+            transform: 'translateX(-50%)'
           }}
-        />
+        >
+          <TrustModeBar mode={mode} onMode={onMode} />
+        </Box>
         <Stack direction="row" alignItems="center" spacing={0.625} sx={{ width: 54, justifyContent: 'flex-end' }}>
           <Icon name="signal_cellular_alt" size={16} color="#fff" />
           <Icon name="wifi" size={16} color="#fff" />
@@ -532,11 +599,20 @@ function WeatherCard({ bare }) {
 }
 
 function TaskCard({ task, onReason, onReview }) {
+  const mode = useMode();
+  const day30 = mode === 'day30';
   const statusTone =
     task.status === 'At risk' ? 'error'
     : task.status === 'In progress' ? 'info'
     : task.status === 'On track' ? 'success'
     : 'default';
+  const coord = task.needsReview
+    ? { label: 'Exception', bg: '#FEE2E2', fg: '#B91C1C' }
+    : task.elevated
+    ? { label: 'Learned pattern', bg: '#EEF2FF', fg: '#4338CA' }
+    : { label: 'Auto-coordinated', bg: '#DCFCE7', fg: '#15803D' };
+  // Day 30: surface reasoning only for unusual / high-impact items.
+  const showReason = day30 ? (task.needsReview || task.elevated) : true;
   return (
     <Card
       variant="outlined"
@@ -578,40 +654,54 @@ function TaskCard({ task, onReason, onReview }) {
                 variant="outlined"
                 sx={{ height: 22, '.MuiChip-label': { px: 0.5, fontSize: 11 } }}
               />
-            </Stack>
-            <Stack
-              direction="row"
-              spacing={0.5}
-              alignItems="flex-start"
-              sx={{ mt: 0.75 }}
-            >
-              {task.elevated && (
-                <Box
+              {day30 && (
+                <Chip
+                  size="small"
+                  label={coord.label}
                   sx={{
-                    display: 'grid', placeItems: 'center',
-                    width: 16, height: 16, borderRadius: '5px',
-                    bgcolor: '#FEF3C7', flexShrink: 0, mt: '1px'
+                    height: 22, bgcolor: coord.bg, color: coord.fg, fontWeight: 700,
+                    '.MuiChip-label': { px: 0.875, fontSize: 11 }
                   }}
-                >
-                  <Icon name="keyboard_double_arrow_up" size={12} color="#B45309" />
-                </Box>
+                />
               )}
-              <Typography variant="caption" sx={{ color: '#475569' }}>
-                {task.reason}
-              </Typography>
             </Stack>
+            {showReason && (
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="flex-start"
+                sx={{ mt: 0.75 }}
+              >
+                {task.elevated && (
+                  <Box
+                    sx={{
+                      display: 'grid', placeItems: 'center',
+                      width: 16, height: 16, borderRadius: '5px',
+                      bgcolor: '#FEF3C7', flexShrink: 0, mt: '1px'
+                    }}
+                  >
+                    <Icon name="keyboard_double_arrow_up" size={12} color="#B45309" />
+                  </Box>
+                )}
+                <Typography variant="caption" sx={{ color: '#475569' }}>
+                  {task.reason}
+                </Typography>
+              </Stack>
+            )}
           </Box>
           <Stack alignItems="flex-end" spacing={0.5}>
-            <IconButton
-              size="small"
-              onClick={() => onReason(task)}
-              sx={{
-                bgcolor: '#EEF2FF', color: '#4338CA',
-                '&:hover': { bgcolor: '#E0E7FF' }, width: 32, height: 32
-              }}
-            >
-              <Icon name="psychology" size={18} />
-            </IconButton>
+            {(!day30 || task.needsReview || task.elevated) && (
+              <IconButton
+                size="small"
+                onClick={() => onReason(task)}
+                sx={{
+                  bgcolor: '#EEF2FF', color: '#4338CA',
+                  '&:hover': { bgcolor: '#E0E7FF' }, width: 32, height: 32
+                }}
+              >
+                <Icon name="psychology" size={18} />
+              </IconButton>
+            )}
             {task.needsReview && (
               <Chip
                 size="small"
@@ -654,6 +744,8 @@ function TierSection({ tier, onReason, onReview }) {
 }
 
 function ReviewCard({ item, onApprove, onOverride }) {
+  const mode = useMode();
+  const day30 = mode === 'day30';
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
   const submit = (kind) => {
@@ -662,6 +754,18 @@ function ReviewCard({ item, onApprove, onOverride }) {
     if (kind === 'approve') onApprove(item);
     else onOverride(item);
   };
+  const lineSx = {
+    display: 'block', fontSize: 12.5, color: '#475569',
+    fontWeight: 400, lineHeight: 1.35, mb: 0.5
+  };
+  const confidenceRow = item.confidence ? (
+    <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5, mb: 0.5 }}>
+      <Icon name="verified" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
+      <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
+        Confidence: {item.confidence}
+      </Typography>
+    </Stack>
+  ) : null;
   return (
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -676,9 +780,22 @@ function ReviewCard({ item, onApprove, onOverride }) {
             <Icon name={item.icon} size={18} color={item.vendor ? '#6D28D9' : '#991B1B'} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-              {item.kind}
-            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                {item.kind}
+              </Typography>
+              {day30 && (
+                <Chip
+                  size="small"
+                  label="Exception · MD review needed"
+                  sx={{
+                    height: 17, fontSize: 9.5, fontWeight: 700,
+                    bgcolor: '#FEE2E2', color: '#B91C1C',
+                    '.MuiChip-label': { px: 0.625 }
+                  }}
+                />
+              )}
+            </Stack>
             <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
               {item.summary}
             </Typography>
@@ -719,19 +836,18 @@ function ReviewCard({ item, onApprove, onOverride }) {
                       '.MuiChip-label': { px: 0.75 }
                     }}
                   />
-                  <Typography variant="body2" sx={{ fontSize: 12.5, mb: 0.5, lineHeight: 1.1 }}>
+                  <Typography variant="caption" sx={lineSx}>
                     {rec.body}
                   </Typography>
                   {rec.why && (
                     <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
-                      <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
-                      <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.15 }}>
-                        <Box component="span" sx={{ fontWeight: 700, color: '#4338CA' }}>Why: </Box>
-                        {rec.why}
+                      <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
+                      <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
+                        Why: {rec.why}
                       </Typography>
                     </Stack>
                   )}
-                  <Typography variant="caption" sx={{ color: '#64748B', lineHeight: 1.1, display: 'block', mb: 0.75 }}>
+                  <Typography variant="caption" sx={{ ...lineSx, mb: 0.75 }}>
                     Tradeoff: {rec.tradeoff}
                   </Typography>
                   <Button
@@ -744,6 +860,7 @@ function ReviewCard({ item, onApprove, onOverride }) {
                   </Button>
                 </Box>
               ))}
+              {confidenceRow}
               <Stack direction="row" spacing={1} sx={{ pt: 0.25 }}>
                 <Button
                   size="small"
@@ -771,21 +888,21 @@ function ReviewCard({ item, onApprove, onOverride }) {
             </Stack>
           ) : (
             <>
-              <Typography variant="body2" sx={{ fontSize: 12.5, mb: 0.5, lineHeight: 1.1 }}>
+              <Typography variant="caption" sx={lineSx}>
                 {item.recommended}
               </Typography>
               {item.why && (
                 <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
-                  <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
-                  <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.15 }}>
-                    <Box component="span" sx={{ fontWeight: 700, color: '#4338CA' }}>Why: </Box>
-                    {item.why}
+                  <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
+                  <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
+                    Why: {item.why}
                   </Typography>
                 </Stack>
               )}
-              <Typography variant="caption" sx={{ color: '#64748B', lineHeight: 1.1, display: 'block' }}>
+              <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
                 Tradeoff: {item.tradeoff}
               </Typography>
+              {confidenceRow}
               <Divider sx={{ my: 1 }} />
               <Stack direction="row" spacing={1}>
                 <Button size="small" variant="contained" onClick={() => onApprove(item)} fullWidth>
@@ -1242,28 +1359,413 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
   );
 }
 
+function CalibrationButton({ onClick }) {
+  return (
+    <Card
+      variant="outlined"
+      onClick={onClick}
+      sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5, cursor: 'pointer' }}
+    >
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 32, height: 32, borderRadius: '10px',
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="verified_user" size={18} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 700, display: 'block' }}>
+              30-Day Calibration Report
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B' }}>
+              {calibration.acceptance}% accepted · tuned to Cedar Ridge
+            </Typography>
+          </Box>
+          <Icon name="chevron_right" size={20} color="#94A3B8" />
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Sparkline({ series, height = 64, color = '#4338CA', fill = true }) {
+  const width = 280;
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const span = max - min || 1;
+  const stepX = width / (series.length - 1);
+  const pad = 5;
+  const pts = series.map((v, i) => [
+    i * stepX,
+    height - ((v - min) / span) * (height - pad * 2) - pad
+  ]);
+  const line = pts
+    .map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`)
+    .join(' ');
+  const area = `${line} L${width},${height} L0,${height} Z`;
+  const last = pts[pts.length - 1];
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width="100%"
+      height={height}
+      preserveAspectRatio="none"
+      style={{ display: 'block' }}
+    >
+      {fill && <path d={area} fill={color} opacity={0.1} />}
+      <path
+        d={line}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle cx={last[0]} cy={last[1]} r={3.5} fill={color} />
+    </svg>
+  );
+}
+
+// GitHub-style day grid — each square is a day; fill = activity that day.
+function DayGrid({ days, color = '#16A34A', cols = 15, size = 7, gap = 3, fluid = false }) {
+  const op = [0, 0.3, 0.6, 1];
+  if (fluid) {
+    // Single horizontal row that fills the available width.
+    return (
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${days.length}, 1fr)`,
+          gap: `${gap}px`,
+          width: '100%'
+        }}
+      >
+        {days.map((d, i) => (
+          <Box
+            key={i}
+            sx={{
+              aspectRatio: '1 / 1',
+              borderRadius: '2px',
+              bgcolor: d ? color : '#E5E7EB',
+              opacity: d ? op[d] : 1
+            }}
+          />
+        ))}
+      </Box>
+    );
+  }
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, ${size}px)`,
+        gap: `${gap}px`,
+        justifyContent: 'start'
+      }}
+    >
+      {days.map((d, i) => (
+        <Box
+          key={i}
+          sx={{
+            width: size,
+            height: size,
+            borderRadius: '2px',
+            bgcolor: d ? color : '#E5E7EB',
+            opacity: d ? op[d] : 1
+          }}
+        />
+      ))}
+    </Box>
+  );
+}
+
+function Bars({ series, color = '#16A34A', height = 96 }) {
+  const max = Math.max(...series, 1);
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height }}>
+      {series.map((v, i) => (
+        <Box
+          key={i}
+          sx={{
+            flex: 1,
+            height: `${Math.max(6, (v / max) * height)}px`,
+            bgcolor: color,
+            opacity: 0.35 + 0.65 * (i / (series.length - 1)),
+            borderRadius: '3px 3px 0 0'
+          }}
+        />
+      ))}
+    </Box>
+  );
+}
+
+function StatDetailSheet({ stat, onClose }) {
+  const tone = stat
+    ? ({ success: '#16A34A', info: '#0EA5E9', warning: '#D97706' }[stat.tone] || '#4338CA')
+    : '#4338CA';
+  return (
+    <Drawer
+      anchor="bottom"
+      open={Boolean(stat)}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      {stat && (
+        <Box sx={{ p: 2 }}>
+          <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 1.5 }}>
+            <Box
+              sx={{
+                width: 34, height: 34, borderRadius: '10px',
+                bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
+              }}
+            >
+              <Icon name={stat.icon} size={18} color="#4338CA" />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                {stat.label}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B' }}>
+                30-day trend · {calibration.rangeStart} → {calibration.rangeEnd}
+              </Typography>
+            </Box>
+            <IconButton size="small" onClick={onClose}>
+              <Icon name="close" size={20} />
+            </IconButton>
+          </Stack>
+
+          <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 30, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+              {stat.value}
+            </Typography>
+            <Chip
+              size="small"
+              icon={<Icon name="trending_up" size={13} sx={{ ml: 0.5 }} />}
+              label={`from ${stat.start}${stat.unit} on ${calibration.rangeStart}`}
+              sx={{
+                height: 22, bgcolor: '#DCFCE7', color: '#15803D', fontWeight: 700,
+                '.MuiChip-label': { px: 0.75, fontSize: 11 }
+              }}
+            />
+          </Stack>
+
+          {(() => {
+            const isPct = stat.unit === '%';
+            const lo = isPct ? Math.min(...stat.series) : 0;
+            const hi = Math.max(...stat.series);
+            const mid = (lo + hi) / 2;
+            const fmt = (v) =>
+              `${Number.isInteger(v) ? v : v.toFixed(0)}${stat.unit}`;
+            const CHART_H = 96;
+            return (
+              <Box sx={{ border: '1px solid #E2E8F0', borderRadius: 2, p: 1.5, bgcolor: '#FCFCFF' }}>
+                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mb: 1 }}>
+                  {isPct ? '30-day trend' : 'Cumulative · last 30 days'}
+                </Typography>
+                <Stack direction="row" spacing={0.75}>
+                  <Stack
+                    justifyContent="space-between"
+                    sx={{ height: CHART_H, width: 30, flexShrink: 0, textAlign: 'right' }}
+                  >
+                    {[hi, mid, lo].map((v, i) => (
+                      <Typography
+                        key={i}
+                        variant="caption"
+                        sx={{ color: '#94A3B8', fontSize: 10, lineHeight: 1 }}
+                      >
+                        {fmt(v)}
+                      </Typography>
+                    ))}
+                  </Stack>
+                  <Box sx={{ flex: 1, position: 'relative', height: CHART_H }}>
+                    {[0, 0.5, 1].map((g) => (
+                      <Box
+                        key={g}
+                        sx={{
+                          position: 'absolute', left: 0, right: 0,
+                          top: `${g * 100}%`,
+                          borderTop: '1px dashed #E2E8F0'
+                        }}
+                      />
+                    ))}
+                    <Box sx={{ position: 'absolute', inset: 0 }}>
+                      {isPct ? (
+                        <Sparkline series={stat.series} color={tone} height={CHART_H} />
+                      ) : (
+                        <Bars series={stat.series} color={tone} height={CHART_H} />
+                      )}
+                    </Box>
+                  </Box>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" sx={{ mt: 1, pl: '38px' }}>
+                  <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                    {calibration.rangeStart} · 30 days ago
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700 }}>
+                    {calibration.rangeEnd} · today
+                  </Typography>
+                </Stack>
+              </Box>
+            );
+          })()}
+
+          <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.4, mt: 1.25 }}>
+            {stat.detail}
+          </Typography>
+        </Box>
+      )}
+    </Drawer>
+  );
+}
+
+function CalibrationSheet({ open, onClose }) {
+  const [selStat, setSelStat] = useState(null);
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          height: 'calc(100dvh - 100px - env(safe-area-inset-top))',
+          maxHeight: 'none',
+          display: 'flex', flexDirection: 'column',
+          pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ p: 2, pb: 1 }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px',
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="verified_user" size={20} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 700 }}>
+              30-Day Calibration Report
+            </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              {calibration.headline}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B' }}>
+              {calibration.sub}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+      <Box sx={{ px: 2, pb: 2, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+          {calibration.stats.map((s) => (
+            <Box
+              key={s.label}
+              role="button"
+              onClick={() => setSelStat(s)}
+              sx={{
+                border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1,
+                bgcolor: '#FCFCFF', cursor: 'pointer',
+                transition: 'border-color .15s',
+                '&:hover': { borderColor: '#A5B4FC' }
+              }}
+            >
+              <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mb: 0.5 }}>
+                <Icon name={s.icon} size={13} color="#475569" sx={{ mt: '1px' }} />
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, flex: 1, lineHeight: 1.2 }}>
+                  {s.label}
+                </Typography>
+                <Icon name="chevron_right" size={15} color="#94A3B8" />
+              </Stack>
+              <Typography sx={{ fontSize: 19, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                {s.value}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10.5 }}>
+                {s.trend}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1.75, mb: 0.75 }}>
+          <Icon name="pattern" size={15} color="#4338CA" />
+          <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+            Patterns the AI learned about your building
+          </Typography>
+        </Stack>
+        <Stack spacing={0.75}>
+          {calibration.patterns.map((p, i) => (
+            <Stack key={i} direction="row" spacing={0.625} alignItems="flex-start">
+              <Icon name="check_circle" size={14} color="#16A34A" sx={{ mt: '2px', flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35 }}>
+                {p}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+      </Box>
+      <StatDetailSheet stat={selStat} onClose={() => setSelStat(null)} />
+    </Drawer>
+  );
+}
+
 function TodayTab({ openReason, openOverride, onApprove, onPriorities }) {
+  const mode = useMode();
+  const day30 = mode === 'day30';
+  const [calOpen, setCalOpen] = useState(false);
+  const shownReviews = day30
+    ? reviews.filter((r) => r.kind !== 'Staffing overload')
+    : reviews;
+  const autoCount = reviews.length - shownReviews.length;
   return (
     <>
       <Box sx={{ px: 1.5, pt: 2 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-              Needs Your Review
-            </Typography>
-            <Typography variant="caption">
-              Exceptions the AI flagged for your call
-            </Typography>
-          </Box>
-          <Chip
-            size="small"
-            label={`${reviews.length} open`}
-            sx={{ bgcolor: '#FEE2E2', color: '#991B1B' }}
-          />
+        {day30 && <CalibrationButton onClick={() => setCalOpen(true)} />}
+        {day30 && <CalibrationSheet open={calOpen} onClose={() => setCalOpen(false)} />}
+        <Stack sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            {day30 ? 'Exceptions Requiring Review' : 'Needs Your Review'}
+          </Typography>
+          <Typography variant="caption">
+            {day30
+              ? 'Routine work is auto-coordinated — only exceptions need you'
+              : 'Decisions the AI escalated for your sign-off'}
+          </Typography>
         </Stack>
+        {day30 && autoCount > 0 && (
+          <Card variant="outlined" sx={{ borderColor: '#BBF7D0', bgcolor: '#F0FDF4', mb: 1.25 }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Icon name="check_circle" size={18} color="#16A34A" />
+                <Typography variant="caption" sx={{ color: '#15803D', fontWeight: 600, flex: 1 }}>
+                  {autoCount} routine staffing decision auto-coordinated from learned rules — no action needed.
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        )}
         <Stack spacing={1.25} sx={{ mb: 0.5 }}>
           <WeatherCard bare />
-          {reviews.map((r) => (
+          {shownReviews.map((r) => (
             <ReviewCard
               key={r.id}
               item={r}
@@ -1280,11 +1782,13 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities }) {
             <Stack direction="row" spacing={0.625} alignItems="center">
               <Icon name="auto_awesome" size={15} color="#4338CA" />
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                AI Activity
+                {day30 ? 'AI Coordination' : 'AI Activity'}
               </Typography>
             </Stack>
             <Typography variant="caption">
-              Last 24 hours · {aiActivity.length} actions · newest first
+              {day30
+                ? `${aiActivity.length} actions auto-coordinated · last 24 hours`
+                : `Last 24 hours · ${aiActivity.length} actions · newest first`}
             </Typography>
           </Box>
           <Chip
@@ -1314,7 +1818,7 @@ function ReviewsTab({ openOverride }) {
 Needs Your Review
           </Typography>
           <Typography variant="caption">
-            Exceptions the AI flagged for your call
+            Decisions the AI escalated for your sign-off
           </Typography>
         </Box>
         <Chip
@@ -2319,6 +2823,8 @@ function CalendarSheet({ open, value, onClose, onPick }) {
 }
 
 function ScheduleTab() {
+  const mode = useMode();
+  const day30 = mode === 'day30';
   const [view, setView] = useState('my');
   const [openMember, setOpenMember] = useState(null);
   const [date, setDate] = useState(new Date(2025, 4, 16));
@@ -2418,6 +2924,18 @@ function ScheduleTab() {
         </Stack>
       ) : (
         <Stack spacing={1}>
+          {day30 && (
+            <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Icon name="auto_awesome" size={16} color="#4338CA" />
+                  <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
+                    AI pre-balanced the team from 30 days of completion patterns
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
           {team.map((p) => {
             const loadHrs = scheduledHours(p.tasks);
             const st = loadStatus(loadHrs, p.capacity);
@@ -2461,6 +2979,22 @@ function ScheduleTab() {
                               : `${fmtHours(loadHrs)}h planned · fits in ${p.capacity}h shift`}
                           </Typography>
                         </Box>
+                      )}
+                      {day30 && day30TeamNotes[p.id] && (
+                        <Stack
+                          direction="row"
+                          spacing={0.625}
+                          alignItems="flex-start"
+                          sx={{
+                            mt: 0.75, p: 0.75, borderRadius: 1.5,
+                            bgcolor: '#FCFCFF', border: '1px solid #E0E7FF'
+                          }}
+                        >
+                          <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '2px', flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
+                            AI rebalanced · {day30TeamNotes[p.id]}
+                          </Typography>
+                        </Stack>
                       )}
                     </Box>
                     <Icon name="chevron_right" size={20} color="#94A3B8" />
@@ -2797,6 +3331,7 @@ export default function App() {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideItem, setOverrideItem] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mode, setMode] = useState('day1');
   const [aiLogOpen, setAiLogOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [snack, setSnack] = useState(null);
@@ -2832,16 +3367,16 @@ export default function App() {
   };
 
   return (
+   <ModeContext.Provider value={mode}>
     <Box
       sx={{
-        width: { xs: '100vw', sm: 390 },
-        maxWidth: '100%',
-        minHeight: { xs: '100vh', sm: '100dvh' },
+        width: '100%',
+        height: '100%',
         bgcolor: '#F1F5F9',
         position: 'relative',
-        pt: 'calc(100px + env(safe-area-inset-top))',
+        pt: HEADER_OFFSET,
         pb: 9,
-        boxShadow: { sm: '0 0 60px rgba(15,23,42,0.12)' },
+        overflowY: 'auto',
         overflowX: 'hidden'
       }}
     >
@@ -2849,6 +3384,8 @@ export default function App() {
         onNotif={() => { setTab(0); setSnack('3 items need your review'); }}
         onMenu={() => setMenuOpen((v) => !v)}
         menuOpen={menuOpen}
+        mode={mode}
+        onMode={setMode}
         onAdd={() => setSnack('New work order request — not in this prototype')}
       />
 
@@ -2863,10 +3400,10 @@ export default function App() {
         sx={{
           position: 'fixed',
           bottom: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: { xs: '100vw', sm: 390 },
-          maxWidth: '100%',
+          left: 0,
+          right: 0,
+          width: '100%',
+          bgcolor: '#fff',
           borderTop: '1px solid #E2E8F0',
           pb: 'env(safe-area-inset-bottom)',
           zIndex: 1100
@@ -2910,13 +3447,13 @@ export default function App() {
         sx={{ zIndex: 1090 }}
         slotProps={{
           backdrop: {
-            sx: { top: 'calc(100px + env(safe-area-inset-top))', bgcolor: 'rgba(15,23,42,0.45)' }
+            sx: { top: HEADER_OFFSET, bgcolor: 'rgba(15,23,42,0.45)' }
           }
         }}
         PaperProps={{
           sx: {
             width: '100%',
-            top: 'calc(100px + env(safe-area-inset-top))',
+            top: HEADER_OFFSET,
             bgcolor: '#004C9A',
             color: '#fff',
             borderBottomLeftRadius: 20,
@@ -3005,5 +3542,6 @@ export default function App() {
         }}
       />
     </Box>
+   </ModeContext.Provider>
   );
 }
