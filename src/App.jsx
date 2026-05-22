@@ -4,11 +4,11 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes } from './data.js';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage } from './data.js';
 import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow } from '@mui/material';
 
 // Trust Maturity Mode — the relationship evolves over time.
-// 'day1' = original prototype, unchanged. 'day30' = calibrated. 'day180' = placeholder.
+// 'day1' = original prototype, unchanged. 'day30' = calibrated. 'day90' = predictive operations.
 const ModeContext = React.createContext('day1');
 const useMode = () => React.useContext(ModeContext);
 const HEADER_OFFSET = 'calc(100px + env(safe-area-inset-top))';
@@ -280,7 +280,7 @@ const toneBg = (tone) => {
 const TRUST_MODES = [
   { id: 'day1', n: '1', disabled: false },
   { id: 'day30', n: '30', disabled: false },
-  { id: 'day180', n: '180', disabled: true }
+  { id: 'day90', n: '90', disabled: false }
 ];
 
 // Compact day-mode control that sits in the status-bar row,
@@ -600,7 +600,8 @@ function WeatherCard({ bare }) {
 
 function TaskCard({ task, onReason, onReview }) {
   const mode = useMode();
-  const day30 = mode === 'day30';
+  const day30 = mode === 'day30' || mode === 'day90'; // calibrated (Day 30+)
+  const day90 = mode === 'day90'; // predictive operations
   const statusTone =
     task.status === 'At risk' ? 'error'
     : task.status === 'In progress' ? 'info'
@@ -745,7 +746,8 @@ function TierSection({ tier, onReason, onReview }) {
 
 function ReviewCard({ item, onApprove, onOverride }) {
   const mode = useMode();
-  const day30 = mode === 'day30';
+  const day30 = mode === 'day30' || mode === 'day90'; // calibrated (Day 30+)
+  const day90 = mode === 'day90'; // predictive operations
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
   const submit = (kind) => {
@@ -787,10 +789,14 @@ function ReviewCard({ item, onApprove, onOverride }) {
               {day30 && (
                 <Chip
                   size="small"
-                  label="Exception · MD review needed"
+                  icon={item.predictive
+                    ? <Icon name="online_prediction" size={10} color="#B45309" sx={{ ml: 0.5 }} />
+                    : undefined}
+                  label={item.predictive ? 'Predictive · readiness risk' : 'Exception · MD review needed'}
                   sx={{
                     height: 17, fontSize: 9.5, fontWeight: 700,
-                    bgcolor: '#FEE2E2', color: '#B91C1C',
+                    bgcolor: item.predictive ? '#FEF3C7' : '#FEE2E2',
+                    color: item.predictive ? '#B45309' : '#B91C1C',
                     '.MuiChip-label': { px: 0.625 }
                   }}
                 />
@@ -1391,6 +1397,232 @@ function CalibrationButton({ onClick }) {
   );
 }
 
+// Day 30 — "Operationally Calibrated" state banner.
+function Day30Banner({ onReview }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
+      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 34, height: 34, borderRadius: '10px', bgcolor: '#EEF2FF',
+              display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="verified_user" size={19} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                {day30Status.headline}
+              </Typography>
+              <Chip
+                size="small"
+                label="Day 30 · Calibrated"
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+              {day30Status.sub}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mt: 1.25 }}>
+          {day30Status.metrics.map((m) => (
+            <Box key={m.label} sx={{ border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff' }}>
+              <Typography sx={{ fontSize: 17, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                {m.value}
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
+                {m.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        <Stack spacing={0.5} sx={{ mt: 1 }}>
+          {day30Status.capabilities.map((c) => (
+            <Stack key={c} direction="row" spacing={0.625} alignItems="center">
+              <Icon name="check_circle" size={14} color="#16A34A" sx={{ flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: '#334155', fontWeight: 600 }}>
+                {c}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+
+        <Box
+          sx={{
+            mt: 1.25, p: 1.25, borderRadius: 1.5,
+            bgcolor: '#EEF2FF', border: '1px solid #C7D2FE'
+          }}
+        >
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+            <Icon name="arrow_circle_up" size={14} color="#4338CA" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+              Recommended next step
+            </Typography>
+          </Stack>
+          <Typography variant="caption" sx={{ display: 'block', color: '#0F172A', fontWeight: 600, lineHeight: 1.35 }}>
+            {day30Status.nextStep.action}
+          </Typography>
+          <Stack spacing={0.375} sx={{ mt: 0.625 }}>
+            {day30Status.nextStep.because.map((b) => (
+              <Stack key={b} direction="row" spacing={0.5} alignItems="flex-start">
+                <Icon name="check_circle" size={12} color="#16A34A" sx={{ mt: '2px', flexShrink: 0 }} />
+                <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
+                  {b}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+
+        <Button
+          fullWidth
+          variant="outlined"
+          onClick={onReview}
+          startIcon={<Icon name="tune" size={16} />}
+          sx={{ mt: 1.25, borderColor: '#CBD5E1', color: '#334155' }}
+        >
+          Review Coordination Settings
+        </Button>
+        <Typography
+          variant="caption"
+          sx={{ display: 'block', textAlign: 'center', color: '#94A3B8', mt: 0.625, lineHeight: 1.3 }}
+        >
+          You can adjust or revert coordination settings at any time.
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Day 90 — "Predictive Operations Mode" banner.
+function Day90Banner({ onReview }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
+      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 34, height: 34, borderRadius: '10px', bgcolor: '#EEF2FF',
+              display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="online_prediction" size={19} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
+              <Chip
+                size="small"
+                label="Day 90 · Insights available"
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {day90Status.headline}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+              {day90Status.sub}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
+              <Icon name="info" size={12} color="#94A3B8" sx={{ mt: '2px', flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', lineHeight: 1.3 }}>
+                {day90Status.context}
+              </Typography>
+            </Stack>
+          </Box>
+        </Stack>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mt: 1.25 }}>
+          {day90Status.metrics.map((m) => (
+            <Box
+              key={m.label}
+              sx={{
+                border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
+                gridColumn: m.wide ? '1 / -1' : 'auto'
+              }}
+            >
+              <Typography sx={{ fontSize: 17, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                {m.value}
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
+                {m.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        <Stack spacing={0.5} sx={{ mt: 1 }}>
+          {day90Status.capabilities.map((c) => (
+            <Stack key={c} direction="row" spacing={0.625} alignItems="center">
+              <Icon name="check_circle" size={14} color="#16A34A" sx={{ flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: '#334155', fontWeight: 600 }}>
+                {c}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+
+        <Box
+          sx={{
+            mt: 1.25, p: 1.25, borderRadius: 1.5,
+            bgcolor: '#EEF2FF', border: '1px solid #C7D2FE'
+          }}
+        >
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.625 }}>
+            <Icon name="online_prediction" size={14} color="#4338CA" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+              Emerging operational patterns
+            </Typography>
+          </Stack>
+          <Stack spacing={0.625}>
+            {day90Status.outlook.map((o) => (
+              <Stack key={o.id} direction="row" spacing={0.625} alignItems="flex-start">
+                <Box
+                  sx={{
+                    width: 20, height: 20, borderRadius: '6px', bgcolor: '#fff',
+                    border: '1px solid #C7D2FE', display: 'grid', placeItems: 'center', flexShrink: 0, mt: '1px'
+                  }}
+                >
+                  <Icon name={o.icon} size={12} color="#4338CA" />
+                </Box>
+                <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.35 }}>
+                  {o.body}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+
+        <Button
+          fullWidth
+          variant="outlined"
+          onClick={onReview}
+          startIcon={<Icon name="insights" size={16} />}
+          sx={{ mt: 1.25, borderColor: '#CBD5E1', color: '#334155' }}
+        >
+          Explore Operational Forecasting
+        </Button>
+        <Typography
+          variant="caption"
+          sx={{ display: 'block', textAlign: 'center', color: '#94A3B8', mt: 0.625, lineHeight: 1.3 }}
+        >
+          Forecasting suggestions can be adjusted or dismissed at any time — Connected Community will continue learning operational rhythms.
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
 function Sparkline({ series, height = 64, color = '#4338CA', fill = true }) {
   const width = 280;
   const min = Math.min(...series);
@@ -1728,82 +1960,882 @@ function CalibrationSheet({ open, onClose }) {
   );
 }
 
-function TodayTab({ openReason, openOverride, onApprove, onPriorities }) {
-  const mode = useMode();
-  const day30 = mode === 'day30';
-  const [calOpen, setCalOpen] = useState(false);
-  const shownReviews = day30
-    ? reviews.filter((r) => r.kind !== 'Staffing overload')
-    : reviews;
-  const autoCount = reviews.length - shownReviews.length;
+const FORECAST_TONE = {
+  warning: { fg: '#D97706', tint: '#FEF3C7' },
+  error: { fg: '#DC2626', tint: '#FEE2E2' },
+  info: { fg: '#0EA5E9', tint: '#E0F2FE' },
+  success: { fg: '#16A34A', tint: '#DCFCE7' }
+};
+
+// Predictive operational-intelligence card (Day 90).
+function ForecastCard({ item }) {
+  const t = FORECAST_TONE[item.tone] || { fg: '#4338CA', tint: '#EEF2FF' };
   return (
-    <>
-      <Box sx={{ px: 1.5, pt: 2 }}>
-        {day30 && <CalibrationButton onClick={() => setCalOpen(true)} />}
-        {day30 && <CalibrationSheet open={calOpen} onClose={() => setCalOpen(false)} />}
-        <Stack sx={{ mb: 1 }}>
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0', borderLeft: `3px solid ${t.fg}` }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 28, height: 28, borderRadius: '8px', bgcolor: t.tint,
+              display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name={item.icon} size={16} color={t.fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
+              <Chip
+                size="small"
+                icon={<Icon name="insights" size={10} color={t.fg} sx={{ ml: 0.5 }} />}
+                label={item.kind}
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: t.tint, color: t.fg,
+                  '.MuiChip-label': { px: 0.5 }
+                }}
+              />
+              <Stack direction="row" spacing={0.375} alignItems="center">
+                <Icon name="schedule" size={11} color="#94A3B8" />
+                <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                  {item.window}
+                </Typography>
+              </Stack>
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: '#475569', lineHeight: 1.35 }}>
+              {item.body}
+            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.625 }}>
+              <Chip
+                size="small"
+                label={item.metric}
+                sx={{
+                  height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#0F172A', color: '#fff',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+              <Stack direction="row" spacing={0.375} alignItems="center">
+                <Icon name="verified" size={12} color="#16A34A" />
+                <Typography variant="caption" sx={{ color: '#475569' }}>
+                  Confidence: {item.confidence}
+                </Typography>
+              </Stack>
+            </Stack>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Day 90 lead section — predictive operational intelligence.
+function OperationalForecast() {
+  return (
+    <Box sx={{ mb: 1.75 }}>
+      <Stack direction="row" spacing={0.625} alignItems="flex-start" sx={{ mb: 1 }}>
+        <Icon name="online_prediction" size={16} color="#4338CA" sx={{ mt: '2px' }} />
+        <Box sx={{ flex: 1 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            {day30 ? 'Exceptions Requiring Review' : 'Needs Your Review'}
+            Operational Forecast
           </Typography>
           <Typography variant="caption">
-            {day30
-              ? 'Routine work is auto-coordinated — only exceptions need you'
-              : 'Decisions the AI escalated for your sign-off'}
+            Predictive readiness — {forecasts.length} signals the AI is tracking ahead
           </Typography>
-        </Stack>
-        {day30 && autoCount > 0 && (
-          <Card variant="outlined" sx={{ borderColor: '#BBF7D0', bgcolor: '#F0FDF4', mb: 1.25 }}>
-            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Icon name="check_circle" size={18} color="#16A34A" />
-                <Typography variant="caption" sx={{ color: '#15803D', fontWeight: 600, flex: 1 }}>
-                  {autoCount} routine staffing decision auto-coordinated from learned rules — no action needed.
+        </Box>
+      </Stack>
+      <Stack spacing={1}>
+        {forecasts.map((f) => (
+          <ForecastCard key={f.id} item={f} />
+        ))}
+      </Stack>
+
+      <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mt: 1 }}>
+        <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.875 }}>
+            <Icon name="insights" size={14} color="#4338CA" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+              Predictive insights
+            </Typography>
+          </Stack>
+          <Stack spacing={1}>
+            {predictiveInsights.map((p) => (
+              <Stack key={p.id} direction="row" spacing={0.75} alignItems="flex-start">
+                <Box
+                  sx={{
+                    width: 22, height: 22, borderRadius: '6px', bgcolor: '#EEF2FF',
+                    display: 'grid', placeItems: 'center', flexShrink: 0, mt: '1px'
+                  }}
+                >
+                  <Icon name={p.icon} size={13} color="#4338CA" />
+                </Box>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Chip
+                    size="small"
+                    label={p.label}
+                    sx={{
+                      height: 16, fontSize: 9, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                      '.MuiChip-label': { px: 0.5 }, mb: 0.25
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35 }}>
+                    {p.body}
+                  </Typography>
+                </Box>
+              </Stack>
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mt: 1 }}>
+        <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', display: 'block', mb: 0.75 }}>
+            AI-generated forecast work · {predictiveWorkOrders.length}
+          </Typography>
+          <Stack spacing={1} divider={<Divider flexItem sx={{ borderColor: '#F1F5F9' }} />}>
+            {predictiveWorkOrders.map((w) => (
+              <Box key={w.id}>
+                <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
+                  <Chip
+                    size="small"
+                    label={w.kind}
+                    sx={{
+                      height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                      '.MuiChip-label': { px: 0.5 }
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label={w.status}
+                    sx={{
+                      height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#F1F5F9', color: '#475569',
+                      '.MuiChip-label': { px: 0.5 }
+                    }}
+                  />
+                </Stack>
+                <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                  {w.title}
                 </Typography>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
+                  <Icon name="place" size={12} color="#94A3B8" />
+                  <Typography variant="caption">{w.location}</Typography>
+                  <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+                  <Icon name="person" size={12} color="#94A3B8" />
+                  <Typography variant="caption">{w.assignee}</Typography>
+                  <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+                  <Icon name="schedule" size={12} color="#94A3B8" />
+                  <Typography variant="caption">{w.eta}</Typography>
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}
+
+// Day 1 — "Learning your building" status banner.
+function Day1Banner() {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
+      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 34, height: 34, borderRadius: '10px', bgcolor: '#EEF2FF',
+              display: 'grid', placeItems: 'center', flexShrink: 0
+            }}
+          >
+            <Icon name="school" size={19} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                {day1Status.headline}
+              </Typography>
+              <Chip
+                size="small"
+                label="Day 1 · Learning"
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+              {day1Status.sub}
+            </Typography>
+          </Box>
+        </Stack>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0.75, mt: 1.25 }}>
+          {day1Status.metrics.map((m) => (
+            <Box key={m.label} sx={{ border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff' }}>
+              <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                {m.value}
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
+                {m.label}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10 }}>
+                {m.sub}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Day 1 — recommendation-framed work card with visible reasoning + approvals.
+function Day1WorkCard({ task, tier, tierNum, onReason, onApprove, onOverride }) {
+  const v = WO_STATUS_VISUAL[task.status] || { icon: 'build', fg: '#475569', bg: '#F1F5F9' };
+  const isCritical = tierNum === 1;
+  const isRoutine = tier.id === 't5';
+  const primaryLabel = isCritical ? 'Assign now' : isRoutine ? 'Approve batch' : 'Approve';
+  const secondaryLabel = isRoutine ? 'Defer' : 'Override';
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              bgcolor: v.bg, display: 'grid', placeItems: 'center', mt: 0.25
+            }}
+          >
+            <Icon name={v.icon} size={18} color={v.fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle2" sx={{ lineHeight: 1.25 }}>{task.title}</Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
+              <Icon name="place" size={13} color="#94A3B8" />
+              <Typography variant="caption">{task.location}</Typography>
+              <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+              <Icon name="person" size={13} color="#94A3B8" />
+              <Typography variant="caption">{task.tech}</Typography>
+            </Stack>
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+          <Chip
+            size="small"
+            label={`Tier ${tierNum}`}
+            sx={{
+              height: 22, bgcolor: toneBg(tier.tone), color: '#0F172A', fontWeight: 700,
+              '.MuiChip-label': { px: 0.875, fontSize: 11 }
+            }}
+          />
+          <Chip
+            size="small"
+            label={task.status}
+            sx={{ height: 22, bgcolor: v.bg, color: v.fg, fontWeight: 700, '.MuiChip-label': { px: 0.875, fontSize: 11 } }}
+          />
+          <Chip
+            size="small"
+            icon={<Icon name="schedule" size={12} sx={{ ml: 0.5 }} />}
+            label={task.eta}
+            variant="outlined"
+            sx={{ height: 22, '.MuiChip-label': { px: 0.5, fontSize: 11 } }}
+          />
+          <Chip
+            size="small"
+            icon={<Icon name="trending_up" size={12} sx={{ ml: 0.5 }} />}
+            label={task.kpi}
+            variant="outlined"
+            sx={{ height: 22, '.MuiChip-label': { px: 0.5, fontSize: 11 } }}
+          />
+        </Stack>
+
+        <Box sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1, mt: 0.875 }}>
+          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.375 }}>
+            <Icon name="auto_awesome" size={13} color="#4338CA" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+              AI recommends
+            </Typography>
+            {task.needsReview && (
+              <Chip
+                size="small"
+                label="Needs MD review"
+                sx={{
+                  height: 16, fontSize: 9, fontWeight: 700, bgcolor: '#FEE2E2', color: '#B91C1C',
+                  '.MuiChip-label': { px: 0.5 }
+                }}
+              />
+            )}
+          </Stack>
+          <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35 }}>
+            {task.recommend}
+          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
+            <Icon name="model_training" size={13} color="#64748B" sx={{ mt: '1px', flexShrink: 0 }} />
+            <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
+              <Box component="span" sx={{ fontWeight: 700 }}>Confidence: </Box>
+              {task.confidence}
+            </Typography>
+          </Stack>
+          <Button
+            size="small"
+            onClick={() => onReason(task)}
+            startIcon={<Icon name="psychology" size={14} />}
+            sx={{ mt: 0.25, ml: -0.5, px: 0.5, fontSize: 11.5, color: '#4338CA' }}
+          >
+            Why this priority?
+          </Button>
+        </Box>
+
+        <Stack direction="row" spacing={0.75} sx={{ mt: 0.875 }}>
+          <Button size="small" variant="contained" fullWidth onClick={() => onApprove(task)}>
+            {primaryLabel}
+          </Button>
+          <Button size="small" variant="outlined" color="error" fullWidth onClick={() => onOverride(task)}>
+            {secondaryLabel}
+          </Button>
+          <IconButton
+            size="small"
+            onClick={() => onReason(task)}
+            sx={{ border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff' }}
+          >
+            <Icon name="add_comment" size={18} />
+          </IconButton>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Day1DispatchPlan({ onReason, onApprove, onOverride }) {
+  return (
+    <>
+      {tiers.map((tier, ti) => (
+        <Box key={tier.id} sx={{ mb: 1.5 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75, px: 0.25 }}>
+            <Box
+              sx={{
+                width: 22, height: 22, borderRadius: '6px',
+                bgcolor: toneBg(tier.tone), display: 'grid', placeItems: 'center'
+              }}
+            >
+              <Icon name={tier.icon} size={14} color="#0F172A" />
+            </Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1 }}>
+              {tier.label}
+            </Typography>
+            <Typography variant="caption">{tier.tasks.length}</Typography>
+          </Stack>
+          <Stack spacing={1}>
+            {tier.tasks.map((t) => (
+              <Day1WorkCard
+                key={t.id}
+                task={t}
+                tier={tier}
+                tierNum={ti + 1}
+                onReason={onReason}
+                onApprove={onApprove}
+                onOverride={onOverride}
+              />
+            ))}
+          </Stack>
+        </Box>
+      ))}
+    </>
+  );
+}
+
+function LearningSignals() {
+  return (
+    <Box>
+      <Stack direction="row" spacing={0.625} alignItems="flex-start" sx={{ mb: 1 }}>
+        <Icon name="model_training" size={16} color="#4338CA" sx={{ mt: '2px' }} />
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Learning signals</Typography>
+          <Typography variant="caption">
+            Early observations — the AI is still calibrating to your building
+          </Typography>
+        </Box>
+      </Stack>
+      <Stack spacing={1}>
+        {learningSignals.map((s) => (
+          <Card key={s.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" spacing={1} alignItems="flex-start">
+                <Box
+                  sx={{
+                    width: 28, height: 28, borderRadius: '8px', bgcolor: '#EEF2FF',
+                    display: 'grid', placeItems: 'center', flexShrink: 0
+                  }}
+                >
+                  <Icon name={s.icon} size={15} color="#4338CA" />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.125 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                      {s.title}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label="Learning"
+                      sx={{
+                        height: 16, fontSize: 9, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                        '.MuiChip-label': { px: 0.5 }
+                      }}
+                    />
+                  </Stack>
+                  <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35 }}>
+                    {s.body}
+                  </Typography>
+                </Box>
               </Stack>
             </CardContent>
           </Card>
-        )}
-        <Stack spacing={1.25} sx={{ mb: 0.5 }}>
-          <WeatherCard bare />
-          {shownReviews.map((r) => (
-            <ReviewCard
-              key={r.id}
-              item={r}
-              onApprove={onApprove}
-              onOverride={openOverride}
-            />
-          ))}
-        </Stack>
-      </Box>
+        ))}
+      </Stack>
+    </Box>
+  );
+}
 
-      <Box sx={{ px: 1.5, pt: 1.75 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Box>
-            <Stack direction="row" spacing={0.625} alignItems="center">
-              <Icon name="auto_awesome" size={15} color="#4338CA" />
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                {day30 ? 'AI Coordination' : 'AI Activity'}
+// ─────────────────────────────────────────────────────────────────────
+// Calm-mode sections — operational readiness framing (replaces task lists)
+// ─────────────────────────────────────────────────────────────────────
+
+function SectionHeader({ icon, title, sub, color = '#4338CA' }) {
+  return (
+    <Stack direction="row" spacing={0.625} alignItems="flex-start" sx={{ mb: 1 }}>
+      <Icon name={icon} size={16} color={color} sx={{ mt: '2px' }} />
+      <Box sx={{ flex: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{title}</Typography>
+        {sub && (
+          <Typography variant="caption" sx={{ display: 'block', lineHeight: 1.3 }}>
+            {sub}
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  );
+}
+
+function OperationalPriorityCard({ item }) {
+  const v = WO_STATUS_VISUAL[item.tone === 'error' ? 'Critical' : item.tone === 'warning' ? 'At risk' : 'Monitor'] || {};
+  const bg = toneBg(item.tone);
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
+              bgcolor: bg, display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={18} color="#0F172A" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
+              {item.body}
+            </Typography>
+            <Chip
+              size="small"
+              label={item.impact}
+              sx={{
+                mt: 0.625, height: 18, fontSize: 10, fontWeight: 700,
+                bgcolor: '#F1F5F9', color: '#475569',
+                '.MuiChip-label': { px: 0.75 }
+              }}
+            />
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StaffingConflictCard({ item }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#FCD34D', bgcolor: '#FFFBEB' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#FEF3C7', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={17} color="#B45309" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
+              {item.body}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
+              <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
+                {item.hint}
               </Typography>
             </Stack>
-            <Typography variant="caption">
-              {day30
-                ? `${aiActivity.length} actions auto-coordinated · last 24 hours`
-                : `Last 24 hours · ${aiActivity.length} actions · newest first`}
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PmTradeoffCard({ item }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#F1F5F9', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={17} color="#475569" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
+              {item.body}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
+              <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
+                {item.hint}
+              </Typography>
+            </Stack>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LearningHighlightCard({ item }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E0E7FF', bgcolor: '#FCFCFF' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={17} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                {item.title}
+              </Typography>
+              <Chip
+                size="small"
+                label="Learning"
+                sx={{
+                  height: 16, fontSize: 9, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                  '.MuiChip-label': { px: 0.5 }
+                }}
+              />
+            </Stack>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
+              {item.body}
             </Typography>
           </Box>
-          <Chip
-            size="small"
-            clickable
-            onClick={onPriorities}
-            icon={<Icon name="low_priority" size={13} color="#475569" sx={{ ml: 0.5 }} />}
-            label="Review priorities"
-            sx={{
-              height: 24, bgcolor: '#fff', color: '#334155',
-              border: '1px solid #CBD5E1', fontWeight: 600
-            }}
-          />
         </Stack>
-        <AiActivityList />
+      </CardContent>
+    </Card>
+  );
+}
+
+function RoutineRollupCard({ data }) {
+  const [open, setOpen] = useState(false);
+  const total = data.items.reduce((s, x) => s + x.count, 0);
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{ cursor: 'pointer' }}
+          onClick={() => setOpen(!open)}
+        >
+          <Box
+            sx={{
+              width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+              bgcolor: '#DCFCE7', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="check_circle" size={16} color="#16A34A" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+              {data.headline}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B' }}>
+              +{total} actions handled automatically · tap for details
+            </Typography>
+          </Box>
+          <Icon name={open ? 'expand_less' : 'expand_more'} size={20} color="#94A3B8" />
+        </Stack>
+        <Collapse in={open}>
+          <Stack spacing={0.5} sx={{ mt: 1, pl: 4.5 }}>
+            {data.items.map((it, i) => (
+              <Stack key={i} direction="row" spacing={0.75} alignItems="center">
+                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#94A3B8' }} />
+                <Typography variant="caption" sx={{ color: '#475569' }}>
+                  <Box component="span" sx={{ fontWeight: 700, color: '#0F172A' }}>+{it.count}</Box>{' '}{it.label}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Collapse>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReadinessSummaryRow({ item }) {
+  const fg = item.tone === 'success' ? '#16A34A' : item.tone === 'warning' ? '#B45309' : '#0369A1';
+  const bg = item.tone === 'success' ? '#DCFCE7' : item.tone === 'warning' ? '#FEF3C7' : '#E0F2FE';
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              bgcolor: bg, display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={17} color={fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
+              {item.body}
+            </Typography>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StrategicRiskCard({ item }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={18} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
+              <Chip
+                size="small"
+                label={item.label}
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+              <Chip
+                size="small"
+                label={item.horizon}
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#F1F5F9', color: '#475569',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
+              {item.body}
+            </Typography>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration }) {
+  const mode = useMode();
+  const day1 = mode === 'day1';
+  const day30 = mode === 'day30';
+  const day90 = mode === 'day90';
+  const calibrated = day30 || day90;
+
+  // Reviews shown shrink with maturity. Day 1 shows full set, Day 30 only
+  // genuine exceptions (cap 2), Day 90 only true anomalies (cap 1).
+  const exceptions = (() => {
+    if (day90) {
+      const predictive = predictiveReviews.slice(0, 1);
+      return predictive.length ? predictive : reviews.filter((r) => r.kind === 'Services Recommendation').slice(0, 1);
+    }
+    if (day30) {
+      const nonStaffing = reviews.filter((r) => r.kind !== 'Staffing overload');
+      return [...nonStaffing, ...predictiveReviews].slice(0, 2);
+    }
+    return reviews;
+  })();
+
+  return (
+    <>
+      <Box sx={{ px: 1.5, pt: 2 }}>
+        {/* Maturity banner */}
+        {day1 && <Day1Banner />}
+        {day30 && <Day30Banner onReview={onCalibration} />}
+        {day90 && <Day90Banner onReview={onCalibration} />}
+
+        {/* ── DAY 1 ───────────────────────────────────────────────── */}
+        {day1 && (
+          <>
+            <SectionHeader
+              icon="priority_high"
+              title="Operational priorities"
+              sub="The three things most likely to need your attention today"
+            />
+            <Stack spacing={1} sx={{ mb: 1.75 }}>
+              {operationalPriorities.map((p) => (
+                <OperationalPriorityCard key={p.id} item={p} />
+              ))}
+            </Stack>
+
+            <SectionHeader icon="group" title="Staffing" sub="One conflict worth a look" />
+            <Box sx={{ mb: 1.75 }}>
+              <StaffingConflictCard item={day1StaffingConflict} />
+            </Box>
+
+            <SectionHeader icon="event_repeat" title="PM tradeoff" sub="One deferrable item the AI flagged" />
+            <Box sx={{ mb: 1.75 }}>
+              <PmTradeoffCard item={day1PmTradeoff} />
+            </Box>
+
+            <SectionHeader icon="model_training" title="Learning signal" sub="An early pattern the AI is still calibrating" />
+            <Box sx={{ mb: 1.75 }}>
+              <LearningHighlightCard item={day1LearningHighlight} />
+            </Box>
+
+            <Box sx={{ mb: 0.5 }}>
+              <RoutineRollupCard data={routineRollup.day1} />
+            </Box>
+          </>
+        )}
+
+        {/* ── DAY 30 ──────────────────────────────────────────────── */}
+        {day30 && (
+          <>
+            <SectionHeader
+              icon="dashboard"
+              title="Today's operational state"
+              sub="Grouped readiness summaries — routine work runs in the background"
+            />
+            <Stack spacing={1} sx={{ mb: 1.75 }}>
+              {day30Readiness.map((r) => (
+                <ReadinessSummaryRow key={r.id} item={r} />
+              ))}
+            </Stack>
+
+            <SectionHeader
+              icon="report_problem"
+              title="Exceptions requiring review"
+              sub={`${exceptions.length} item${exceptions.length === 1 ? '' : 's'} the AI escalated — everything else is handled`}
+              color="#B91C1C"
+            />
+            <Stack spacing={1.25} sx={{ mb: 1.5 }}>
+              <WeatherCard bare />
+              {exceptions.map((r) => (
+                <ReviewCard
+                  key={r.id}
+                  item={r}
+                  onApprove={onApprove}
+                  onOverride={openOverride}
+                />
+              ))}
+            </Stack>
+
+            <Box sx={{ mb: 0.5 }}>
+              <RoutineRollupCard data={routineRollup.day30} />
+            </Box>
+          </>
+        )}
+
+        {/* ── DAY 90 ──────────────────────────────────────────────── */}
+        {day90 && (
+          <>
+            <SectionHeader
+              icon="monitor_heart"
+              title="Operational health"
+              sub="Readiness and risk — what changed, what's trending"
+            />
+            <Stack spacing={1} sx={{ mb: 1.75 }}>
+              {day90Health.map((h) => (
+                <ReadinessSummaryRow key={h.id} item={h} />
+              ))}
+            </Stack>
+
+            {strategicRisks.length > 0 && (
+              <>
+                <SectionHeader
+                  icon="online_prediction"
+                  title="Strategic risk"
+                  sub="One anomaly the AI thinks you should personally weigh"
+                />
+                <Stack spacing={1} sx={{ mb: 1.75 }}>
+                  {strategicRisks.slice(0, 1).map((s) => (
+                    <StrategicRiskCard key={s.id} item={s} />
+                  ))}
+                </Stack>
+              </>
+            )}
+
+            {exceptions.length > 0 && (
+              <>
+                <SectionHeader
+                  icon="report_problem"
+                  title="Exception"
+                  sub="One decision the AI escalated — everything else is handled"
+                  color="#B91C1C"
+                />
+                <Stack spacing={1.25} sx={{ mb: 1.5 }}>
+                  {exceptions.map((r) => (
+                    <ReviewCard
+                      key={r.id}
+                      item={r}
+                      onApprove={onApprove}
+                      onOverride={openOverride}
+                    />
+                  ))}
+                </Stack>
+              </>
+            )}
+
+            <Box sx={{ mb: 0.5 }}>
+              <RoutineRollupCard data={routineRollup.day90} />
+            </Box>
+          </>
+        )}
       </Box>
     </>
   );
@@ -1995,7 +3027,7 @@ function TaskListRow({ task }) {
   );
 }
 
-function TasksTab() {
+function TasksView() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [showSkipped, setShowSkipped] = useState(false);
   const overdue = tasksList.filter((t) => t.status === 'overdue');
@@ -2004,7 +3036,7 @@ function TasksTab() {
   const completed = tasksList.filter((t) => t.status === 'completed');
   const open = [...overdue, ...upcoming];
   return (
-    <Box sx={{ px: 1.5, pt: 1.5 }}>
+    <>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
         <Box>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -2113,6 +3145,563 @@ function TasksTab() {
       <Stack spacing={1}>
         {upcoming.map((t) => <TaskListRow key={t.id} task={t} />)}
       </Stack>
+    </>
+  );
+}
+
+// Shared collapsible bucket card (Skipped / Awaiting parts / Ready, etc.)
+function BucketCard({ icon, iconFg, iconBg, borderColor, bg, chevronColor, title, sub, open, onToggle, children }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor, mb: 1, bgcolor: bg }}>
+      <CardContent
+        sx={{ p: 1.25, '&:last-child': { pb: 1.25 }, cursor: 'pointer' }}
+        onClick={onToggle}
+      >
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: iconBg, display: 'grid', placeItems: 'center' }}>
+            <Icon name={icon} size={16} color={iconFg} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>{title}</Typography>
+            <Typography variant="caption">{sub}</Typography>
+          </Box>
+          <Icon name={open ? 'expand_less' : 'expand_more'} size={22} color={chevronColor} />
+        </Stack>
+        <Collapse in={open}>
+          <Stack spacing={1} sx={{ mt: 1.25 }}>{children}</Stack>
+        </Collapse>
+      </CardContent>
+    </Card>
+  );
+}
+
+const WO_STATUS_VISUAL = {
+  'In progress': { icon: 'pending', fg: '#0369A1', bg: '#E0F2FE' },
+  Queued: { icon: 'schedule', fg: '#475569', bg: '#F1F5F9' },
+  Bundled: { icon: 'bolt', fg: '#15803D', bg: '#DCFCE7' },
+  'Auto-coordinated': { icon: 'auto_awesome', fg: '#4338CA', bg: '#EEF2FF' },
+  Monitor: { icon: 'monitoring', fg: '#B45309', bg: '#FEF3C7' },
+  'At risk': { icon: 'error', fg: '#DC2626', bg: '#FEE2E2' },
+  Overdue: { icon: 'error', fg: '#DC2626', bg: '#FEE2E2' },
+  'On track': { icon: 'check_circle', fg: '#16A34A', bg: '#DCFCE7' },
+  Open: { icon: 'schedule', fg: '#0369A1', bg: '#E0F2FE' },
+  Deferrable: { icon: 'schedule', fg: '#475569', bg: '#F1F5F9' },
+  Unassigned: { icon: 'person_off', fg: '#64748B', bg: '#F1F5F9' },
+  'Awaiting parts': { icon: 'inventory_2', fg: '#B45309', bg: '#FEF3C7' }
+};
+
+function WorkOrderRow({ wo }) {
+  const v = WO_STATUS_VISUAL[wo.status] || { icon: 'build', fg: '#475569', bg: '#F1F5F9' };
+  const topLabel = wo.kind || wo.category || wo.kpi || 'Work order';
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              bgcolor: v.bg, display: 'grid', placeItems: 'center', mt: 0.25
+            }}
+          >
+            <Icon name={v.icon} size={18} color={v.fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.125 }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                {topLabel}
+              </Typography>
+              <Box sx={{ flex: 1 }} />
+              <Chip
+                size="small"
+                label={wo.status}
+                sx={{
+                  height: 18, fontSize: 9.5, fontWeight: 700, bgcolor: v.bg, color: v.fg,
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.25 }}>
+              {wo.title}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
+              <Icon name="place" size={13} color="#94A3B8" />
+              <Typography variant="caption">{wo.location}</Typography>
+              <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+              <Icon name="schedule" size={13} color="#94A3B8" />
+              <Typography variant="caption">{wo.eta}</Typography>
+            </Stack>
+            {wo.reason && (
+              <Typography variant="caption" sx={{ display: 'block', color: '#94A3B8', mt: 0.25, lineHeight: 1.3 }}>
+                {wo.reason}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
+              <Icon name="person" size={14} color="#94A3B8" />
+              <Typography variant="caption" sx={{ color: (wo.assignee || wo.tech) && (wo.assignee || wo.tech) !== 'Reassign needed' && (wo.assignee || wo.tech) !== 'Unassigned' ? '#475569' : '#94A3B8' }}>
+                {wo.assignee || wo.tech || 'Unassigned'}
+              </Typography>
+            </Stack>
+          </Box>
+          <Icon name="chevron_right" size={20} color="#94A3B8" />
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WorkOrdersView() {
+  const mode = useMode();
+  const day90 = mode === 'day90';
+  const day30 = mode === 'day30';
+  const [showParts, setShowParts] = useState(false);
+  const [showUnassigned, setShowUnassigned] = useState(false);
+  const [showActive, setShowActive] = useState(!day90);
+  const all = [
+    ...tiers.flatMap((t) => t.tasks).filter((w) => w.id.startsWith('wo-') || w.id.startsWith('qw-')),
+    ...backlog,
+    ...predictiveWorkOrders
+  ];
+  const overdue = all.filter((w) => w.status === 'Overdue');
+  const awaitingParts = all.filter((w) => w.status === 'Awaiting parts');
+  const unassigned = all.filter((w) => w.status === 'Unassigned');
+  const active = all.filter(
+    (w) => !['Overdue', 'Awaiting parts', 'Unassigned'].includes(w.status)
+  );
+  // At Day 30/90, only surface At risk / Critical actives by default.
+  const exceptionsOnly = active.filter((w) => ['At risk', 'Critical', 'Monitor'].includes(w.status));
+  const visibleActive = day30 || day90 ? exceptionsOnly : active;
+  const routineActiveCount = active.length - visibleActive.length;
+  return (
+    <>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Work orders</Typography>
+          <Typography variant="caption">
+            Dispatch + backlog · {active.length + overdue.length} active
+          </Typography>
+        </Box>
+        <Chip
+          size="small"
+          label={`${awaitingParts.length} awaiting parts`}
+          sx={{ bgcolor: '#FEF3C7', color: '#92400E' }}
+        />
+      </Stack>
+
+      <BucketCard
+        icon="inventory_2" iconFg="#B45309" iconBg="#FEF3C7"
+        borderColor="#FDE68A" bg="#FFFBEB" chevronColor="#92400E"
+        title="Awaiting parts" sub={`${awaitingParts.length} blocked on parts or vendor delivery`}
+        open={showParts} onToggle={() => setShowParts((v) => !v)}
+      >
+        {awaitingParts.map((w) => <WorkOrderRow key={w.id} wo={w} />)}
+      </BucketCard>
+
+      <BucketCard
+        icon="person_off" iconFg="#64748B" iconBg="#F1F5F9"
+        borderColor="#E2E8F0" bg="#F8FAFC" chevronColor="#64748B"
+        title="Unassigned" sub={`${unassigned.length} lower-priority — awaiting capacity`}
+        open={showUnassigned} onToggle={() => setShowUnassigned((v) => !v)}
+      >
+        {unassigned.map((w) => <WorkOrderRow key={w.id} wo={w} />)}
+      </BucketCard>
+
+      {overdue.length > 0 && (
+        <>
+          <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 700, display: 'block', mb: 0.75, mt: 0.5 }}>
+            OVERDUE · {overdue.length}
+          </Typography>
+          <Stack spacing={1} sx={{ mb: 1.5 }}>
+            {overdue.map((w) => <WorkOrderRow key={w.id} wo={w} />)}
+          </Stack>
+        </>
+      )}
+
+      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75, mt: 0.5 }}>
+        {(day30 || day90) ? `EXCEPTIONS · ${visibleActive.length}` : `ACTIVE · ${active.length}`}
+      </Typography>
+      <Stack spacing={1}>
+        {visibleActive.map((w) => <WorkOrderRow key={w.id} wo={w} />)}
+      </Stack>
+      {routineActiveCount > 0 && (
+        <Box sx={{ mt: 1 }}>
+          <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                onClick={() => setShowActive((v) => !v)}
+                sx={{ cursor: 'pointer' }}
+              >
+                <Icon name="check_circle" size={16} color="#16A34A" />
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, flex: 1 }}>
+                  +{routineActiveCount} routine work order{routineActiveCount === 1 ? '' : 's'} coordinated automatically
+                </Typography>
+                <Icon name={showActive ? 'expand_less' : 'expand_more'} size={18} color="#94A3B8" />
+              </Stack>
+              <Collapse in={showActive}>
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {active.filter((w) => !visibleActive.includes(w)).map((w) => <WorkOrderRow key={w.id} wo={w} />)}
+                </Stack>
+              </Collapse>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+    </>
+  );
+}
+
+const TURN_STATUS_VISUAL = {
+  'At risk': { icon: 'error', fg: '#DC2626', bg: '#FEE2E2', bar: '#DC2626' },
+  'On track': { icon: 'trending_up', fg: '#16A34A', bg: '#DCFCE7', bar: '#16A34A' },
+  'In progress': { icon: 'pending', fg: '#0369A1', bg: '#E0F2FE', bar: '#0EA5E9' },
+  Scheduled: { icon: 'event', fg: '#475569', bg: '#F1F5F9', bar: '#94A3B8' },
+  Ready: { icon: 'check_circle', fg: '#16A34A', bg: '#DCFCE7', bar: '#16A34A' }
+};
+
+function UnitTurnRow({ turn }) {
+  const v = TURN_STATUS_VISUAL[turn.status] || TURN_STATUS_VISUAL.Scheduled;
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              bgcolor: v.bg, display: 'grid', placeItems: 'center', mt: 0.25
+            }}
+          >
+            <Icon name={v.icon} size={18} color={v.fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.625} alignItems="center">
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>{turn.unit}</Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>· {turn.area}</Typography>
+              <Box sx={{ flex: 1 }} />
+              <Chip
+                size="small"
+                label={turn.status}
+                sx={{
+                  height: 18, fontSize: 9.5, fontWeight: 700, bgcolor: v.bg, color: v.fg,
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Typography
+              variant="caption"
+              sx={{ display: 'block', mt: 0.125, fontWeight: 600, color: turn.status === 'At risk' ? '#DC2626' : '#64748B' }}
+            >
+              {turn.moveIn}
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.625 }}>
+              <LinearProgress
+                variant="determinate"
+                value={turn.readiness}
+                sx={{
+                  flex: 1, height: 6, borderRadius: 4, bgcolor: '#F1F5F9',
+                  '& .MuiLinearProgress-bar': { bgcolor: v.bar }
+                }}
+              />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#0F172A' }}>
+                {turn.readiness}%
+              </Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ display: 'block', color: '#94A3B8', mt: 0.5, lineHeight: 1.3 }}>
+              {turn.note}
+            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+              <Icon name="person" size={14} color="#94A3B8" />
+              <Typography variant="caption" sx={{ color: turn.assignee === 'Reassign needed' ? '#94A3B8' : '#475569' }}>
+                {turn.assignee}
+              </Typography>
+              <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>{turn.eta}</Typography>
+              {turn.learned && (
+                <Chip
+                  size="small"
+                  icon={<Icon name="model_training" size={10} color="#4338CA" sx={{ ml: 0.5 }} />}
+                  label="Learned pattern"
+                  sx={{
+                    height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                    '.MuiChip-label': { px: 0.5 }
+                  }}
+                />
+              )}
+            </Stack>
+          </Box>
+          <Icon name="chevron_right" size={20} color="#94A3B8" />
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function UnitTurnsView() {
+  const [showReady, setShowReady] = useState(false);
+  const [showScheduled, setShowScheduled] = useState(false);
+  const atRisk = unitTurns.filter((t) => t.status === 'At risk');
+  const inProgress = unitTurns.filter((t) => ['On track', 'In progress'].includes(t.status));
+  const scheduled = unitTurns.filter((t) => t.status === 'Scheduled');
+  const ready = unitTurns.filter((t) => t.status === 'Ready');
+  return (
+    <>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Unit turns</Typography>
+          <Typography variant="caption">
+            Move-in readiness · {atRisk.length + inProgress.length} in progress
+          </Typography>
+        </Box>
+        {atRisk.length > 0 && (
+          <Chip
+            size="small"
+            label={`${atRisk.length} at risk`}
+            sx={{ bgcolor: '#FEE2E2', color: '#991B1B' }}
+          />
+        )}
+      </Stack>
+
+      {atRisk.length > 0 && (
+        <>
+          <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+            MOVE-IN AT RISK · {atRisk.length}
+          </Typography>
+          <Stack spacing={1} sx={{ mb: 1.5 }}>
+            {atRisk.map((t) => <UnitTurnRow key={t.id} turn={t} />)}
+          </Stack>
+        </>
+      )}
+
+      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+        IN PROGRESS · {inProgress.length}
+      </Typography>
+      <Stack spacing={1} sx={{ mb: 1.5 }}>
+        {inProgress.map((t) => <UnitTurnRow key={t.id} turn={t} />)}
+      </Stack>
+
+      <BucketCard
+        icon="event" iconFg="#475569" iconBg="#F1F5F9"
+        borderColor="#E2E8F0" bg="#F8FAFC" chevronColor="#64748B"
+        title="Scheduled" sub={`${scheduled.length} staged for an upcoming move-in`}
+        open={showScheduled} onToggle={() => setShowScheduled((v) => !v)}
+      >
+        {scheduled.map((t) => <UnitTurnRow key={t.id} turn={t} />)}
+      </BucketCard>
+
+      <BucketCard
+        icon="check_circle" iconFg="#16A34A" iconBg="#DCFCE7"
+        borderColor="#E2E8F0" bg="#F8FAFC" chevronColor="#64748B"
+        title="Ready" sub={`${ready.length} turn${ready.length === 1 ? '' : 's'} complete`}
+        open={showReady} onToggle={() => setShowReady((v) => !v)}
+      >
+        {ready.map((t) => <UnitTurnRow key={t.id} turn={t} />)}
+      </BucketCard>
+    </>
+  );
+}
+
+const SV_STATUS_VISUAL = {
+  'Pending approval': { icon: 'pending_actions', fg: '#DC2626', bg: '#FEE2E2' },
+  Scheduled: { icon: 'event', fg: '#475569', bg: '#F1F5F9' },
+  'On site': { icon: 'engineering', fg: '#0369A1', bg: '#E0F2FE' },
+  'In progress': { icon: 'pending', fg: '#0369A1', bg: '#E0F2FE' },
+  'Awaiting quote': { icon: 'request_quote', fg: '#B45309', bg: '#FEF3C7' },
+  Completed: { icon: 'check_circle', fg: '#16A34A', bg: '#DCFCE7' }
+};
+
+function ServiceRow({ svc }) {
+  const v = SV_STATUS_VISUAL[svc.status] || { icon: 'handshake', fg: '#475569', bg: '#F1F5F9' };
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              bgcolor: v.bg, display: 'grid', placeItems: 'center', mt: 0.25
+            }}
+          >
+            <Icon name={v.icon} size={18} color={v.fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.625} alignItems="center">
+              <Icon name="storefront" size={13} color="#94A3B8" />
+              <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700 }}>
+                {svc.vendor}
+              </Typography>
+              <Chip
+                size="small"
+                label={svc.trade}
+                sx={{
+                  height: 16, fontSize: 9, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
+                  '.MuiChip-label': { px: 0.5 }
+                }}
+              />
+              <Box sx={{ flex: 1 }} />
+              <Chip
+                size="small"
+                label={svc.status}
+                sx={{
+                  height: 18, fontSize: 9.5, fontWeight: 700, bgcolor: v.bg, color: v.fg,
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.25, mt: 0.25 }}>
+              {svc.title}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
+              <Icon name="place" size={13} color="#94A3B8" />
+              <Typography variant="caption">{svc.location}</Typography>
+              <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+              <Icon name="schedule" size={13} color="#94A3B8" />
+              <Typography variant="caption">{svc.window}</Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ display: 'block', color: '#94A3B8', mt: 0.25, lineHeight: 1.3 }}>
+              {svc.note}
+            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
+              <Chip
+                size="small"
+                icon={<Icon name="payments" size={11} sx={{ ml: 0.5 }} />}
+                label={svc.cost}
+                variant="outlined"
+                sx={{ height: 20, borderColor: '#CBD5E1', color: '#475569', '.MuiChip-label': { px: 0.5, fontSize: 10.5 } }}
+              />
+              <Chip
+                size="small"
+                icon={<Icon name="schedule" size={11} sx={{ ml: 0.5 }} />}
+                label={svc.sla}
+                variant="outlined"
+                sx={{ height: 20, borderColor: '#CBD5E1', color: '#475569', '.MuiChip-label': { px: 0.5, fontSize: 10.5 } }}
+              />
+            </Stack>
+          </Box>
+          <Icon name="chevron_right" size={20} color="#94A3B8" />
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ServicesView() {
+  const [showQuote, setShowQuote] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const approval = services.filter((s) => s.status === 'Pending approval');
+  const active = services.filter((s) => ['Scheduled', 'On site', 'In progress'].includes(s.status));
+  const quote = services.filter((s) => s.status === 'Awaiting quote');
+  const done = services.filter((s) => s.status === 'Completed');
+  return (
+    <>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Services</Typography>
+          <Typography variant="caption">
+            Outsourced to service providers · {active.length} scheduled
+          </Typography>
+        </Box>
+        {approval.length > 0 && (
+          <Chip
+            size="small"
+            label={`${approval.length} needs approval`}
+            sx={{ bgcolor: '#FEE2E2', color: '#991B1B' }}
+          />
+        )}
+      </Stack>
+
+      {approval.length > 0 && (
+        <>
+          <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+            NEEDS YOUR APPROVAL · {approval.length}
+          </Typography>
+          <Stack spacing={1} sx={{ mb: 1.5 }}>
+            {approval.map((s) => <ServiceRow key={s.id} svc={s} />)}
+          </Stack>
+        </>
+      )}
+
+      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+        SCHEDULED · {active.length}
+      </Typography>
+      <Stack spacing={1} sx={{ mb: 1.5 }}>
+        {active.map((s) => <ServiceRow key={s.id} svc={s} />)}
+      </Stack>
+
+      <BucketCard
+        icon="request_quote" iconFg="#B45309" iconBg="#FEF3C7"
+        borderColor="#FDE68A" bg="#FFFBEB" chevronColor="#92400E"
+        title="Awaiting quote" sub={`${quote.length} pending a vendor estimate`}
+        open={showQuote} onToggle={() => setShowQuote((v) => !v)}
+      >
+        {quote.map((s) => <ServiceRow key={s.id} svc={s} />)}
+      </BucketCard>
+
+      <BucketCard
+        icon="check_circle" iconFg="#16A34A" iconBg="#DCFCE7"
+        borderColor="#E2E8F0" bg="#F8FAFC" chevronColor="#64748B"
+        title="Completed" sub={`${done.length} service${done.length === 1 ? '' : 's'} closed`}
+        open={showDone} onToggle={() => setShowDone((v) => !v)}
+      >
+        {done.map((s) => <ServiceRow key={s.id} svc={s} />)}
+      </BucketCard>
+    </>
+  );
+}
+
+const WORK_SEGMENTS = [
+  { id: 'orders', label: 'Work orders' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'turns', label: 'Unit turns' },
+  { id: 'services', label: 'Services' }
+];
+
+function WorkTab() {
+  const [seg, setSeg] = useState('orders');
+  const mode = useMode();
+  const calibrated = mode === 'day30' || mode === 'day90';
+  return (
+    <Box sx={{ px: 1.5, pt: 1.5 }}>
+      {calibrated && (
+        <Box sx={{ mb: 1.25 }}>
+          <RoutineRollupCard data={mode === 'day90' ? routineRollup.day90 : routineRollup.day30} />
+          <Typography variant="caption" sx={{ display: 'block', color: '#64748B', mt: 0.75, lineHeight: 1.35 }}>
+            Below: anything the AI couldn't fully coordinate on its own — overdue, at-risk, or unassigned.
+          </Typography>
+        </Box>
+      )}
+      <ToggleButtonGroup
+        size="small"
+        exclusive
+        fullWidth
+        value={seg}
+        onChange={(_, v) => v && setSeg(v)}
+        sx={{
+          mb: 1.5,
+          bgcolor: '#F1F5F9',
+          border: '1px solid #CBD5E1',
+          borderRadius: 2,
+          p: 0.5,
+          '.MuiToggleButton-root': {
+            flex: 1, minWidth: 0, px: 0.5, py: 0.625, fontSize: 11.5, fontWeight: 600,
+            lineHeight: 1.15, whiteSpace: 'nowrap',
+            textTransform: 'none', border: 'none', borderRadius: '8px !important',
+            color: '#475569'
+          },
+          '.Mui-selected': {
+            bgcolor: '#fff !important', color: '#0F172A !important',
+            boxShadow: '0 1px 3px rgba(15,23,42,0.12)'
+          }
+        }}
+      >
+        {WORK_SEGMENTS.map((s) => (
+          <ToggleButton key={s.id} value={s.id}>{s.label}</ToggleButton>
+        ))}
+      </ToggleButtonGroup>
+      {seg === 'orders' && <WorkOrdersView />}
+      {seg === 'tasks' && <TasksView />}
+      {seg === 'turns' && <UnitTurnsView />}
+      {seg === 'services' && <ServicesView />}
     </Box>
   );
 }
@@ -2824,7 +4413,8 @@ function CalendarSheet({ open, value, onClose, onPick }) {
 
 function ScheduleTab() {
   const mode = useMode();
-  const day30 = mode === 'day30';
+  const day30 = mode === 'day30' || mode === 'day90'; // calibrated (Day 30+)
+  const day90 = mode === 'day90'; // predictive operations
   const [view, setView] = useState('my');
   const [openMember, setOpenMember] = useState(null);
   const [date, setDate] = useState(new Date(2025, 4, 16));
@@ -2913,29 +4503,156 @@ function ScheduleTab() {
               <Stack direction="row" spacing={1} alignItems="center">
                 <Icon name="auto_awesome" size={16} color="#4338CA" />
                 <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
-                  AI ordered your day by priority — top items first
+                  {day90
+                    ? 'Your day is reduced to operational oversight only'
+                    : day30
+                      ? 'Your day is reduced to approvals and exceptions'
+                      : 'AI ordered your day by priority — top items first'}
                 </Typography>
               </Stack>
             </CardContent>
           </Card>
-          {orderByPriority(mdSchedule).map((item) => (
-            <TimelineItem key={item.id} item={item} />
-          ))}
+          {(() => {
+            const ordered = orderByPriority(mdSchedule);
+            // Day 30: show only Approval / Override review / Sign-off / Walkthrough on warning+
+            // Day 90: show only top 2 most strategic items
+            const isStrategic = (it) =>
+              ['Approval', 'Override review', 'Sign-off'].includes(it.kind) ||
+              it.tone === 'error' || it.tone === 'warning';
+            const visible = day90
+              ? ordered.filter(isStrategic).slice(0, 2)
+              : day30
+                ? ordered.filter(isStrategic)
+                : ordered;
+            const hiddenCount = ordered.length - visible.length;
+            return (
+              <>
+                {visible.map((item) => (
+                  <TimelineItem key={item.id} item={item} />
+                ))}
+                {hiddenCount > 0 && (
+                  <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
+                    <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Icon name="check_circle" size={16} color="#16A34A" />
+                        <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, flex: 1 }}>
+                          +{hiddenCount} routine block{hiddenCount === 1 ? '' : 's'} coordinated without your input
+                        </Typography>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            );
+          })()}
         </Stack>
-      ) : (
+      ) : day90 ? (
+        // Day 90 — high-level operational coverage. No per-tech task stacks.
         <Stack spacing={1}>
-          {day30 && (
-            <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+          <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Icon name="auto_awesome" size={16} color="#4338CA" />
+                <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
+                  Operational coverage is balanced — the AI is monitoring drift, not assignments
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+          {day90Coverage.map((c) => (
+            <Card key={c.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
               <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Icon name="auto_awesome" size={16} color="#4338CA" />
-                  <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
-                    AI pre-balanced the team from 30 days of completion patterns
+                <Stack direction="row" spacing={1.25} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                      bgcolor: '#DCFCE7', display: 'grid', placeItems: 'center'
+                    }}
+                  >
+                    <Icon name={c.icon} size={17} color="#16A34A" />
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, flex: 1 }}>
+                    {c.title}
                   </Typography>
+                  <Icon name="check_circle" size={18} color="#16A34A" />
                 </Stack>
               </CardContent>
             </Card>
-          )}
+          ))}
+          <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35 }}>
+                Per-technician detail is available on demand — tap any name to drill in.
+              </Typography>
+              <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.5} sx={{ mt: 0.75 }}>
+                {team.map((p) => (
+                  <Chip
+                    key={p.id}
+                    size="small"
+                    clickable
+                    onClick={() => setOpenMember(p)}
+                    label={p.name}
+                    sx={{
+                      height: 22, bgcolor: '#fff', border: '1px solid #CBD5E1',
+                      color: '#334155', fontWeight: 600, '.MuiChip-label': { px: 0.875, fontSize: 11 }
+                    }}
+                  />
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        </Stack>
+      ) : day30 ? (
+        // Day 30 — one focus line per technician. No task stacks.
+        <Stack spacing={1}>
+          <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Icon name="auto_awesome" size={16} color="#4338CA" />
+                <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
+                  AI pre-balanced the team from 30 days of completion patterns
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+          {team.map((p) => {
+            const f = teamFocus[p.id] || { focus: 'Routine assignments', state: 'Stable', tone: 'success' };
+            return (
+              <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                <CardContent
+                  sx={{ p: 1.25, '&:last-child': { pb: 1.25 }, cursor: 'pointer' }}
+                  onClick={() => setOpenMember(p)}
+                >
+                  <Stack direction="row" spacing={1.25} alignItems="center">
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" alignItems="center" spacing={0.75}>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{p.name}</Typography>
+                        <Chip
+                          size="small"
+                          label={f.state}
+                          sx={{
+                            height: 18, fontSize: 10, bgcolor: toneBg(f.tone), color: '#0F172A',
+                            '.MuiChip-label': { px: 0.75 }
+                          }}
+                        />
+                      </Stack>
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25 }}>
+                        <Icon name="flag" size={13} color="#94A3B8" />
+                        <Typography variant="caption" sx={{ color: '#475569' }}>
+                          Focus · {f.focus}
+                        </Typography>
+                      </Stack>
+                    </Box>
+                    <Icon name="chevron_right" size={20} color="#94A3B8" />
+                  </Stack>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Stack>
+      ) : (
+        // Day 1 — original detailed view (MD is supervising operations).
+        <Stack spacing={1}>
           {team.map((p) => {
             const loadHrs = scheduledHours(p.tasks);
             const st = loadStatus(loadHrs, p.capacity);
@@ -2979,22 +4696,6 @@ function ScheduleTab() {
                               : `${fmtHours(loadHrs)}h planned · fits in ${p.capacity}h shift`}
                           </Typography>
                         </Box>
-                      )}
-                      {day30 && day30TeamNotes[p.id] && (
-                        <Stack
-                          direction="row"
-                          spacing={0.625}
-                          alignItems="flex-start"
-                          sx={{
-                            mt: 0.75, p: 0.75, borderRadius: 1.5,
-                            bgcolor: '#FCFCFF', border: '1px solid #E0E7FF'
-                          }}
-                        >
-                          <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '2px', flexShrink: 0 }} />
-                          <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
-                            AI rebalanced · {day30TeamNotes[p.id]}
-                          </Typography>
-                        </Stack>
                       )}
                     </Box>
                     <Icon name="chevron_right" size={20} color="#94A3B8" />
@@ -3056,10 +4757,11 @@ const AI_ACTION_ICON = {
   Prioritized: 'low_priority',
   Sequenced: 'sort',
   Assigned: 'person_add',
-  Batched: 'dynamic_feed',
+  Bundled: 'dynamic_feed',
   Rescheduled: 'event_repeat',
   Snoozed: 'snooze',
   Dispatched: 'support_agent',
+  Forecasted: 'insights',
   'Auto-closed': 'task_alt'
 };
 
@@ -3074,6 +4776,7 @@ function AiActivityList() {
               success: '#16A34A', default: '#64748B'
             }[a.tone] || '#64748B';
             const done = a.status === 'completed';
+            const monitoring = a.status === 'monitoring';
             const last = idx === items.length - 1;
             const act = actioned[a.id];
             return (
@@ -3153,6 +4856,17 @@ function AiActivityList() {
                             }}
                           />
                         )}
+                        {monitoring && (
+                          <Chip
+                            size="small"
+                            icon={<Icon name="monitoring" size={11} color="#B45309" sx={{ ml: 0.5 }} />}
+                            label="Monitoring"
+                            sx={{
+                              height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#FEF3C7', color: '#B45309',
+                              '.MuiChip-label': { px: 0.5 }
+                            }}
+                          />
+                        )}
                         {done && (
                           <Typography variant="caption" sx={{ color: '#16A34A', fontWeight: 700 }}>
                             Completed
@@ -3170,7 +4884,7 @@ function AiActivityList() {
                         <Typography variant="caption">{a.target}</Typography>
                       </Stack>
 
-                      {!done && (
+                      {!done && !monitoring && (
                         act ? (
                           <Box
                             sx={{
@@ -3334,7 +5048,9 @@ export default function App() {
   const [mode, setMode] = useState('day1');
   const [aiLogOpen, setAiLogOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
   const [snack, setSnack] = useState(null);
+  const calibrated = mode === 'day30' || mode === 'day90';
 
   const openReason = (t) => setReasonTask(t);
   const closeReason = () => setReasonTask(null);
@@ -3344,7 +5060,7 @@ export default function App() {
   const handleApprove = (item) => {
     const what =
       item?.recommendations ? item.recommendations[0]?.body
-      : item?.recommended || 'recommendation';
+      : item?.recommended || item?.title || 'recommendation';
     setSnack(`Approved · ${what}`);
   };
 
@@ -3389,9 +5105,9 @@ export default function App() {
         onAdd={() => setSnack('New work order request — not in this prototype')}
       />
 
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} />}
       {tab === 1 && <ScheduleTab />}
-      {tab === 2 && <TasksTab />}
+      {tab === 2 && <WorkTab />}
       {tab === 3 && <KPIsTab />}
       {tab === 4 && <SettingsTab />}
 
@@ -3433,8 +5149,8 @@ export default function App() {
             icon={<Icon name="calendar_month" size={22} />}
           />
           <BottomNavigationAction
-            label="Tasks"
-            icon={<Icon name="checklist" size={22} />}
+            label="Work"
+            icon={<Icon name="handyman" size={22} />}
           />
         </BottomNavigation>
       </Paper>
@@ -3465,8 +5181,11 @@ export default function App() {
           {[
             { label: 'Dispatch', icon: 'bolt', tab: 0 },
             { label: 'Schedule', icon: 'calendar_month', tab: 1 },
-            { label: 'Tasks', icon: 'checklist', tab: 2 },
+            { label: 'Work', icon: 'handyman', tab: 2 },
             { label: 'AI activity', icon: 'auto_awesome', action: 'aiLog' },
+            ...(calibrated
+              ? [{ label: 'Coordination Settings', icon: 'verified_user', action: 'calibration' }]
+              : []),
             { label: 'KPIs', icon: 'monitoring', tab: 3 },
             { label: 'Settings', icon: 'tune', tab: 4 }
           ].map((m, i) => {
@@ -3484,6 +5203,7 @@ export default function App() {
                   alignItems="center"
                   onClick={() => {
                     if (m.action === 'aiLog') setAiLogOpen(true);
+                    else if (m.action === 'calibration') setCalOpen(true);
                     else setTab(m.tab);
                     setMenuOpen(false);
                   }}
@@ -3525,6 +5245,7 @@ export default function App() {
         onReason={openReason}
         onReview={openOverride}
       />
+      <CalibrationSheet open={calOpen} onClose={() => setCalOpen(false)} />
 
       <Snackbar
         open={Boolean(snack)}
