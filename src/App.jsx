@@ -2254,89 +2254,127 @@ function Day1MetricSheet({ open, metricKey, onClose, onRespond }) {
           </Box>
           <Box sx={{ p: 1.5, overflowY: 'auto' }}>
             <Stack spacing={1.25}>
-              {data.items.map((it) => (
-                <Card key={it.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
-                  <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', mb: 0.25 }}>
-                      {it.when}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
-                      {it.title}
-                    </Typography>
-                    <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.375 }}>
-                      {it.body}
-                    </Typography>
-                    {it.why && (
-                      <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.625 }}>
-                        <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
-                        <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600 }}>
-                          {it.why}
+              {data.items.map((it) => {
+                const stateBg = it.stateTone === 'success' ? '#DCFCE7'
+                  : it.stateTone === 'warning' ? '#FEF3C7'
+                  : it.stateTone === 'info' ? '#E0F2FE'
+                  : '#F1F5F9';
+                const stateFg = it.stateTone === 'success' ? '#15803D'
+                  : it.stateTone === 'warning' ? '#92400E'
+                  : it.stateTone === 'info' ? '#0369A1'
+                  : '#475569';
+                return (
+                  <Card key={it.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                    <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                          {it.when}
                         </Typography>
+                        {it.state && (
+                          <Chip
+                            size="small"
+                            label={it.state}
+                            sx={{
+                              height: 18, fontSize: 10, fontWeight: 700,
+                              bgcolor: stateBg, color: stateFg,
+                              '.MuiChip-label': { px: 0.75 }
+                            }}
+                          />
+                        )}
                       </Stack>
-                    )}
-                    {it.outcome && (
-                      <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
-                        <Stack direction="row" spacing={0.5} alignItems="flex-start">
-                          <Icon name="model_training" size={13} color="#64748B" sx={{ mt: '1px', flexShrink: 0 }} />
-                          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
-                            <Box component="span" sx={{ fontWeight: 700 }}>What the AI learned: </Box>
-                            {it.outcome}
+                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                        {it.title}
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.375 }}>
+                        {it.body}
+                      </Typography>
+                      {it.why && (
+                        <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.625 }}>
+                          <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600 }}>
+                            {it.why}
                           </Typography>
                         </Stack>
-                      </Box>
-                    )}
-                    <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<Icon name="add_comment" size={14} />}
-                        onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'context' })}
-                        sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
-                      >
-                        Add context
-                      </Button>
-                      {metricKey === 'patterns' ? (
-                        <>
+                      )}
+                      {it.outcome && (
+                        <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
+                          <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                            <Icon name="model_training" size={13} color="#64748B" sx={{ mt: '1px', flexShrink: 0 }} />
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3, display: 'block' }}>
+                                <Box component="span" sx={{ fontWeight: 700 }}>What the AI learned: </Box>
+                                {it.outcome}
+                              </Typography>
+                              <Button
+                                size="small"
+                                onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'context' })}
+                                startIcon={<Icon name="add_comment" size={13} />}
+                                sx={{
+                                  mt: 0.5, ml: -0.5, px: 0.5, py: 0,
+                                  textTransform: 'none', fontSize: 11.5, fontWeight: 600,
+                                  color: '#4338CA', minHeight: 0
+                                }}
+                              >
+                                Add context
+                              </Button>
+                            </Box>
+                          </Stack>
+                        </Box>
+                      )}
+                      <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                        {metricKey === 'patterns' ? (
+                          <>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'confirm' })}
+                              sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                            >
+                              Confirm pattern
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="inherit"
+                              onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'dismiss' })}
+                              sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                            >
+                              Dismiss
+                            </Button>
+                          </>
+                        ) : metricKey === 'overrides' ? (
                           <Button
                             size="small"
                             variant="contained"
-                            onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'confirm' })}
-                            sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                            fullWidth
+                            onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'reinforce' })}
+                            sx={{ textTransform: 'none', fontSize: 12 }}
                           >
-                            Confirm pattern
+                            Reinforce rule
                           </Button>
+                        ) : (
                           <Button
                             size="small"
-                            color="inherit"
-                            onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'dismiss' })}
-                            sx={{ minWidth: 0, textTransform: 'none', fontSize: 12, color: '#64748B' }}
+                            variant="contained"
+                            fullWidth
+                            disabled={!it.undoable}
+                            startIcon={<Icon name="undo" size={14} />}
+                            onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'undo' })}
+                            sx={{
+                              textTransform: 'none', fontSize: 12,
+                              '&.Mui-disabled': {
+                                bgcolor: '#F1F5F9', color: '#94A3B8'
+                              }
+                            }}
                           >
-                            Dismiss
+                            {it.undoable ? 'Undo' : `${it.state} — can't undo`}
                           </Button>
-                        </>
-                      ) : metricKey === 'overrides' ? (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'reinforce' })}
-                          sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
-                        >
-                          Reinforce rule
-                        </Button>
-                      ) : (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'revisit' })}
-                          sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
-                        >
-                          Revisit
-                        </Button>
-                      )}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
+                        )}
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </Stack>
           </Box>
         </>
@@ -5318,13 +5356,15 @@ export default function App() {
   };
 
   const handleDay1Respond = ({ kind }) => {
-    setDay1Metric(null);
+    // Add-context shouldn't dismiss the drawer — it's an inline note action.
+    if (kind !== 'context') setDay1Metric(null);
     setSnack(
       kind === 'context' ? 'Context recorded · AI will weight it on the next pass'
       : kind === 'confirm' ? 'Pattern confirmed · AI will start using it'
       : kind === 'dismiss' ? 'Pattern dismissed · AI will stop tracking it'
       : kind === 'reinforce' ? 'Override reinforced · AI will treat it as a rule'
-      : 'Decision queued for revisit'
+      : kind === 'undo' ? 'Action undone · prior state restored'
+      : 'Decision queued'
     );
   };
 
