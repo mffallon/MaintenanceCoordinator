@@ -4,7 +4,7 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage } from './data.js';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails } from './data.js';
 import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow } from '@mui/material';
 
 // Trust Maturity Mode — the relationship evolves over time.
@@ -2137,7 +2137,7 @@ function OperationalForecast() {
 }
 
 // Day 1 — "Learning your building" status banner.
-function Day1Banner() {
+function Day1Banner({ onMetric }) {
   return (
     <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -2171,10 +2171,29 @@ function Day1Banner() {
         </Stack>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0.75, mt: 1.25 }}>
           {day1Status.metrics.map((m) => (
-            <Box key={m.label} sx={{ border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff' }}>
-              <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
-                {m.value}
-              </Typography>
+            <Box
+              key={m.label}
+              onClick={() => onMetric && onMetric(m.key)}
+              sx={{
+                border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
+                cursor: onMetric ? 'pointer' : 'default',
+                transition: 'transform 80ms, border-color 80ms, box-shadow 80ms',
+                position: 'relative',
+                '&:hover': onMetric ? {
+                  borderColor: '#A5B4FC',
+                  boxShadow: '0 1px 3px rgba(67,56,202,0.12)'
+                } : {},
+                '&:active': onMetric ? { transform: 'scale(0.98)' } : {}
+              }}
+            >
+              <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
+                <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                  {m.value}
+                </Typography>
+                {onMetric && (
+                  <Icon name="chevron_right" size={14} color="#CBD5E1" />
+                )}
+              </Stack>
               <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
                 {m.label}
               </Typography>
@@ -2186,6 +2205,143 @@ function Day1Banner() {
         </Box>
       </CardContent>
     </Card>
+  );
+}
+
+// Drawer that opens when a Day 1 banner metric tile is tapped. Shows the
+// history behind that metric with per-item "respond / add context" actions.
+function Day1MetricSheet({ open, metricKey, onClose, onRespond }) {
+  const data = metricKey ? day1MetricDetails[metricKey] : null;
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      {data && (
+        <>
+          <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+            <Stack direction="row" spacing={1.25} alignItems="flex-start">
+              <Box
+                sx={{
+                  width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+                  bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+                }}
+              >
+                <Icon name={data.icon} size={20} color={data.color} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                  {data.title}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+                  {data.sub}
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={onClose}>
+                <Icon name="close" size={20} color="#64748B" />
+              </IconButton>
+            </Stack>
+          </Box>
+          <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+            <Stack spacing={1.25}>
+              {data.items.map((it) => (
+                <Card key={it.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                  <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', mb: 0.25 }}>
+                      {it.when}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                      {it.title}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.375 }}>
+                      {it.body}
+                    </Typography>
+                    {it.why && (
+                      <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.625 }}>
+                        <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+                        <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600 }}>
+                          {it.why}
+                        </Typography>
+                      </Stack>
+                    )}
+                    {it.outcome && (
+                      <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
+                        <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                          <Icon name="model_training" size={13} color="#64748B" sx={{ mt: '1px', flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
+                            <Box component="span" sx={{ fontWeight: 700 }}>What the AI learned: </Box>
+                            {it.outcome}
+                          </Typography>
+                        </Stack>
+                      </Box>
+                    )}
+                    <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Icon name="add_comment" size={14} />}
+                        onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'context' })}
+                        sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                      >
+                        Add context
+                      </Button>
+                      {metricKey === 'patterns' ? (
+                        <>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'confirm' })}
+                            sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                          >
+                            Confirm pattern
+                          </Button>
+                          <Button
+                            size="small"
+                            color="inherit"
+                            onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'dismiss' })}
+                            sx={{ minWidth: 0, textTransform: 'none', fontSize: 12, color: '#64748B' }}
+                          >
+                            Dismiss
+                          </Button>
+                        </>
+                      ) : metricKey === 'overrides' ? (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'reinforce' })}
+                          sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                        >
+                          Reinforce rule
+                        </Button>
+                      ) : (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'revisit' })}
+                          sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                        >
+                          Revisit
+                        </Button>
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+            </Stack>
+          </Box>
+        </>
+      )}
+    </Drawer>
   );
 }
 
@@ -2725,7 +2881,7 @@ function StrategicRiskCard({ item }) {
   );
 }
 
-function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration }) {
+function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration, onDay1Metric }) {
   const mode = useMode();
   const day1 = mode === 'day1';
   const day30 = mode === 'day30';
@@ -2750,7 +2906,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
     <>
       <Box sx={{ px: 1.5, pt: 2 }}>
         {/* Maturity banner */}
-        {day1 && <Day1Banner />}
+        {day1 && <Day1Banner onMetric={onDay1Metric} />}
         {day30 && <Day30Banner onReview={onCalibration} />}
         {day90 && <Day90Banner onReview={onCalibration} />}
 
@@ -5127,6 +5283,7 @@ export default function App() {
   const [aiLogOpen, setAiLogOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
+  const [day1Metric, setDay1Metric] = useState(null);
   const [snack, setSnack] = useState(null);
   const calibrated = mode === 'day30' || mode === 'day90';
 
@@ -5160,6 +5317,17 @@ export default function App() {
     );
   };
 
+  const handleDay1Respond = ({ kind }) => {
+    setDay1Metric(null);
+    setSnack(
+      kind === 'context' ? 'Context recorded · AI will weight it on the next pass'
+      : kind === 'confirm' ? 'Pattern confirmed · AI will start using it'
+      : kind === 'dismiss' ? 'Pattern dismissed · AI will stop tracking it'
+      : kind === 'reinforce' ? 'Override reinforced · AI will treat it as a rule'
+      : 'Decision queued for revisit'
+    );
+  };
+
   return (
    <ModeContext.Provider value={mode}>
     <Box
@@ -5183,7 +5351,7 @@ export default function App() {
         onAdd={() => setSnack('New work order request — not in this prototype')}
       />
 
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} />}
       {tab === 1 && <ScheduleTab />}
       {tab === 2 && <WorkTab />}
       {tab === 3 && <KPIsTab />}
@@ -5324,6 +5492,12 @@ export default function App() {
         onReview={openOverride}
       />
       <CalibrationSheet open={calOpen} onClose={() => setCalOpen(false)} />
+      <Day1MetricSheet
+        open={Boolean(day1Metric)}
+        metricKey={day1Metric}
+        onClose={() => setDay1Metric(null)}
+        onRespond={handleDay1Respond}
+      />
 
       <Snackbar
         open={Boolean(snack)}

@@ -846,10 +846,137 @@ export const day1Status = {
   headline: 'Learning Cedar Ridge operations',
   sub: 'AI is recommending priorities while it learns technician patterns, unit-turn timing, and PM tradeoffs.',
   metrics: [
-    { label: 'Recommendations accepted', value: '9', sub: 'this week' },
-    { label: 'Overrides learned', value: '2', sub: 'so far' },
-    { label: 'Patterns detected', value: '3', sub: 'early signals' }
+    { key: 'accepted', label: 'Recommendations accepted', value: '9', sub: 'this week' },
+    { key: 'overrides', label: 'Overrides learned', value: '2', sub: 'so far' },
+    { key: 'patterns', label: 'Patterns detected', value: '3', sub: 'early signals' }
   ]
+};
+
+// Detailed history behind each Day 1 metric tile — populates the drawer
+// when the MD taps a tile. Each item is independently respondable.
+export const day1MetricDetails = {
+  accepted: {
+    title: 'Recommendations accepted',
+    sub: '9 AI recommendations you approved this week — the AI is calibrating to your decisions.',
+    icon: 'thumb_up_alt',
+    color: '#16A34A',
+    items: [
+      {
+        id: 'ac-1', when: 'Today · 7:12 AM',
+        title: 'Route Marco D. to fire panel first',
+        body: 'You approved routing Marco to the West Wing fire-panel trouble signal ahead of his Bldg B sweep.',
+        why: 'Life-safety priority — survey window opens Monday.',
+        outcome: 'AI will keep this routing pattern for life-safety alerts.'
+      },
+      {
+        id: 'ac-2', when: 'Today · 6:58 AM',
+        title: 'Bundle 4 overdue logs onto Diane K.\'s route',
+        body: 'You approved batching food-safety and water-temp logs onto her afternoon walk.',
+        why: 'Zero added travel — same floor coverage.',
+        outcome: 'AI will keep batching small log tasks onto existing routes.'
+      },
+      {
+        id: 'ac-3', when: 'Yesterday · 4:18 PM',
+        title: 'Defer Floor 3 filter PM to Saturday',
+        body: 'You approved moving the deferrable PM to relieve Jacob B.\'s overload.',
+        why: 'No compliance deadline before May 31.',
+        outcome: 'AI will offer Saturday slots when PM is the lowest-risk deferral.'
+      },
+      {
+        id: 'ac-4', when: 'Yesterday · 11:02 AM',
+        title: 'Pre-stage Apex Mechanical for Unit 214',
+        body: 'You approved a vendor hold ahead of tomorrow\'s 10 AM move-in.',
+        why: '3 repeat HVAC failures in 90 days — in-house ETA at risk.',
+        outcome: 'AI will pre-stage Apex when repeat-failure threshold is met.'
+      },
+      {
+        id: 'ac-5', when: 'Wed · 2:45 PM',
+        title: 'Assign generator inspection to Sasha P.',
+        body: 'You accepted Sasha as the substitute after Bruce\'s capacity was tight.',
+        why: 'Sasha had the most open time today.',
+        outcome: 'AI will weight Sasha higher when Bruce is overloaded.'
+      },
+      {
+        id: 'ac-6', when: 'Tue · 9:30 AM',
+        title: 'Snooze ceiling-tile replacement 24 hrs',
+        body: 'You accepted holding a low-risk cosmetic PM while move-in load cleared.',
+        why: 'No safety or compliance impact.',
+        outcome: 'AI will offer to snooze cosmetic PMs during move-in spikes.'
+      },
+      {
+        id: 'ac-7', when: 'Mon · 8:05 AM',
+        title: 'Sequence tomorrow\'s critical path',
+        body: 'You approved the AI\'s ordering of 31 work orders by risk and capacity.',
+        why: 'Aligned with last week\'s overrides on regulatory items.',
+        outcome: 'AI will continue producing morning sequences for your review.'
+      },
+      {
+        id: 'ac-8', when: 'Mon · 7:48 AM',
+        title: 'Auto-close fire extinguisher initials',
+        body: 'You confirmed AI closing the task after TELS logbook upload.',
+        why: 'Logbook entry already on file.',
+        outcome: 'AI will auto-close routine logbook-confirmed tasks.'
+      },
+      {
+        id: 'ac-9', when: 'Sun · 3:40 PM',
+        title: 'Route Diane K. through Floor 1-3 quick-wins',
+        body: 'You accepted bundling 4 light-fixture / hinge fixes onto her route.',
+        why: 'Co-located along her existing 2 PM path.',
+        outcome: 'AI will continue bundling quick-wins along active routes.'
+      }
+    ]
+  },
+  overrides: {
+    title: 'Overrides learned',
+    sub: '2 times you went a different direction than the AI suggested — it\'s incorporating your reasoning.',
+    icon: 'undo',
+    color: '#B45309',
+    items: [
+      {
+        id: 'ov-1', when: 'Wed · 10:22 AM',
+        title: 'You overrode: "Assign Bruce W. to Unit 117 paint touch-up"',
+        body: 'You routed it to Sasha P. instead, noting Bruce is preferred for life-safety walkthroughs.',
+        why: 'Your override taught the AI to reserve Bruce for life-safety tasks.',
+        outcome: 'AI now ranks Bruce lower for cosmetic unit-turn work.'
+      },
+      {
+        id: 'ov-2', when: 'Mon · 1:55 PM',
+        title: 'You overrode: "Defer Boiler #2 inspection to Tuesday"',
+        body: 'You kept it on Monday, citing the overnight cold-snap forecast.',
+        why: 'Override taught the AI to weight weather signals on seasonal mechanical PMs.',
+        outcome: 'AI now elevates seasonal mechanical PMs when overnight lows drop below 28°F.'
+      }
+    ]
+  },
+  patterns: {
+    title: 'Patterns detected',
+    sub: '3 early signals the AI is watching — none yet confident enough to act on without you.',
+    icon: 'sensors',
+    color: '#4338CA',
+    items: [
+      {
+        id: 'pt-1', when: 'Detected 4 days ago',
+        title: 'Luis R. completes unit turns ~18% faster during occupancy spikes',
+        body: 'Across 6 unit turns in the last 14 days, Luis outpaced the team average when move-in volume was high.',
+        why: 'Sample size is small — the AI wants more examples before suggesting reassignments.',
+        outcome: 'Confirm the pattern to let AI suggest Luis for time-sensitive turns.'
+      },
+      {
+        id: 'pt-2', when: 'Detected 6 days ago',
+        title: 'HVAC work orders cluster in Memory Care East after deferred PM',
+        body: '4 HVAC work orders in 60 days followed deferred filter PMs in that wing.',
+        why: 'AI is monitoring whether this is a real pattern or coincidence.',
+        outcome: 'Confirm to let AI surface a PM-protection recommendation for Memory Care East.'
+      },
+      {
+        id: 'pt-3', when: 'Detected 9 days ago',
+        title: 'PM tasks slip when move-in volume exceeds 4/week',
+        body: 'PM completion drops ~12% during weeks with 4+ move-ins; AI is tracking the correlation.',
+        why: 'Still calibrating — needs another move-in cycle for confidence.',
+        outcome: 'Confirm to let AI auto-defer low-risk PMs during high-occupancy weeks.'
+      }
+    ]
+  }
 };
 
 // Day 1 learning signals — early, low-confidence observations.
