@@ -2298,27 +2298,34 @@ function Day1MetricSheet({ open, metricKey, onClose, onRespond }) {
                       )}
                       {it.outcome && (
                         <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
-                          <Stack direction="row" spacing={0.5} alignItems="flex-start">
-                            <Icon name="model_training" size={13} color="#64748B" sx={{ mt: '1px', flexShrink: 0 }} />
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3, display: 'block' }}>
-                                <Box component="span" sx={{ fontWeight: 700 }}>What the AI learned: </Box>
-                                {it.outcome}
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            alignItems="center"
+                            justifyContent="space-between"
+                          >
+                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                              <Icon name="model_training" size={13} color="#64748B" sx={{ flexShrink: 0 }} />
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', lineHeight: 1.3 }}>
+                                What the AI learned
                               </Typography>
-                              <Button
-                                size="small"
-                                onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'context' })}
-                                startIcon={<Icon name="add_comment" size={13} />}
-                                sx={{
-                                  mt: 0.5, ml: -0.5, px: 0.5, py: 0,
-                                  textTransform: 'none', fontSize: 11.5, fontWeight: 600,
-                                  color: '#4338CA', minHeight: 0
-                                }}
-                              >
-                                Add context
-                              </Button>
-                            </Box>
+                            </Stack>
+                            <Button
+                              size="small"
+                              onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'context' })}
+                              startIcon={<Icon name="add_comment" size={13} />}
+                              sx={{
+                                px: 0.5, py: 0,
+                                textTransform: 'none', fontSize: 11.5, fontWeight: 600,
+                                color: '#4338CA', minHeight: 0, flexShrink: 0
+                              }}
+                            >
+                              Add context
+                            </Button>
                           </Stack>
+                          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35, display: 'block', mt: 0.5, pl: 2.25 }}>
+                            {it.outcome}
+                          </Typography>
                         </Box>
                       )}
                       <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
