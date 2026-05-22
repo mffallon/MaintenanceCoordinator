@@ -2416,8 +2416,7 @@ function SectionHeader({ icon, title, sub, color = '#4338CA' }) {
   );
 }
 
-function OperationalPriorityCard({ item }) {
-  const v = WO_STATUS_VISUAL[item.tone === 'error' ? 'Critical' : item.tone === 'warning' ? 'At risk' : 'Monitor'] || {};
+function OperationalPriorityCard({ item, onApprove, onOverride, onReason }) {
   const bg = toneBg(item.tone);
   return (
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
@@ -2438,23 +2437,54 @@ function OperationalPriorityCard({ item }) {
             <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
               {item.body}
             </Typography>
-            <Chip
-              size="small"
-              label={item.impact}
-              sx={{
-                mt: 0.625, height: 18, fontSize: 10, fontWeight: 700,
-                bgcolor: '#F1F5F9', color: '#475569',
-                '.MuiChip-label': { px: 0.75 }
-              }}
-            />
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.625 }}>
+              <Chip
+                size="small"
+                label={item.impact}
+                sx={{
+                  height: 18, fontSize: 10, fontWeight: 700,
+                  bgcolor: '#F1F5F9', color: '#475569',
+                  '.MuiChip-label': { px: 0.75 }
+                }}
+              />
+              {item.action && (
+                <Chip
+                  size="small"
+                  icon={<Icon name="auto_awesome" size={11} sx={{ ml: 0.5 }} />}
+                  label={`AI: ${item.action}`}
+                  sx={{
+                    height: 18, fontSize: 10, fontWeight: 700,
+                    bgcolor: '#EEF2FF', color: '#4338CA',
+                    '.MuiChip-label': { px: 0.625 }
+                  }}
+                />
+              )}
+            </Stack>
           </Box>
+        </Stack>
+        <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+          <Button size="small" variant="contained" fullWidth onClick={() => onApprove && onApprove(item)}>
+            {item.approveLabel || 'Approve'}
+          </Button>
+          <Button size="small" variant="outlined" color="inherit" fullWidth onClick={() => onOverride && onOverride(item)}>
+            Override
+          </Button>
+          {onReason && (
+            <IconButton
+              size="small"
+              onClick={() => onReason(item)}
+              sx={{ border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff' }}
+            >
+              <Icon name="psychology" size={18} />
+            </IconButton>
+          )}
         </Stack>
       </CardContent>
     </Card>
   );
 }
 
-function StaffingConflictCard({ item }) {
+function StaffingConflictCard({ item, onApprove, onOverride }) {
   return (
     <Card variant="outlined" sx={{ borderColor: '#FCD34D', bgcolor: '#FFFBEB' }}>
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -2482,12 +2512,20 @@ function StaffingConflictCard({ item }) {
             </Stack>
           </Box>
         </Stack>
+        <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+          <Button size="small" variant="contained" fullWidth onClick={() => onApprove && onApprove(item)}>
+            Approve reassignment
+          </Button>
+          <Button size="small" variant="outlined" color="inherit" fullWidth onClick={() => onOverride && onOverride(item)}>
+            Keep as-is
+          </Button>
+        </Stack>
       </CardContent>
     </Card>
   );
 }
 
-function PmTradeoffCard({ item }) {
+function PmTradeoffCard({ item, onApprove, onOverride }) {
   return (
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -2514,6 +2552,14 @@ function PmTradeoffCard({ item }) {
               </Typography>
             </Stack>
           </Box>
+        </Stack>
+        <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+          <Button size="small" variant="contained" fullWidth onClick={() => onApprove && onApprove(item)}>
+            Approve defer
+          </Button>
+          <Button size="small" variant="outlined" color="inherit" fullWidth onClick={() => onOverride && onOverride(item)}>
+            Keep today
+          </Button>
         </Stack>
       </CardContent>
     </Card>
@@ -2712,27 +2758,59 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
         {day1 && (
           <>
             <SectionHeader
-              icon="priority_high"
-              title="Operational priorities"
-              sub="The three things most likely to need your attention today"
+              icon="how_to_reg"
+              title="Needs your approval"
+              sub="Decisions the AI surfaced for your sign-off — you're supervising"
+              color="#B91C1C"
             />
-            <Stack spacing={1} sx={{ mb: 1.75 }}>
-              {operationalPriorities.map((p) => (
-                <OperationalPriorityCard key={p.id} item={p} />
+            <Stack spacing={1.25} sx={{ mb: 1.75 }}>
+              <WeatherCard bare />
+              {reviews.map((r) => (
+                <ReviewCard
+                  key={r.id}
+                  item={r}
+                  onApprove={onApprove}
+                  onOverride={openOverride}
+                />
               ))}
             </Stack>
 
-            <SectionHeader icon="group" title="Staffing" sub="One conflict worth a look" />
+            <SectionHeader
+              icon="priority_high"
+              title="Operational priorities"
+              sub="Top operational items — review the AI's suggested action, then approve or override"
+            />
+            <Stack spacing={1} sx={{ mb: 1.75 }}>
+              {operationalPriorities.map((p) => (
+                <OperationalPriorityCard
+                  key={p.id}
+                  item={p}
+                  onApprove={onApprove}
+                  onOverride={openOverride}
+                  onReason={openReason}
+                />
+              ))}
+            </Stack>
+
+            <SectionHeader icon="group" title="Staffing" sub="One conflict worth a decision today" />
             <Box sx={{ mb: 1.75 }}>
-              <StaffingConflictCard item={day1StaffingConflict} />
+              <StaffingConflictCard
+                item={day1StaffingConflict}
+                onApprove={onApprove}
+                onOverride={openOverride}
+              />
             </Box>
 
             <SectionHeader icon="event_repeat" title="PM tradeoff" sub="One deferrable item the AI flagged" />
             <Box sx={{ mb: 1.75 }}>
-              <PmTradeoffCard item={day1PmTradeoff} />
+              <PmTradeoffCard
+                item={day1PmTradeoff}
+                onApprove={onApprove}
+                onOverride={openOverride}
+              />
             </Box>
 
-            <SectionHeader icon="model_training" title="Learning signal" sub="An early pattern the AI is still calibrating" />
+            <SectionHeader icon="model_training" title="Learning signal" sub="An early pattern — still calibrating, no action needed yet" />
             <Box sx={{ mb: 1.75 }}>
               <LearningHighlightCard item={day1LearningHighlight} />
             </Box>

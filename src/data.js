@@ -1153,19 +1153,25 @@ export const operationalPriorities = [
     id: 'op-1', icon: 'meeting_room', tone: 'warning',
     title: 'Unit 214 HVAC is impacting move-in readiness',
     body: '10 AM move-in tomorrow — in-house ETA is at risk after 3 repeat failures in 90 days.',
-    impact: 'Move-in readiness'
+    impact: 'Move-in readiness',
+    action: 'Dispatch Apex Mechanical',
+    approveLabel: 'Approve dispatch'
   },
   {
     id: 'op-2', icon: 'ac_unit', tone: 'error',
     title: 'Boiler freeze-prep recommended before overnight cold snap',
     body: 'Overnight low forecast 22°F. A burst freeze risks resident heat loss and a major repair bill.',
-    impact: 'Operational continuity'
+    impact: 'Operational continuity',
+    action: 'Hold Jacob on Boiler #2, route Marco to fire panel',
+    approveLabel: 'Approve sequence'
   },
   {
     id: 'op-3', icon: 'event_repeat', tone: 'info',
     title: 'PM completion risk emerging from staffing strain',
     body: 'A few PM tasks may slip this week if today’s load isn’t rebalanced before tomorrow.',
-    impact: 'PM compliance'
+    impact: 'PM compliance',
+    action: 'Reassign Floor 3 filter PM to Diane',
+    approveLabel: 'Approve plan'
   }
 ];
 
