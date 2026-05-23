@@ -11,7 +11,9 @@ function DeviceStage({ children }) {
       <GlobalStyles
         styles={{
           'html, body, #root': { height: '100%' },
-          body: { margin: 0 }
+          // Lock body scroll so MUI never adds padding-right compensation
+          // (which was making the fixed AppBar visually inset).
+          body: { margin: 0, overflow: 'hidden' }
         }}
       />
       <Box
@@ -72,7 +74,15 @@ const theme = createTheme({
     MuiCard: { styleOverrides: { root: { borderRadius: 14 } } },
     MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
     MuiButton: { defaultProps: { disableElevation: true } },
-    MuiAppBar: { styleOverrides: { root: { backgroundImage: 'none' } } }
+    MuiAppBar: { styleOverrides: { root: { backgroundImage: 'none' } } },
+    // Stop MUI from applying scrollbar-compensation padding to body and
+    // .mui-fixed elements when overlays open. That padding was making the
+    // fixed AppBar look inset from the iPhone-frame edges.
+    MuiDrawer: { defaultProps: { disableScrollLock: true } },
+    MuiDialog: { defaultProps: { disableScrollLock: true } },
+    MuiModal: { defaultProps: { disableScrollLock: true } },
+    MuiPopover: { defaultProps: { disableScrollLock: true } },
+    MuiMenu: { defaultProps: { disableScrollLock: true } }
   }
 });
 

@@ -372,15 +372,14 @@ function TrustModeBar({ mode, onMode }) {
 function TopBar({ onNotif, onMenu, onAdd, menuOpen, mode, onMode }) {
   return (
     <AppBar
-      position="fixed"
+      position="static"
       elevation={0}
       sx={{
         bgcolor: '#004C9A',
         color: '#fff',
         borderBottom: '1px solid rgba(41,48,54,0.15)',
-        left: 0,
-        right: 0,
         width: '100%',
+        flexShrink: 0,
         zIndex: 1100
       }}
     >
@@ -416,7 +415,7 @@ function TopBar({ onNotif, onMenu, onAdd, menuOpen, mode, onMode }) {
           <Icon name="battery_full" size={18} color="#fff" sx={{ transform: 'rotate(90deg)' }} />
         </Stack>
       </Box>
-      <Toolbar sx={{ minHeight: 56, px: 1, gap: 1 }}>
+      <Toolbar disableGutters sx={{ minHeight: 56, px: 1, gap: 1 }}>
         <Box sx={{ flex: 1, minWidth: 0, pl: 1, display: 'flex', alignItems: 'center' }}>
           <TelsLogo height={22} />
         </Box>
@@ -6434,8 +6433,8 @@ function ScheduleTab() {
   const longLabel = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const shortLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   return (
-    <Box sx={{ px: 1.5, pt: 1.5 }}>
-      <Box sx={{ mb: 1.25 }}>
+    <Box sx={{ px: 1, pt: 1.5 }}>
+      <Box sx={{ mb: 1.25, px: 0.5 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
           Schedule
         </Typography>
@@ -6660,29 +6659,27 @@ function ScheduleTab() {
           })}
         </Stack>
       ) : (
-        // Day 1 — original detailed view (MD is supervising operations).
+        // Day 1 — built from the same scaffold as Day 30/90. Capacity
+        // visualization is shown via a thin LinearProgress bar, no
+        // absolutely-positioned overlays that could push layout out.
         <Stack spacing={1}>
           {team.map((p) => {
             const loadHrs = scheduledHours(p.tasks);
             const st = loadStatus(loadHrs, p.capacity);
             const tone = st.tone;
+            const cap = p.capacity || 0;
+            const pct = cap > 0 ? Math.min(100, Math.round((loadHrs / cap) * 100)) : 0;
+            const over = cap > 0 && loadHrs > cap;
             return (
               <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
                 <CardContent
-                  sx={{
-                    p: 1.25, '&:last-child': { pb: 1.25 },
-                    cursor: 'pointer'
-                  }}
+                  sx={{ p: 1.25, '&:last-child': { pb: 1.25 }, cursor: 'pointer' }}
                   onClick={() => setOpenMember(p)}
                 >
                   <Stack direction="row" spacing={1.25} alignItems="center">
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Stack direction="row" alignItems="center" spacing={0.75}>
+                      <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{p.name}</Typography>
-                      </Stack>
-                      <Stack direction="row" alignItems="center" spacing={0.75}>
-                        <Typography variant="caption">{p.shift}</Typography>
-                        <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
                         <Chip
                           size="small"
                           label={st.label}
@@ -6692,17 +6689,30 @@ function ScheduleTab() {
                             '.MuiChip-label': { px: 0.75 }
                           }}
                         />
-                        <Typography variant="caption" sx={{ color: '#64748B' }}>
-                          · {p.tasks.length} items
-                        </Typography>
                       </Stack>
-                      {p.capacity > 0 && (
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
+                        <Icon name="schedule" size={13} color="#94A3B8" />
+                        <Typography variant="caption">{p.shift}</Typography>
+                        <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
+                        <Typography variant="caption">{p.tasks.length} items</Typography>
+                      </Stack>
+                      {cap > 0 && (
                         <Box sx={{ mt: 0.75 }}>
-                          <DayBar tasks={p.tasks} capacity={p.capacity} />
-                          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25 }}>
-                            {loadHrs > p.capacity
-                              ? `${fmtHours(loadHrs)}h planned · ${fmtHours(loadHrs - p.capacity)}h over an ${p.capacity}h shift`
-                              : `${fmtHours(loadHrs)}h planned · fits in ${p.capacity}h shift`}
+                          <LinearProgress
+                            variant="determinate"
+                            value={pct}
+                            sx={{
+                              height: 6, borderRadius: 3, bgcolor: '#F1F5F9',
+                              '& .MuiLinearProgress-bar': {
+                                bgcolor: over ? '#DC2626' : toneBg(tone),
+                                borderRadius: 3
+                              }
+                            }}
+                          />
+                          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5, lineHeight: 1.25 }}>
+                            {over
+                              ? `${fmtHours(loadHrs)}h planned · ${fmtHours(loadHrs - cap)}h over an ${cap}h shift`
+                              : `${fmtHours(loadHrs)}h planned · fits in ${cap}h shift`}
                           </Typography>
                         </Box>
                       )}
@@ -7210,10 +7220,9 @@ export default function App() {
         height: '100%',
         bgcolor: '#F1F5F9',
         position: 'relative',
-        pt: HEADER_OFFSET,
-        pb: 9,
-        overflowY: 'auto',
-        overflowX: 'hidden'
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}
     >
       <TopBar
@@ -7225,6 +7234,17 @@ export default function App() {
         onAdd={() => setSnack('New work order request — not in this prototype')}
       />
 
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          '&::-webkit-scrollbar': { display: 'none' }
+        }}
+      >
       {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} onViewStaff={openStaffByName} onSnooze={(it) => setSnoozeTarget(it)} onContext={(it) => setContextTarget({ id: it.id, when: it.receivedAgo || it.when, title: it.title })} onPatternsTile={() => setCoordPatternsOpen(true)} onRisksTile={() => setRisksOpen(true)} snoozedIds={extraWorkOrders.map((w) => w.id)} />}
       {tab === 1 && <ScheduleTab />}
       {tab === 2 && <WorkTab seg={workSeg} onSegChange={setWorkSeg} />}
@@ -7238,15 +7258,13 @@ export default function App() {
           onUndo={(it) => setSnack(`Undid · ${it.title}`)}
         />
       )}
+      </Box>
 
       <Paper
         elevation={0}
         sx={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
           width: '100%',
+          flexShrink: 0,
           bgcolor: '#fff',
           borderTop: '1px solid #E2E8F0',
           pb: 'env(safe-area-inset-bottom)',
