@@ -7220,8 +7220,9 @@ export default function App() {
         height: '100%',
         bgcolor: '#F1F5F9',
         position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
+        display: 'grid',
+        gridTemplateRows: 'auto 1fr auto',
+        gridTemplateColumns: '100%',
         overflow: 'hidden'
       }}
     >
@@ -7236,8 +7237,8 @@ export default function App() {
 
       <Box
         sx={{
-          flex: 1,
           minHeight: 0,
+          minWidth: 0,
           overflowY: 'auto',
           overflowX: 'hidden',
           scrollbarWidth: 'none',
