@@ -6659,17 +6659,12 @@ function ScheduleTab() {
           })}
         </Stack>
       ) : (
-        // Day 1 — built from the same scaffold as Day 30/90. Capacity
-        // visualization is shown via a thin LinearProgress bar, no
-        // absolutely-positioned overlays that could push layout out.
+        // Day 1 — same outer scaffold and Card shape as Day 30 Team view.
         <Stack spacing={1}>
           {team.map((p) => {
             const loadHrs = scheduledHours(p.tasks);
             const st = loadStatus(loadHrs, p.capacity);
             const tone = st.tone;
-            const cap = p.capacity || 0;
-            const pct = cap > 0 ? Math.min(100, Math.round((loadHrs / cap) * 100)) : 0;
-            const over = cap > 0 && loadHrs > cap;
             return (
               <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
                 <CardContent
@@ -6678,44 +6673,24 @@ function ScheduleTab() {
                 >
                   <Stack direction="row" spacing={1.25} alignItems="center">
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap>
+                      <Stack direction="row" alignItems="center" spacing={0.75}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{p.name}</Typography>
                         <Chip
                           size="small"
                           label={st.label}
                           sx={{
-                            height: 18, fontSize: 10,
-                            bgcolor: toneBg(tone), color: '#0F172A',
+                            height: 18, fontSize: 10, bgcolor: toneBg(tone), color: '#0F172A',
                             '.MuiChip-label': { px: 0.75 }
                           }}
                         />
                       </Stack>
-                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25 }}>
                         <Icon name="schedule" size={13} color="#94A3B8" />
-                        <Typography variant="caption">{p.shift}</Typography>
-                        <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
-                        <Typography variant="caption">{p.tasks.length} items</Typography>
+                        <Typography variant="caption" sx={{ color: '#475569' }}>
+                          {p.shift} · {p.tasks.length} items
+                          {p.capacity > 0 && ` · ${fmtHours(loadHrs)}h / ${p.capacity}h`}
+                        </Typography>
                       </Stack>
-                      {cap > 0 && (
-                        <Box sx={{ mt: 0.75 }}>
-                          <LinearProgress
-                            variant="determinate"
-                            value={pct}
-                            sx={{
-                              height: 6, borderRadius: 3, bgcolor: '#F1F5F9',
-                              '& .MuiLinearProgress-bar': {
-                                bgcolor: over ? '#DC2626' : toneBg(tone),
-                                borderRadius: 3
-                              }
-                            }}
-                          />
-                          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5, lineHeight: 1.25 }}>
-                            {over
-                              ? `${fmtHours(loadHrs)}h planned · ${fmtHours(loadHrs - cap)}h over an ${cap}h shift`
-                              : `${fmtHours(loadHrs)}h planned · fits in ${cap}h shift`}
-                          </Typography>
-                        </Box>
-                      )}
                     </Box>
                     <Icon name="chevron_right" size={20} color="#94A3B8" />
                   </Stack>
