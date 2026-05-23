@@ -6661,6 +6661,16 @@ function ScheduleTab() {
       ) : (
         // Day 1 — same outer scaffold and Card shape as Day 30 Team view.
         <Stack spacing={1}>
+          <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Icon name="auto_awesome" size={16} color="#4338CA" />
+                <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
+                  AI is recommending team assignments — still learning each tech's pace
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
           {team.map((p) => {
             const loadHrs = scheduledHours(p.tasks);
             const st = loadStatus(loadHrs, p.capacity);
