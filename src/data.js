@@ -844,11 +844,11 @@ export const day30TeamNotes = {
 // the MD stays in control. Banner + early calibration signals.
 export const day1Status = {
   headline: 'Learning Cedar Ridge operations',
-  sub: 'AI is recommending priorities while it learns technician patterns, unit-turn timing, and PM tradeoffs.',
+  sub: 'Recommending today, learning as it goes.',
   metrics: [
     { key: 'accepted', label: 'Recommendations accepted', value: '9', sub: 'this week' },
     { key: 'overrides', label: 'Overrides learned', value: '2', sub: 'so far' },
-    { key: 'patterns', label: 'Patterns detected', value: '3', sub: 'early signals' }
+    { key: 'patterns', label: 'Patterns detected', value: '4', sub: 'early signals' }
   ]
 };
 
@@ -856,8 +856,8 @@ export const day1Status = {
 // when the MD taps a tile. Each item is independently respondable.
 export const day1MetricDetails = {
   accepted: {
-    title: 'Recommendations accepted',
-    sub: '9 AI recommendations you approved this week — the AI is calibrating to your decisions.',
+    title: 'Review Accepted Recommendations',
+    sub: '9 AI recommendations you approved this week.',
     icon: 'thumb_up_alt',
     color: '#16A34A',
     items: [
@@ -867,7 +867,9 @@ export const day1MetricDetails = {
         state: 'In progress', stateTone: 'info', undoable: true,
         body: 'You approved routing Marco to the West Wing fire-panel trouble signal ahead of his Bldg B sweep.',
         why: 'Life-safety priority — survey window opens Monday.',
-        outcome: 'AI will keep this routing pattern for life-safety alerts.'
+        outcome: 'Keeping this routing pattern for life-safety alerts.',
+        target: 'WO-1041 · Fire panel trouble signal — West Wing',
+        route: { tab: 2, seg: 'orders', highlight: 'wo-1041' }
       },
       {
         id: 'ac-2', when: 'Today · 6:58 AM',
@@ -875,7 +877,9 @@ export const day1MetricDetails = {
         state: 'Scheduled', stateTone: 'default', undoable: true,
         body: 'You approved batching food-safety and water-temp logs onto her afternoon walk.',
         why: 'Zero added travel — same floor coverage.',
-        outcome: 'AI will keep batching small log tasks onto existing routes.'
+        outcome: 'Batching small log tasks onto existing routes going forward.',
+        target: 'TK-4 · Food-safety & water-temp logs — Floors 1–3',
+        route: { tab: 2, seg: 'tasks', highlight: 'tk-4' }
       },
       {
         id: 'ac-3', when: 'Yesterday · 4:18 PM',
@@ -883,7 +887,9 @@ export const day1MetricDetails = {
         state: 'Scheduled', stateTone: 'default', undoable: true,
         body: 'You approved moving the deferrable PM to relieve Jacob B.\'s overload.',
         why: 'No compliance deadline before May 31.',
-        outcome: 'AI will offer Saturday slots when PM is the lowest-risk deferral.'
+        outcome: 'Offering Saturday slots when PM is the lowest-risk deferral.',
+        target: 'TK-7 · Replace air handler filters — Floor 3',
+        route: { tab: 2, seg: 'tasks', highlight: 'tk-7' }
       },
       {
         id: 'ac-4', when: 'Yesterday · 11:02 AM',
@@ -891,7 +897,9 @@ export const day1MetricDetails = {
         state: 'Awaiting vendor', stateTone: 'warning', undoable: true,
         body: 'You approved a vendor hold ahead of tomorrow\'s 10 AM move-in.',
         why: '3 repeat HVAC failures in 90 days — in-house ETA at risk.',
-        outcome: 'AI will pre-stage Apex when repeat-failure threshold is met.'
+        outcome: 'Pre-staging Apex when repeat-failure thresholds are met.',
+        target: 'UT-214 · Unit 214 HVAC recommission',
+        route: { tab: 2, seg: 'turns', highlight: 'turn-214' }
       },
       {
         id: 'ac-5', when: 'Wed · 2:45 PM',
@@ -899,7 +907,7 @@ export const day1MetricDetails = {
         state: 'Completed', stateTone: 'success', undoable: false,
         body: 'You accepted Sasha as the substitute after Bruce\'s capacity was tight.',
         why: 'Sasha had the most open time today.',
-        outcome: 'AI will weight Sasha higher when Bruce is overloaded.'
+        outcome: 'Weighting Sasha higher when Bruce is overloaded.'
       },
       {
         id: 'ac-6', when: 'Tue · 9:30 AM',
@@ -907,7 +915,9 @@ export const day1MetricDetails = {
         state: 'On hold', stateTone: 'default', undoable: true,
         body: 'You accepted holding a low-risk cosmetic PM while move-in load cleared.',
         why: 'No safety or compliance impact.',
-        outcome: 'AI will offer to snooze cosmetic PMs during move-in spikes.'
+        outcome: 'Offering to snooze cosmetic PMs during move-in spikes.',
+        target: 'WO-1052 · Carpet transition strip — 2F corridor',
+        route: { tab: 2, seg: 'orders', highlight: 'wo-1052' }
       },
       {
         id: 'ac-7', when: 'Mon · 8:05 AM',
@@ -915,7 +925,7 @@ export const day1MetricDetails = {
         state: 'Completed', stateTone: 'success', undoable: false,
         body: 'You approved the AI\'s ordering of 31 work orders by risk and capacity.',
         why: 'Aligned with last week\'s overrides on regulatory items.',
-        outcome: 'AI will continue producing morning sequences for your review.'
+        outcome: 'Producing morning sequences for your review each day.'
       },
       {
         id: 'ac-8', when: 'Mon · 7:48 AM',
@@ -923,7 +933,7 @@ export const day1MetricDetails = {
         state: 'Closed', stateTone: 'success', undoable: false,
         body: 'You confirmed AI closing the task after TELS logbook upload.',
         why: 'Logbook entry already on file.',
-        outcome: 'AI will auto-close routine logbook-confirmed tasks.'
+        outcome: 'Auto-closing routine logbook-confirmed tasks.'
       },
       {
         id: 'ac-9', when: 'Sun · 3:40 PM',
@@ -931,13 +941,13 @@ export const day1MetricDetails = {
         state: 'Completed', stateTone: 'success', undoable: false,
         body: 'You accepted bundling 4 light-fixture / hinge fixes onto her route.',
         why: 'Co-located along her existing 2 PM path.',
-        outcome: 'AI will continue bundling quick-wins along active routes.'
+        outcome: 'Bundling quick-wins along active routes.'
       }
     ]
   },
   overrides: {
-    title: 'Overrides learned',
-    sub: '2 times you went a different direction than the AI suggested — it\'s incorporating your reasoning.',
+    title: 'Review Overrides Learned',
+    sub: '2 overrides the AI is learning from.',
     icon: 'undo',
     color: '#B45309',
     items: [
@@ -947,7 +957,7 @@ export const day1MetricDetails = {
         state: 'Active rule', stateTone: 'success',
         body: 'You routed it to Sasha P. instead, noting Bruce is preferred for life-safety walkthroughs.',
         why: 'Your override taught the AI to reserve Bruce for life-safety tasks.',
-        outcome: 'AI now ranks Bruce lower for cosmetic unit-turn work.'
+        outcome: 'Bruce now ranks lower for cosmetic unit-turn work.'
       },
       {
         id: 'ov-2', when: 'Mon · 1:55 PM',
@@ -955,39 +965,47 @@ export const day1MetricDetails = {
         state: 'Active rule', stateTone: 'success',
         body: 'You kept it on Monday, citing the overnight cold-snap forecast.',
         why: 'Override taught the AI to weight weather signals on seasonal mechanical PMs.',
-        outcome: 'AI now elevates seasonal mechanical PMs when overnight lows drop below 28°F.'
+        outcome: 'Seasonal mechanical PMs now elevate when overnight lows drop below 28°F.'
       }
     ]
   },
   patterns: {
-    title: 'Patterns detected',
-    sub: '3 early signals the AI is watching — none yet confident enough to act on without you.',
+    title: 'Review Patterns Detected',
+    sub: '4 early signals the AI is watching.',
     icon: 'sensors',
     color: '#4338CA',
     items: [
       {
-        id: 'pt-1', when: 'Detected 4 days ago',
-        title: 'Luis R. completes unit turns ~18% faster during occupancy spikes',
-        state: 'Monitoring · 6 samples', stateTone: 'info',
-        body: 'Across 6 unit turns in the last 14 days, Luis outpaced the team average when move-in volume was high.',
-        why: 'Sample size is small — the AI wants more examples before suggesting reassignments.',
-        outcome: 'Confirm the pattern to let AI suggest Luis for time-sensitive turns.'
-      },
-      {
-        id: 'pt-2', when: 'Detected 6 days ago',
-        title: 'HVAC work orders cluster in Memory Care East after deferred PM',
-        state: 'Monitoring · 4 samples', stateTone: 'info',
-        body: '4 HVAC work orders in 60 days followed deferred filter PMs in that wing.',
-        why: 'AI is monitoring whether this is a real pattern or coincidence.',
-        outcome: 'Confirm to let AI surface a PM-protection recommendation for Memory Care East.'
-      },
-      {
-        id: 'pt-3', when: 'Detected 9 days ago',
+        id: 'pt-3', when: 'Updated 9 days ago',
         title: 'PM tasks slip when move-in volume exceeds 4/week',
         state: 'Monitoring · 2 cycles', stateTone: 'info',
         body: 'PM completion drops ~12% during weeks with 4+ move-ins; AI is tracking the correlation.',
         why: 'Still calibrating — needs another move-in cycle for confidence.',
-        outcome: 'Confirm to let AI auto-defer low-risk PMs during high-occupancy weeks.'
+        outcome: 'Confirm to auto-defer low-risk PMs during high-occupancy weeks.'
+      },
+      {
+        id: 'pt-2', when: 'Updated 6 days ago',
+        title: 'HVAC work orders cluster in Memory Care East after deferred PM',
+        state: 'Monitoring · 4 samples', stateTone: 'info',
+        body: '4 HVAC work orders in 60 days followed deferred filter PMs in that wing.',
+        why: 'AI is monitoring whether this is a real pattern or coincidence.',
+        outcome: 'Confirm to surface a PM-protection recommendation for Memory Care East.'
+      },
+      {
+        id: 'pt-1', when: 'Updated 4 days ago',
+        title: 'Luis R. completes unit turns ~18% faster during occupancy spikes',
+        state: 'Monitoring · 6 samples', stateTone: 'info',
+        body: 'Across 6 unit turns in the last 14 days, Luis outpaced the team average when move-in volume was high.',
+        why: 'Sample size is small — the AI wants more examples before suggesting reassignments.',
+        outcome: 'Confirm to surface Luis for time-sensitive turns.'
+      },
+      {
+        id: 'pt-4', when: 'Updated 2 days ago',
+        title: 'Luis may be faster on unit turns during move-in spikes',
+        state: 'Monitoring · 6 turns', stateTone: 'info',
+        body: 'Early pattern from 6 unit turns — Luis is trending ahead of the team average during high-volume weeks.',
+        why: 'Sample size is small — still calibrating before suggesting reassignments.',
+        outcome: 'Confirm to consider Luis as the default for time-sensitive turns.'
       }
     ]
   }
@@ -1013,12 +1031,11 @@ export const learningSignals = [
 // rhythms; the MD now manages exceptions, not every task.
 export const day30Status = {
   headline: 'Connected Community is operationally calibrated to Cedar Ridge',
-  sub: 'Connected Community has successfully coordinated routine staffing, PM balancing, and readiness operations over the last 30 days.',
+  sub: 'Coordination is steady and the AI is learning fast — ready to widen what it handles next?',
   metrics: [
-    { value: '82%', label: 'Recommendation acceptance' },
-    { value: '11', label: 'Learned coordination patterns' },
-    { value: '−14%', label: 'WO aging' },
-    { value: '+9%', label: 'Unit-turn readiness' }
+    { key: 'acceptance', value: '82%', label: 'Recommendation acceptance', sub: 'last 30 days' },
+    { key: 'patterns', value: '11', label: 'Learned coordination patterns', sub: 'active rules' },
+    { key: 'pm', value: '94%', label: 'PM tasks performed on time', sub: 'last 30 days' }
   ],
   capabilities: [
     'Routine PM coordination active',
@@ -1041,11 +1058,11 @@ export const day90Status = {
   sub: 'Connected Community has developed enough operational context to begin surfacing predictive readiness insights across staffing, maintenance, and compliance operations.',
   context: 'These insights are based on 90 days of staffing, maintenance, occupancy, and PM coordination patterns.',
   metrics: [
-    { value: '94%', label: 'Readiness stability maintained' },
-    { value: '23', label: 'Operational patterns learned' },
-    { value: '3', label: 'Forecasted risks prevented this week' },
-    { value: '−18%', label: 'PM degradation risk' },
-    { value: '42 days', label: 'Backlog stabilized — consecutive', wide: true }
+    { key: 'stability', value: '94%', label: 'Readiness stability maintained' },
+    { key: 'patterns', value: '23', label: 'Operational patterns learned' },
+    { key: 'risks', value: '3', label: 'Forecasted risks prevented this week' },
+    { key: 'degradation', value: '−18%', label: 'PM degradation risk' },
+    { key: 'backlog', value: '42 days', label: 'Backlog stabilized — consecutive', wide: true }
   ],
   capabilities: [
     'Predictive PM insights available',
@@ -1132,13 +1149,18 @@ export const predictiveTasks = [
 // Predictive readiness recommendation — an exception at Day 30 / Day 90.
 export const predictiveReviews = [
   {
-    id: 'rv-4', kind: 'Predictive readiness risk', icon: 'online_prediction',
-    summary: 'PM completion trend indicates a likely HVAC emergency workload increase within 14 days.',
-    recommended: 'Protect the HVAC PM block Wednesday morning; defer low-impact quick wins.',
-    why: 'Historical PM deferrals correlate with emergency-WO spikes during temperature swings.',
-    tradeoff: '2 low-priority hallway tasks delayed until Friday.',
-    confidence: 'Medium-high · based on historical winter workload patterns',
-    predictive: true
+    id: 'rv-4', kind: 'Technician pattern · needs your read', icon: 'psychology_alt',
+    summary: 'Bruce W.\'s completion times have slowed ~22% over the last 30 days — but the pattern is ambiguous and one of the likely causes is HR-sensitive.',
+    recommended: 'Hold autonomous rebalancing for Bruce. Three remediation paths are staged behind your judgment.',
+    why: 'AI ran three causal hypotheses against the data and can\'t separate them with confidence: (1) physical fatigue (slower starts, faster on familiar assets), (2) route saturation (Bruce is the most-used tech for life-safety this quarter), (3) unfamiliar asset mix (3 new chiller variants added in April). Each has a different remediation path, and one is a conversation only you can have.',
+    tradeoff: 'Holding rebalancing means Bruce stays at current load this week. No compliance impact — life-safety tasks are still completing on time, just slower.',
+    confidence: 'Medium · the trend is real, but the cause attribution is genuinely uncertain',
+    predictive: true,
+    options: [
+      'Operational · rebalance Bruce\'s route this week and watch',
+      'Training · pair Bruce with Sasha on new chiller variants',
+      'HR · have the conversation (no autonomous action)'
+    ]
   }
 ];
 
@@ -1187,7 +1209,7 @@ export const unitTurns = [
   {
     id: 'turn-318', unit: 'Unit 318', area: 'Bldg B · Floor 3',
     moveIn: 'Move-in tomorrow · 2:00 PM', status: 'On track', readiness: 70,
-    assignee: 'Luis R.', eta: '2h 30m remaining', learned: true,
+    assignee: 'Luis R.', eta: '2h 30m remaining', learned: true, patternId: 'pt-4',
     note: 'AI auto-coordinated — Luis turns units 18% faster during occupancy spikes.'
   },
   {
@@ -1288,6 +1310,27 @@ export const learnedPatterns = [
 // Calm-mode data — operational readiness framing (replaces task lists)
 // ─────────────────────────────────────────────────────────────────────
 
+// A freshly-received work order surfaced at the top of Day 1 approvals.
+// The AI proposes an assignment based on today's remaining capacity.
+export const incomingWorkOrder = {
+  id: 'wo-1099',
+  receivedAgo: '4 min ago',
+  priority: 'Medium',
+  category: 'Plumbing',
+  icon: 'water_drop',
+  title: 'Toilet running continuously',
+  location: 'Bldg A · Floor 2 · Unit 209',
+  body: 'Wasting water continuously and disturbing the resident — satisfaction risk if it goes overnight.',
+  suggestion: {
+    tech: 'Sasha P.',
+    open: '2.4 hrs open',
+    eta: 'ETA 25 min',
+    rationale: 'Sasha has the most open capacity today and is already on Floor 2 (Unit 117 paint touch-up).',
+    travel: 'Zero added travel'
+  },
+  confidence: 'High · capacity math from today\'s assignments'
+};
+
 // Day 1 — max 3 grouped operational priorities (NOT raw work orders).
 export const operationalPriorities = [
   {
@@ -1373,22 +1416,84 @@ export const day30Readiness = [
   {
     id: 'r-pm', icon: 'event_repeat', tone: 'success',
     title: 'Routine PM coordination stabilized',
-    body: '11 PM tasks scheduled, routed, and tracked without intervention this week.'
+    body: '11 PM tasks scheduled, routed, and tracked without intervention this week.',
+    details: {
+      summary: 'How the AI coordinated PM work this week',
+      stats: [
+        { value: '11', label: 'scheduled' },
+        { value: '9', label: 'completed' },
+        { value: '2', label: 'in flight' }
+      ],
+      items: [
+        { primary: 'Air handler filter PM · Floor 2', secondary: 'Bruce W. · Wed 9:00 AM', state: 'Completed' },
+        { primary: 'Boiler quarterly inspection · Mech Room A', secondary: 'Jacob B. · Thu 10:00 AM', state: 'Completed' },
+        { primary: 'Generator weekly exercise', secondary: 'Sasha P. · Fri 8:00 AM', state: 'Completed' },
+        { primary: 'Smoke detector battery test · Floor 1', secondary: 'Bruce W. · Fri 2:00 PM', state: 'Scheduled' },
+        { primary: 'Hot water temp logs', secondary: 'Diane K. · Sat 11:00 AM', state: 'Scheduled' }
+      ],
+      rollup: '+6 more routed without intervention'
+    }
   },
   {
     id: 'r-batch', icon: 'inventory_2', tone: 'success',
     title: 'Quick-win batching completed automatically',
-    body: '5 minor work orders bundled onto existing technician routes — zero added travel.'
+    body: '5 minor work orders bundled onto existing technician routes — zero added travel.',
+    details: {
+      summary: 'Bundled onto Diane K.\'s 2 PM Floor 1–3 route',
+      stats: [
+        { value: '5', label: 'bundled' },
+        { value: '55m', label: 'route time' },
+        { value: '0', label: 'detours' }
+      ],
+      items: [
+        { primary: 'Light fixture replacement · 2F-204', secondary: 'Diane K. · 2:00 PM', state: 'Completed' },
+        { primary: 'Cabinet hinge tighten · 2F-212', secondary: 'Diane K. · 2:15 PM', state: 'Completed' },
+        { primary: 'Door stop reinstall · 1F-118', secondary: 'Diane K. · 2:30 PM', state: 'Completed' },
+        { primary: 'Faucet aerator clean · 3F-308', secondary: 'Diane K. · 2:45 PM', state: 'In progress' },
+        { primary: 'Caulk re-seal · 1F-120', secondary: 'Diane K. · 3:00 PM', state: 'Scheduled' }
+      ]
+    }
   },
   {
     id: 'r-occ', icon: 'meeting_room', tone: 'success',
     title: 'Occupancy readiness protected',
-    body: 'Tomorrow’s 10 AM move-in is sequenced; vendor backup pre-staged for Unit 214.'
+    body: 'Tomorrow’s 10 AM move-in is sequenced; vendor backup pre-staged for Unit 214.',
+    details: {
+      summary: 'Unit 214 — move-in 10:00 AM tomorrow',
+      stats: [
+        { value: '92%', label: 'ready' },
+        { value: '2', label: 'open items' },
+        { value: '0', label: 'blockers' }
+      ],
+      items: [
+        { primary: 'HVAC recommission', secondary: 'Apex Mechanical · vendor SLA 2 hr', state: 'In progress' },
+        { primary: 'Paint touch-up', secondary: 'Sasha P. · 11:00 AM today', state: 'Completed' },
+        { primary: 'Deep clean', secondary: 'Housekeeping · 1:00 PM today', state: 'Completed' },
+        { primary: 'Welcome packet & key fob', secondary: 'Front desk', state: 'Ready' },
+        { primary: 'Resident orientation', secondary: 'Mike F. · 4:00 PM tomorrow', state: 'Scheduled' }
+      ]
+    }
   },
   {
     id: 'r-backlog', icon: 'trending_flat', tone: 'info',
     title: 'WO backlog trending stable',
-    body: 'Backlog held steady at 8 items for 14 days; no aged items past 60 days.'
+    body: 'Backlog held steady at 8 items for 14 days; no aged items past 60 days.',
+    details: {
+      summary: 'Backlog composition — last 14 days',
+      stats: [
+        { value: '8', label: 'in backlog' },
+        { value: '18d', label: 'oldest' },
+        { value: '−1', label: 'vs. last wk' }
+      ],
+      items: [
+        { primary: 'Carpet transition strip · 2F corridor', secondary: 'Low · 30m · opened May 6', state: 'Cosmetic' },
+        { primary: 'Drywall scuff repaint · Activity Room', secondary: 'Low · 45m · opened May 9', state: 'Cosmetic' },
+        { primary: 'Parking pole light · North Lot', secondary: 'Medium · vendor ETA May 22', state: 'Awaiting parts' },
+        { primary: 'Walk-in cooler gasket · Kitchen', secondary: 'Medium · vendor ETA May 20', state: 'Awaiting parts' },
+        { primary: 'Bath caulking · Units 203 & 207', secondary: 'Low · 1h · opened May 11', state: 'Preventive' }
+      ],
+      rollup: '+3 more lower-priority items'
+    }
   }
 ];
 
@@ -1413,6 +1518,99 @@ export const day90Health = [
     id: 'h-pm', icon: 'trending_down', tone: 'success',
     title: 'PM degradation risk reduced after staffing rebalance',
     body: 'Cross-training and load balancing dropped projected risk by 18%.'
+  }
+];
+
+// Day 90 — 3 forecasted risks the AI prevented this week.
+// Tappable on the KPIs / banner tile "Forecasted risks prevented this week".
+export const forecastedRisksPrevented = [
+  {
+    id: 'fp-1', when: 'Prevented Tue · May 20',
+    title: 'Boiler #2 freeze burst risk averted',
+    body: 'AI staged the seasonal freeze-protection PM 48 hrs ahead of the overnight low after weather forecast crossed the 28°F learned threshold.',
+    risk: 'Resident heat loss + ~$18k emergency repair if circulation lines burst.',
+    action: 'Seasonal PM completed by Jacob B. before the cold snap.',
+    saved: 'Est. $18k avoided',
+    confidence: 'High · matched the learned cold-snap pattern'
+  },
+  {
+    id: 'fp-2', when: 'Prevented Mon · May 19',
+    title: 'Unit 214 move-in delay averted',
+    body: 'AI pre-staged Apex Mechanical 16 hrs before the 10 AM move-in after the repeat-failure threshold tripped.',
+    risk: 'Lost first-month revenue + family escalation if HVAC didn\'t clear in time.',
+    action: 'Vendor approved on the morning queue; arrived 9:05 AM with parts.',
+    saved: 'Move-in protected',
+    confidence: 'High · 3rd repeat failure in 90d'
+  },
+  {
+    id: 'fp-3', when: 'Prevented Sun · May 18',
+    title: 'Memory Care East HVAC emergency block held',
+    body: 'AI protected Wednesday\'s HVAC PM block after detecting the degradation pattern in Memory Care East.',
+    risk: '~22% projected emergency-WO spike during temperature swings.',
+    action: 'PM block stayed on the schedule; 2 low-impact quick-wins shifted to Friday.',
+    saved: 'Est. 6 emergency calls avoided',
+    confidence: 'Medium-high · matches historical winter pattern'
+  }
+];
+
+// Day 30 — active coordination rules the AI applies routinely.
+// Tappable on the KPIs tile "Learned coordination patterns".
+export const coordinationPatterns = [
+  {
+    id: 'cp-1', title: 'Pre-stage Apex Mechanical on repeat HVAC failures',
+    body: 'When an HVAC asset hits 3+ failures in 90 days, the AI pre-stages an Apex Mechanical vendor request for your approval.',
+    learnedOn: 'Learned Apr 14', state: 'Active', applied: 4, acceptance: 100
+  },
+  {
+    id: 'cp-2', title: 'Reserve Marco D. for life-safety responses',
+    body: 'Fire-panel and exit-light issues route to Marco first during the survey window.',
+    learnedOn: 'Learned Apr 18', state: 'Active', applied: 6, acceptance: 100
+  },
+  {
+    id: 'cp-3', title: 'Batch quick-wins onto Diane K.\'s afternoon route',
+    body: 'Co-located light/hinge/seal fixes bundle onto Diane\'s 2 PM walk — zero added travel.',
+    learnedOn: 'Learned Apr 20', state: 'Active', applied: 11, acceptance: 92
+  },
+  {
+    id: 'cp-4', title: 'Sequence move-in HVAC ahead of cosmetic turns',
+    body: 'When a move-in is <24h out, HVAC supersedes paint and cosmetic PMs.',
+    learnedOn: 'Learned Apr 22', state: 'Active', applied: 5, acceptance: 100
+  },
+  {
+    id: 'cp-5', title: 'Elevate seasonal mechanical PMs below 28°F',
+    body: 'Overnight lows under 28°F bump boiler and freeze-risk PMs to Critical.',
+    learnedOn: 'Learned Apr 24', state: 'Active', applied: 3, acceptance: 100
+  },
+  {
+    id: 'cp-6', title: 'Offer Saturday PM slots when today is at capacity',
+    body: 'Deferrable PMs slide to Saturday AM when the team is sequenced over capacity.',
+    learnedOn: 'Learned Apr 27', state: 'Active', applied: 8, acceptance: 88
+  },
+  {
+    id: 'cp-7', title: 'Weight Sasha P. higher when Bruce W. is overloaded',
+    body: 'Generator and mechanical work routes to Sasha when Bruce\'s shift is +1h over.',
+    learnedOn: 'Learned May 2', state: 'Active', applied: 7, acceptance: 100
+  },
+  {
+    id: 'cp-8', title: 'Auto-close TELS-confirmed logbook tasks',
+    body: 'Routine fire-extinguisher and water-temp logs close automatically once TELS confirms upload.',
+    learnedOn: 'Learned May 5', state: 'Active', applied: 14, acceptance: 100
+  },
+  {
+    id: 'cp-9', title: 'Batch food-safety logs onto Floor 1–3 routes',
+    body: 'Refrigerator/freezer log tasks bundle onto whoever is already routed through those floors.',
+    learnedOn: 'Learned May 8', state: 'Active', applied: 9, acceptance: 100
+  },
+  {
+    id: 'cp-10', title: 'Reserve Bruce W. for life-safety walkthroughs',
+    body: 'Cosmetic unit-turn paint touch-ups route to Sasha or Luis instead — keep Bruce on safety rounds.',
+    learnedOn: 'Learned May 11', state: 'Paused', applied: 3, acceptance: 67,
+    pausedReason: 'Awaiting your sign-off after recent override.'
+  },
+  {
+    id: 'cp-11', title: 'Snooze cosmetic PMs during move-in spikes',
+    body: 'Low-risk ceiling-tile and drywall touch-ups hold 24h when 3+ move-ins land in the same day.',
+    learnedOn: 'Learned May 14', state: 'Active', applied: 4, acceptance: 100
   }
 ];
 
