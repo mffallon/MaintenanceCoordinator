@@ -4,13 +4,41 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails } from './data.js';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails, incomingWorkOrder, coordinationPatterns, forecastedRisksPrevented } from './data.js';
 import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow } from '@mui/material';
 
 // Trust Maturity Mode — the relationship evolves over time.
 // 'day1' = original prototype, unchanged. 'day30' = calibrated. 'day90' = predictive operations.
 const ModeContext = React.createContext('day1');
 const useMode = () => React.useContext(ModeContext);
+
+const HighlightContext = React.createContext(null);
+const useHighlight = () => React.useContext(HighlightContext);
+
+// Callback that opens a unified item-detail drawer for any work row.
+const ItemDetailContext = React.createContext(() => {});
+const useOpenItem = () => React.useContext(ItemDetailContext);
+
+// Callback that opens a learned-pattern detail drawer by pattern id.
+const OpenPatternContext = React.createContext(() => {});
+const useOpenPattern = () => React.useContext(OpenPatternContext);
+
+// Additional work orders added at runtime (e.g., snoozed incoming WOs)
+// that should appear in the Work tab alongside the static dataset.
+const ExtraWorkOrdersContext = React.createContext([]);
+const useExtraWorkOrders = () => React.useContext(ExtraWorkOrdersContext);
+
+// Callback that opens a readiness-summary detail drawer (Day 30/90).
+const OpenReadinessContext = React.createContext(() => {});
+const useOpenReadiness = () => React.useContext(OpenReadinessContext);
+
+// Reusable sx fragment to flag a row as the navigated-to highlight target.
+// Adds a soft amber ring + slight scale that fades back via CSS transition.
+const highlightSx = (isOn) => isOn ? {
+  borderColor: '#F59E0B !important',
+  boxShadow: '0 0 0 3px rgba(245,158,11,0.25)',
+  transition: 'box-shadow 250ms ease-out, border-color 250ms ease-out'
+} : {};
 const HEADER_OFFSET = 'calc(100px + env(safe-area-inset-top))';
 
 const Icon = ({ name, size = 20, color, sx }) => (
@@ -744,12 +772,18 @@ function TierSection({ tier, onReason, onReview }) {
   );
 }
 
-function ReviewCard({ item, onApprove, onOverride }) {
+function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
+  // For staffing overloads, the secondary action navigates the MD to the
+  // affected tech's schedule instead of opening the generic Override sheet.
+  const staffing = item?.kind === 'Staffing overload';
+  // Pull the tech name out of the summary, e.g. "Jacob B. is sequenced…"
+  const techName = staffing ? (item.summary || '').split(' is ')[0] : null;
   const mode = useMode();
   const day30 = mode === 'day30' || mode === 'day90'; // calibrated (Day 30+)
   const day90 = mode === 'day90'; // predictive operations
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
   const submit = (kind) => {
     setNoteOpen(false);
     setNote('');
@@ -845,38 +879,65 @@ function ReviewCard({ item, onApprove, onOverride }) {
                   <Typography variant="caption" sx={lineSx}>
                     {rec.body}
                   </Typography>
-                  {rec.why && (
-                    <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
-                      <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
-                      <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
-                        Why: {rec.why}
-                      </Typography>
-                    </Stack>
-                  )}
-                  <Typography variant="caption" sx={{ ...lineSx, mb: 0.75 }}>
-                    Tradeoff: {rec.tradeoff}
-                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => setMoreOpen((v) => !v)}
+                    startIcon={<Icon name={moreOpen ? 'expand_less' : 'expand_more'} size={15} />}
+                    sx={{
+                      alignSelf: 'flex-start', textTransform: 'none',
+                      color: '#475569', fontWeight: 600, fontSize: 12,
+                      px: 0.5, mb: 0.25, mt: -0.25
+                    }}
+                  >
+                    {moreOpen ? 'Less info' : 'More info'}
+                  </Button>
+                  <Collapse in={moreOpen} unmountOnExit>
+                    {rec.why && (
+                      <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
+                        <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
+                        <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
+                          Why: {rec.why}
+                        </Typography>
+                      </Stack>
+                    )}
+                    <Typography variant="caption" sx={{ ...lineSx, mb: 0.75 }}>
+                      Tradeoff: {rec.tradeoff}
+                    </Typography>
+                    {i === item.recommendations.length - 1 && confidenceRow}
+                  </Collapse>
                   <Button
                     size="small"
                     fullWidth
                     variant={i === 0 ? 'contained' : 'outlined'}
                     onClick={() => onApprove(item)}
+                    sx={{ mt: 0.75 }}
                   >
                     {i === 0 ? 'Approve recommended' : 'Approve this instead'}
                   </Button>
                 </Box>
               ))}
-              {confidenceRow}
               <Stack direction="row" spacing={1} sx={{ pt: 0.25 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={() => onOverride(item)}
-                  fullWidth
-                >
-                  Override
-                </Button>
+                {staffing && techName && onViewStaff ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Icon name="calendar_month" size={15} />}
+                    onClick={() => onViewStaff(techName)}
+                    fullWidth
+                  >
+                    View {techName}'s schedule
+                  </Button>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    onClick={() => onOverride(item)}
+                    fullWidth
+                  >
+                    Override
+                  </Button>
+                )}
                 <IconButton
                   size="small"
                   onClick={() => setNoteOpen((v) => !v)}
@@ -897,18 +958,32 @@ function ReviewCard({ item, onApprove, onOverride }) {
               <Typography variant="caption" sx={lineSx}>
                 {item.recommended}
               </Typography>
-              {item.why && (
-                <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
-                  <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
-                  <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
-                    Why: {item.why}
-                  </Typography>
-                </Stack>
-              )}
-              <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
-                Tradeoff: {item.tradeoff}
-              </Typography>
-              {confidenceRow}
+              <Button
+                size="small"
+                onClick={() => setMoreOpen((v) => !v)}
+                startIcon={<Icon name={moreOpen ? 'expand_less' : 'expand_more'} size={15} />}
+                sx={{
+                  alignSelf: 'flex-start', textTransform: 'none',
+                  color: '#475569', fontWeight: 600, fontSize: 12,
+                  px: 0.5, mb: 0.25, mt: -0.25
+                }}
+              >
+                {moreOpen ? 'Less info' : 'More info'}
+              </Button>
+              <Collapse in={moreOpen} unmountOnExit>
+                {item.why && (
+                  <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
+                    <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
+                    <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
+                      Why: {item.why}
+                    </Typography>
+                  </Stack>
+                )}
+                <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
+                  Tradeoff: {item.tradeoff}
+                </Typography>
+                {confidenceRow}
+              </Collapse>
               <Divider sx={{ my: 1 }} />
               <Stack direction="row" spacing={1}>
                 <Button size="small" variant="contained" onClick={() => onApprove(item)} fullWidth>
@@ -1398,7 +1473,7 @@ function CalibrationButton({ onClick }) {
 }
 
 // Day 30 — "Operationally Calibrated" state banner.
-function Day30Banner({ onReview }) {
+function Day30Banner({ onReview, onMetric }) {
   return (
     <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -1426,84 +1501,68 @@ function Day30Banner({ onReview }) {
               />
             </Stack>
             <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
-              {day30Status.sub}
+              {day30Status.sub}{' '}
+              <Box
+                component="span"
+                onClick={(e) => { e.stopPropagation(); onReview && onReview(); }}
+                sx={{
+                  color: '#0369A1', textDecoration: 'underline',
+                  fontWeight: 600, cursor: 'pointer'
+                }}
+              >
+                Review coordination settings
+              </Box>.
             </Typography>
           </Box>
         </Stack>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mt: 1.25 }}>
-          {day30Status.metrics.map((m) => (
-            <Box key={m.label} sx={{ border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff' }}>
-              <Typography sx={{ fontSize: 17, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
-                {m.value}
-              </Typography>
-              <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
-                {m.label}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-
-        <Stack spacing={0.5} sx={{ mt: 1 }}>
-          {day30Status.capabilities.map((c) => (
-            <Stack key={c} direction="row" spacing={0.625} alignItems="center">
-              <Icon name="check_circle" size={14} color="#16A34A" sx={{ flexShrink: 0 }} />
-              <Typography variant="caption" sx={{ color: '#334155', fontWeight: 600 }}>
-                {c}
-              </Typography>
-            </Stack>
-          ))}
-        </Stack>
-
-        <Box
-          sx={{
-            mt: 1.25, p: 1.25, borderRadius: 1.5,
-            bgcolor: '#EEF2FF', border: '1px solid #C7D2FE'
-          }}
-        >
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
-            <Icon name="arrow_circle_up" size={14} color="#4338CA" />
-            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-              Recommended next step
-            </Typography>
-          </Stack>
-          <Typography variant="caption" sx={{ display: 'block', color: '#0F172A', fontWeight: 600, lineHeight: 1.35 }}>
-            {day30Status.nextStep.action}
-          </Typography>
-          <Stack spacing={0.375} sx={{ mt: 0.625 }}>
-            {day30Status.nextStep.because.map((b) => (
-              <Stack key={b} direction="row" spacing={0.5} alignItems="flex-start">
-                <Icon name="check_circle" size={12} color="#16A34A" sx={{ mt: '2px', flexShrink: 0 }} />
-                <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
-                  {b}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0.75, mt: 1.25 }}>
+          {day30Status.metrics.map((m) => {
+            const clickable = Boolean(onMetric && m.key);
+            return (
+              <Box
+                key={m.label}
+                onClick={() => clickable && onMetric(m.key)}
+                sx={{
+                  border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
+                  cursor: clickable ? 'pointer' : 'default',
+                  transition: 'transform 80ms, border-color 80ms, box-shadow 80ms',
+                  position: 'relative',
+                  '&:hover': clickable ? {
+                    borderColor: '#A5B4FC',
+                    boxShadow: '0 1px 3px rgba(67,56,202,0.12)'
+                  } : {},
+                  '&:active': clickable ? { transform: 'scale(0.98)' } : {}
+                }}
+              >
+                <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
+                  <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                    {m.value}
+                  </Typography>
+                  {clickable && (
+                    <Icon name="chevron_right" size={14} color="#CBD5E1" />
+                  )}
+                </Stack>
+                <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
+                  {m.label}
                 </Typography>
-              </Stack>
-            ))}
-          </Stack>
+                {m.sub && (
+                  <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10 }}>
+                    {m.sub}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })}
         </Box>
 
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={onReview}
-          startIcon={<Icon name="tune" size={16} />}
-          sx={{ mt: 1.25, borderColor: '#CBD5E1', color: '#334155' }}
-        >
-          Review Coordination Settings
-        </Button>
-        <Typography
-          variant="caption"
-          sx={{ display: 'block', textAlign: 'center', color: '#94A3B8', mt: 0.625, lineHeight: 1.3 }}
-        >
-          You can adjust or revert coordination settings at any time.
-        </Typography>
       </CardContent>
     </Card>
   );
 }
 
 // Day 90 — "Predictive Operations Mode" banner.
-function Day90Banner({ onReview }) {
+function Day90Banner({ onReview, onMetric }) {
   return (
     <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -1543,81 +1602,40 @@ function Day90Banner({ onReview }) {
         </Stack>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mt: 1.25 }}>
-          {day90Status.metrics.map((m) => (
-            <Box
-              key={m.label}
-              sx={{
-                border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
-                gridColumn: m.wide ? '1 / -1' : 'auto'
-              }}
-            >
-              <Typography sx={{ fontSize: 17, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
-                {m.value}
-              </Typography>
-              <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
-                {m.label}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-
-        <Stack spacing={0.5} sx={{ mt: 1 }}>
-          {day90Status.capabilities.map((c) => (
-            <Stack key={c} direction="row" spacing={0.625} alignItems="center">
-              <Icon name="check_circle" size={14} color="#16A34A" sx={{ flexShrink: 0 }} />
-              <Typography variant="caption" sx={{ color: '#334155', fontWeight: 600 }}>
-                {c}
-              </Typography>
-            </Stack>
-          ))}
-        </Stack>
-
-        <Box
-          sx={{
-            mt: 1.25, p: 1.25, borderRadius: 1.5,
-            bgcolor: '#EEF2FF', border: '1px solid #C7D2FE'
-          }}
-        >
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.625 }}>
-            <Icon name="online_prediction" size={14} color="#4338CA" />
-            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-              Emerging operational patterns
-            </Typography>
-          </Stack>
-          <Stack spacing={0.625}>
-            {day90Status.outlook.map((o) => (
-              <Stack key={o.id} direction="row" spacing={0.625} alignItems="flex-start">
-                <Box
-                  sx={{
-                    width: 20, height: 20, borderRadius: '6px', bgcolor: '#fff',
-                    border: '1px solid #C7D2FE', display: 'grid', placeItems: 'center', flexShrink: 0, mt: '1px'
-                  }}
-                >
-                  <Icon name={o.icon} size={12} color="#4338CA" />
-                </Box>
-                <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.35 }}>
-                  {o.body}
+          {day90Status.metrics.map((m) => {
+            const clickable = Boolean(onMetric && m.key);
+            return (
+              <Box
+                key={m.label}
+                onClick={() => clickable && onMetric(m.key)}
+                sx={{
+                  border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
+                  gridColumn: m.wide ? '1 / -1' : 'auto',
+                  cursor: clickable ? 'pointer' : 'default',
+                  transition: 'transform 80ms, border-color 80ms, box-shadow 80ms',
+                  '&:hover': clickable ? {
+                    borderColor: '#A5B4FC',
+                    boxShadow: '0 1px 3px rgba(67,56,202,0.12)'
+                  } : {},
+                  '&:active': clickable ? { transform: 'scale(0.98)' } : {}
+                }}
+              >
+                <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
+                  <Typography sx={{ fontSize: 17, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                    {m.value}
+                  </Typography>
+                  {clickable && (
+                    <Icon name="chevron_right" size={14} color="#CBD5E1" />
+                  )}
+                </Stack>
+                <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
+                  {m.label}
                 </Typography>
-              </Stack>
-            ))}
-          </Stack>
+              </Box>
+            );
+          })}
         </Box>
 
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={onReview}
-          startIcon={<Icon name="insights" size={16} />}
-          sx={{ mt: 1.25, borderColor: '#CBD5E1', color: '#334155' }}
-        >
-          Explore Operational Forecasting
-        </Button>
-        <Typography
-          variant="caption"
-          sx={{ display: 'block', textAlign: 'center', color: '#94A3B8', mt: 0.625, lineHeight: 1.3 }}
-        >
-          Forecasting suggestions can be adjusted or dismissed at any time — Connected Community will continue learning operational rhythms.
-        </Typography>
       </CardContent>
     </Card>
   );
@@ -1864,6 +1882,7 @@ function StatDetailSheet({ stat, onClose }) {
 
 function CalibrationSheet({ open, onClose }) {
   const [selStat, setSelStat] = useState(null);
+  const mode = useMode();
   return (
     <Drawer
       anchor="bottom"
@@ -1938,6 +1957,54 @@ function CalibrationSheet({ open, onClose }) {
             </Box>
           ))}
         </Box>
+        {mode === 'day30' && day30Status.nextStep && (
+          <Box
+            sx={{
+              mt: 1.5, p: 1.25, borderRadius: 1.5,
+              bgcolor: '#EEF2FF', border: '1px solid #C7D2FE'
+            }}
+          >
+            <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.5 }}>
+              <Icon name="arrow_circle_up" size={15} color="#4338CA" />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+                Recommended next step
+              </Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ display: 'block', color: '#0F172A', fontWeight: 700, lineHeight: 1.35, mb: 0.625 }}>
+              {day30Status.nextStep.action}
+            </Typography>
+            <Stack spacing={0.375}>
+              {day30Status.nextStep.because.map((b, i) => (
+                <Stack key={i} direction="row" spacing={0.5} alignItems="flex-start">
+                  <Icon name="check_circle" size={12} color="#16A34A" sx={{ mt: '2px', flexShrink: 0 }} />
+                  <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
+                    {b}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+            <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+              <Button
+                size="small"
+                variant="contained"
+                fullWidth
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Allow
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                fullWidth
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Not yet
+              </Button>
+            </Stack>
+          </Box>
+        )}
+
         <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1.75, mb: 0.75 }}>
           <Icon name="pattern" size={15} color="#4338CA" />
           <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
@@ -2137,7 +2204,7 @@ function OperationalForecast() {
 }
 
 // Day 1 — "Learning your building" status banner.
-function Day1Banner({ onMetric }) {
+function Day1Banner({ onMetric, onSettings }) {
   return (
     <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -2165,7 +2232,17 @@ function Day1Banner({ onMetric }) {
               />
             </Stack>
             <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
-              {day1Status.sub}
+              {day1Status.sub}{' '}
+              <Box
+                component="span"
+                onClick={(e) => { e.stopPropagation(); onSettings && onSettings(); }}
+                sx={{
+                  color: '#0369A1', textDecoration: 'underline',
+                  fontWeight: 600, cursor: 'pointer'
+                }}
+              >
+                Adjust coordination settings
+              </Box>.
             </Typography>
           </Box>
         </Stack>
@@ -2240,7 +2317,7 @@ function Day1MetricSheet({ open, metricKey, onClose, onRespond }) {
                 <Icon name={data.icon} size={20} color={data.color} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {data.title}
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
@@ -2313,17 +2390,17 @@ function Day1MetricSheet({ open, metricKey, onClose, onRespond }) {
                             <Button
                               size="small"
                               onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'context' })}
-                              startIcon={<Icon name="add_comment" size={13} />}
+                              startIcon={<Icon name="add_comment" size={13} color="#0369A1" />}
                               sx={{
                                 px: 0.5, py: 0,
                                 textTransform: 'none', fontSize: 11.5, fontWeight: 600,
-                                color: '#4338CA', minHeight: 0, flexShrink: 0
+                                color: '#0369A1', minHeight: 0, flexShrink: 0
                               }}
                             >
                               Add context
                             </Button>
                           </Stack>
-                          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35, display: 'block', mt: 0.5, pl: 2.25 }}>
+                          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35, display: 'block', mt: 0.5 }}>
                             {it.outcome}
                           </Typography>
                         </Box>
@@ -2350,15 +2427,25 @@ function Day1MetricSheet({ open, metricKey, onClose, onRespond }) {
                             </Button>
                           </>
                         ) : metricKey === 'overrides' ? (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            fullWidth
-                            onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'reinforce' })}
-                            sx={{ textTransform: 'none', fontSize: 12 }}
-                          >
-                            Reinforce rule
-                          </Button>
+                          <>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'reinforce' })}
+                              sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                            >
+                              Reinforce rule
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="inherit"
+                              onClick={() => onRespond && onRespond({ metric: metricKey, item: it, kind: 'ignore' })}
+                              sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+                            >
+                              Ignore rule
+                            </Button>
+                          </>
                         ) : (
                           <Button
                             size="small"
@@ -2386,6 +2473,1109 @@ function Day1MetricSheet({ open, metricKey, onClose, onRespond }) {
           </Box>
         </>
       )}
+    </Drawer>
+  );
+}
+
+// Confirmation drawer that opens when an "Undo" button is tapped inside
+// Day1MetricSheet. Lets the MD decide whether to keep the AI decision,
+// proceed with the undo, add context, or jump to the underlying item.
+function Day1UndoSheet({ open, item, onClose, onAction }) {
+  if (!item) {
+    return (
+      <Drawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        PaperProps={{ sx: { borderTopLeftRadius: 20, borderTopRightRadius: 20 } }}
+      />
+    );
+  }
+  const stateBg = item.stateTone === 'success' ? '#DCFCE7'
+    : item.stateTone === 'warning' ? '#FEF3C7'
+    : item.stateTone === 'info' ? '#E0F2FE'
+    : '#F1F5F9';
+  const stateFg = item.stateTone === 'success' ? '#15803D'
+    : item.stateTone === 'warning' ? '#92400E'
+    : item.stateTone === 'info' ? '#0369A1'
+    : '#475569';
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#FEF3C7', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="undo" size={20} color="#B45309" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              Undo this decision?
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+              Review before reverting — this will roll back the action and the rule the AI learned from it.
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} color="#64748B" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+          <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                {item.when}
+              </Typography>
+              {item.state && (
+                <Chip
+                  size="small"
+                  label={item.state}
+                  sx={{
+                    height: 18, fontSize: 10, fontWeight: 700,
+                    bgcolor: stateBg, color: stateFg,
+                    '.MuiChip-label': { px: 0.75 }
+                  }}
+                />
+              )}
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.5 }}>
+              {item.body}
+            </Typography>
+            {item.why && (
+              <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.75 }}>
+                <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+                <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600 }}>
+                  {item.why}
+                </Typography>
+              </Stack>
+            )}
+            {item.outcome && (
+              <Box sx={{ mt: 0.75, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
+                  <Icon name="model_training" size={13} color="#64748B" />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', lineHeight: 1.3 }}>
+                    Rule that will be reverted
+                  </Typography>
+                </Stack>
+                <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35, display: 'block', mt: 0.25 }}>
+                  {item.outcome}
+                </Typography>
+              </Box>
+            )}
+
+            {item.target && (
+              <Box
+                onClick={() => onAction && onAction('open')}
+                sx={{
+                  mt: 1, p: 1, border: '1px solid #BAE6FD', borderRadius: 1.5,
+                  bgcolor: '#F0F9FF', cursor: 'pointer',
+                  transition: 'background-color 80ms',
+                  '&:hover': { bgcolor: '#E0F2FE' }
+                }}
+              >
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                  <Icon name="open_in_new" size={14} color="#0369A1" />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#0369A1', lineHeight: 1.25 }}>
+                      Open the source item
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: 'block', color: '#475569', lineHeight: 1.25,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {item.target}
+                    </Typography>
+                  </Box>
+                  <Icon name="chevron_right" size={18} color="#94A3B8" />
+                </Stack>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+
+        <Stack spacing={0.875} sx={{ mt: 1.5 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            color="error"
+            startIcon={<Icon name="undo" size={16} />}
+            onClick={() => onAction && onAction('decline')}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Decline — undo and revert the rule
+          </Button>
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<Icon name="check" size={16} />}
+            onClick={() => onAction && onAction('accept')}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Accept again — keep the AI decision
+          </Button>
+          <Button
+            fullWidth
+            startIcon={<Icon name="add_comment" size={15} color="#0369A1" />}
+            onClick={() => onAction && onAction('context')}
+            sx={{ textTransform: 'none', fontWeight: 600, color: '#0369A1' }}
+          >
+            Add context instead
+          </Button>
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+// Drawer that opens when "Snooze" is tapped on a new incoming work order.
+// Lets the MD pick a duration + optional reason (or skip and just snooze).
+function SnoozeSheet({ open, item, onClose, onConfirm }) {
+  const DURATIONS = [
+    { id: '1h', label: '1 hour', until: 'in 1 hr' },
+    { id: '2h', label: '2 hours', until: 'in 2 hrs' },
+    { id: 'eod', label: 'End of day', until: 'EOD' },
+    { id: 'tom', label: 'Tomorrow AM', until: 'tomorrow AM' }
+  ];
+  const REASONS = [
+    { id: 'resident', label: 'Resident not home', icon: 'no_meeting_room' },
+    { id: 'parts', label: 'Waiting on parts', icon: 'inventory_2' },
+    { id: 'capacity', label: 'Capacity opens later', icon: 'schedule' },
+    { id: 'lower', label: 'Lower priority right now', icon: 'low_priority' },
+    { id: 'conflict', label: 'Schedule conflict', icon: 'event_busy' },
+    { id: 'other', label: 'Other reason', icon: 'more_horiz' }
+  ];
+  const [duration, setDuration] = React.useState('eod');
+  const [reason, setReason] = React.useState(null);
+
+  React.useEffect(() => {
+    if (open) {
+      setDuration('eod');
+      setReason(null);
+    }
+  }, [open]);
+
+  if (!item) {
+    return (
+      <Drawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        PaperProps={{ sx: { borderTopLeftRadius: 20, borderTopRightRadius: 20 } }}
+      />
+    );
+  }
+
+  const picked = DURATIONS.find((d) => d.id === duration) || DURATIONS[2];
+  const pickedReason = REASONS.find((r) => r.id === reason);
+
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#E0F2FE', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="snooze" size={20} color="#0369A1" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              Snooze this work order
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+              It'll move to the Work tab and resurface when the snooze ends.
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} color="#64748B" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        <Box
+          sx={{
+            p: 1, mb: 1.5, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5
+          }}
+        >
+          <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block' }}>
+            {(item.id || '').toUpperCase()}
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.25, mt: 0.125 }}>
+            {item.title}
+          </Typography>
+        </Box>
+
+        <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#475569', mb: 0.5 }}>
+          For how long?
+        </Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.625, mb: 1.5 }}>
+          {DURATIONS.map((d) => {
+            const on = duration === d.id;
+            return (
+              <Button
+                key={d.id}
+                variant={on ? 'contained' : 'outlined'}
+                color={on ? 'primary' : 'inherit'}
+                onClick={() => setDuration(d.id)}
+                sx={{
+                  textTransform: 'none', fontWeight: 600, fontSize: 12.5,
+                  py: 0.75, borderColor: on ? undefined : '#CBD5E1'
+                }}
+              >
+                {d.label}
+              </Button>
+            );
+          })}
+        </Box>
+
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569' }}>
+            Reason (optional — helps AI learn)
+          </Typography>
+          {reason && (
+            <Button
+              size="small"
+              onClick={() => setReason(null)}
+              sx={{ minHeight: 0, py: 0, px: 0.5, fontSize: 11, color: '#64748B', textTransform: 'none' }}
+            >
+              Clear
+            </Button>
+          )}
+        </Stack>
+        <Stack direction="row" spacing={0.625} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+          {REASONS.map((r) => {
+            const on = reason === r.id;
+            return (
+              <Chip
+                key={r.id}
+                clickable
+                onClick={() => setReason(on ? null : r.id)}
+                icon={<Icon name={r.icon} size={13} color={on ? '#fff' : '#475569'} sx={{ ml: 0.5 }} />}
+                label={r.label}
+                sx={{
+                  height: 26,
+                  bgcolor: on ? '#0F172A' : '#fff',
+                  color: on ? '#fff' : '#334155',
+                  border: '1px solid',
+                  borderColor: on ? '#0F172A' : '#CBD5E1',
+                  fontWeight: 600,
+                  '.MuiChip-label': { px: 0.875, fontSize: 11.5 },
+                  '&:hover': { bgcolor: on ? '#1E293B' : '#F8FAFC' }
+                }}
+              />
+            );
+          })}
+        </Stack>
+
+        <Stack spacing={0.875}>
+          <Button
+            fullWidth
+            variant="contained"
+            startIcon={<Icon name="snooze" size={16} />}
+            onClick={() => onConfirm && onConfirm({ duration: picked, reason: pickedReason })}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Snooze · {picked.label}{pickedReason ? ` · ${pickedReason.label}` : ''}
+          </Button>
+          {!reason && (
+            <Button
+              fullWidth
+              variant="text"
+              onClick={() => onConfirm && onConfirm({ duration: picked, reason: null })}
+              sx={{ textTransform: 'none', fontWeight: 600, color: '#64748B' }}
+            >
+              Skip reason and just snooze
+            </Button>
+          )}
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+// Drawer for the "Learned coordination patterns" KPI tile.
+// Lists active and paused coordination rules with per-rule actions
+// (Pause / Resume, Add context).
+// Drawer for the Day 90 "Forecasted risks prevented this week" tile.
+// Lists each prevented risk with its rationale and the action that averted it.
+function ForecastedRisksSheet({ open, onClose, onContext }) {
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#DCFCE7', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="shield" size={20} color="#16A34A" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              Forecasted risks prevented
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+              3 risks the AI saw coming and acted on before they hit — this week.
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} color="#64748B" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        <Stack spacing={1.25}>
+          {forecastedRisksPrevented.map((r) => (
+            <Card key={r.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
+                  <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                    {r.when}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    icon={<Icon name="check_circle" size={11} color="#15803D" sx={{ ml: 0.5 }} />}
+                    label="Averted"
+                    sx={{
+                      height: 18, fontSize: 10, fontWeight: 700,
+                      bgcolor: '#DCFCE7', color: '#15803D',
+                      '.MuiChip-label': { px: 0.625 }
+                    }}
+                  />
+                </Stack>
+                <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                  {r.title}
+                </Typography>
+                <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.375 }}>
+                  {r.body}
+                </Typography>
+
+                <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#FEF2F2', borderRadius: 1.25, border: '1px solid #FECACA' }}>
+                  <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                    <Icon name="warning" size={13} color="#B91C1C" sx={{ mt: '1px', flexShrink: 0 }} />
+                    <Typography variant="caption" sx={{ color: '#991B1B', lineHeight: 1.3 }}>
+                      <Box component="span" sx={{ fontWeight: 700 }}>Risk if untreated: </Box>
+                      {r.risk}
+                    </Typography>
+                  </Stack>
+                </Box>
+
+                <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F0FDF4', borderRadius: 1.25, border: '1px solid #BBF7D0' }}>
+                  <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                    <Icon name="check_circle" size={13} color="#16A34A" sx={{ mt: '1px', flexShrink: 0 }} />
+                    <Typography variant="caption" sx={{ color: '#166534', lineHeight: 1.3 }}>
+                      <Box component="span" sx={{ fontWeight: 700 }}>Action taken: </Box>
+                      {r.action}
+                    </Typography>
+                  </Stack>
+                </Box>
+
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+                  <Chip
+                    size="small"
+                    icon={<Icon name="savings" size={11} color="#475569" sx={{ ml: 0.5 }} />}
+                    label={r.saved}
+                    variant="outlined"
+                    sx={{ height: 18, fontSize: 10, '.MuiChip-label': { px: 0.5 } }}
+                  />
+                  <Chip
+                    size="small"
+                    icon={<Icon name="verified" size={11} color="#475569" sx={{ ml: 0.5 }} />}
+                    label={r.confidence}
+                    variant="outlined"
+                    sx={{ height: 18, fontSize: 10, '.MuiChip-label': { px: 0.5 } }}
+                  />
+                </Stack>
+
+                <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Icon name="add_comment" size={13} color="#0369A1" />}
+                    onClick={() => onContext && onContext(r)}
+                    sx={{
+                      textTransform: 'none', fontSize: 12, fontWeight: 600,
+                      color: '#0369A1', borderColor: '#BAE6FD', flex: 1
+                    }}
+                  >
+                    Add context
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+function CoordinationPatternsSheet({ open, onClose, onContext, onSnack }) {
+  const [items, setItems] = React.useState(coordinationPatterns);
+
+  React.useEffect(() => {
+    if (open) setItems(coordinationPatterns);
+  }, [open]);
+
+  const togglePause = (id) => {
+    setItems((prev) => prev.map((p) =>
+      p.id === id ? { ...p, state: p.state === 'Paused' ? 'Active' : 'Paused' } : p
+    ));
+    const target = items.find((p) => p.id === id);
+    if (target && onSnack) {
+      onSnack(target.state === 'Paused'
+        ? `"${target.title}" resumed`
+        : `"${target.title}" paused`);
+    }
+  };
+
+  const activeCount = items.filter((p) => p.state === 'Active').length;
+  const pausedCount = items.filter((p) => p.state === 'Paused').length;
+
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="rule" size={20} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              Learned coordination patterns
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+              {activeCount} active · {pausedCount} paused — tap any to adjust.
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} color="#64748B" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        <Stack spacing={1}>
+          {items.map((p) => {
+            const paused = p.state === 'Paused';
+            return (
+              <Card key={p.id} variant="outlined" sx={{ borderColor: paused ? '#FDE68A' : '#E2E8F0', bgcolor: paused ? '#FFFBEB' : '#fff' }}>
+                <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                      {p.learnedOn}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={p.state}
+                      sx={{
+                        height: 18, fontSize: 10, fontWeight: 700,
+                        bgcolor: paused ? '#FEF3C7' : '#DCFCE7',
+                        color: paused ? '#92400E' : '#15803D',
+                        '.MuiChip-label': { px: 0.75 }
+                      }}
+                    />
+                  </Stack>
+                  <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+                    {p.title}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.375 }}>
+                    {p.body}
+                  </Typography>
+
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+                    <Chip
+                      size="small"
+                      icon={<Icon name="replay" size={11} color="#475569" sx={{ ml: 0.5 }} />}
+                      label={`Applied ${p.applied} times`}
+                      variant="outlined"
+                      sx={{ height: 18, fontSize: 10, '.MuiChip-label': { px: 0.5 } }}
+                    />
+                    <Chip
+                      size="small"
+                      icon={<Icon name="thumb_up_alt" size={11} color="#475569" sx={{ ml: 0.5 }} />}
+                      label={`${p.acceptance}% accepted`}
+                      variant="outlined"
+                      sx={{ height: 18, fontSize: 10, '.MuiChip-label': { px: 0.5 } }}
+                    />
+                  </Stack>
+
+                  {paused && p.pausedReason && (
+                    <Box sx={{ mt: 0.75, p: 0.75, bgcolor: '#FEF3C7', borderRadius: 1.25, border: '1px solid #FDE68A' }}>
+                      <Typography variant="caption" sx={{ color: '#92400E', lineHeight: 1.3 }}>
+                        <Box component="span" sx={{ fontWeight: 700 }}>Paused: </Box>
+                        {p.pausedReason}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                    <Button
+                      size="small"
+                      variant={paused ? 'contained' : 'outlined'}
+                      color={paused ? 'primary' : 'inherit'}
+                      fullWidth
+                      startIcon={<Icon name={paused ? 'play_arrow' : 'pause'} size={14} />}
+                      onClick={() => togglePause(p.id)}
+                      sx={{ textTransform: 'none', fontSize: 12 }}
+                    >
+                      {paused ? 'Resume rule' : 'Pause rule'}
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<Icon name="add_comment" size={13} color="#0369A1" />}
+                      onClick={() => onContext && onContext(p)}
+                      sx={{
+                        textTransform: 'none', fontSize: 12, fontWeight: 600,
+                        color: '#0369A1', borderColor: '#BAE6FD', flex: 1
+                      }}
+                    >
+                      Add context
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+// Drawer for typing or dictating context against a Day 1 metric item.
+// Opens on top of the metric/undo drawers; saving closes only this sheet.
+function AddContextSheet({ open, item, onClose, onSave }) {
+  const [value, setValue] = React.useState('');
+  const [recording, setRecording] = React.useState(false);
+  const recordTimer = React.useRef(null);
+  const pulseT = React.useRef(0);
+  const [pulse, setPulse] = React.useState(0);
+
+  // Reset on open
+  React.useEffect(() => {
+    if (open) {
+      setValue('');
+      setRecording(false);
+      if (recordTimer.current) { clearTimeout(recordTimer.current); recordTimer.current = null; }
+    }
+  }, [open]);
+
+  // Pulse animation for the mic when "recording"
+  React.useEffect(() => {
+    if (!recording) return;
+    const id = setInterval(() => setPulse((p) => (p + 1) % 2), 600);
+    return () => clearInterval(id);
+  }, [recording]);
+
+  const toggleMic = () => {
+    if (recording) {
+      if (recordTimer.current) { clearTimeout(recordTimer.current); recordTimer.current = null; }
+      setRecording(false);
+      return;
+    }
+    setRecording(true);
+    // Simulate transcription completing after ~1.8s
+    recordTimer.current = setTimeout(() => {
+      const sample = item?.id?.startsWith('ov-')
+        ? 'Keep this rule active — Bruce is best on life-safety calls during survey weeks.'
+        : item?.id?.startsWith('pt-')
+          ? 'Match what I’m seeing — let’s give it another two weeks of data.'
+          : 'Worked well today. Keep this pattern for the next survey cycle.';
+      setValue((v) => (v ? v + ' ' : '') + sample);
+      setRecording(false);
+    }, 1800);
+  };
+
+  const canSave = value.trim().length > 0;
+
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#E0F2FE', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="add_comment" size={20} color="#0369A1" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              Add context
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+              Tell the AI what to weight on the next pass — type or dictate.
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} color="#64748B" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5 }}>
+        {item && (
+          <Box
+            sx={{
+              p: 1, mb: 1.25, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block' }}>
+              {item.when || 'Day 1 calibration'}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.25, mt: 0.125 }}>
+              {item.title}
+            </Typography>
+          </Box>
+        )}
+
+        <Box sx={{ position: 'relative' }}>
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            maxRows={8}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={recording ? 'Listening…' : 'e.g., Bruce is preferred on life-safety walkthroughs — keep him out of cosmetic turns during survey weeks.'}
+            disabled={recording}
+            InputProps={{
+              sx: {
+                fontSize: 13.5, lineHeight: 1.45, pr: 5.5,
+                bgcolor: recording ? '#FFF7ED' : '#fff'
+              }
+            }}
+          />
+          <IconButton
+            onClick={toggleMic}
+            sx={{
+              position: 'absolute', right: 6, bottom: 6,
+              bgcolor: recording ? '#DC2626' : '#0F172A',
+              color: '#fff',
+              transition: 'background-color 120ms, transform 200ms',
+              transform: recording && pulse ? 'scale(1.08)' : 'scale(1)',
+              boxShadow: recording ? '0 0 0 4px rgba(220,38,38,0.25)' : 'none',
+              '&:hover': { bgcolor: recording ? '#B91C1C' : '#1E293B' }
+            }}
+            size="small"
+          >
+            <Icon name={recording ? 'stop' : 'mic'} size={18} color="#fff" />
+          </IconButton>
+        </Box>
+
+        {recording && (
+          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
+            <Box
+              sx={{
+                width: 8, height: 8, borderRadius: '50%', bgcolor: '#DC2626',
+                animation: 'pulse 1.2s infinite',
+                '@keyframes pulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.3 }
+                }
+              }}
+            />
+            <Typography variant="caption" sx={{ color: '#B91C1C', fontWeight: 600 }}>
+              Listening… tap mic to stop
+            </Typography>
+          </Stack>
+        )}
+
+        <Stack direction="row" spacing={0.875} sx={{ mt: 1.5 }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            color="inherit"
+            onClick={onClose}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            fullWidth
+            variant="contained"
+            disabled={!canSave}
+            onClick={() => onSave && onSave(value.trim())}
+            startIcon={<Icon name="check" size={16} />}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Save context
+          </Button>
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+// Drawer that opens when a "Learned pattern" chip is tapped on a unit turn
+// (or anywhere else). Renders the pattern in the same shape as the Day 1
+// patterns drawer — timestamp, state pill, title, body, why, "What the AI
+// learned" panel with Add context, Confirm / Dismiss footer.
+// Drawer for a readiness-summary row on Day 30 (and the backlog row in
+// Outcomes). Shows the items behind the summary plus quick stats.
+function ReadinessDetailSheet({ open, item, onClose }) {
+  if (!item) {
+    return (
+      <Drawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        PaperProps={{ sx: { borderTopLeftRadius: 20, borderTopRightRadius: 20 } }}
+      />
+    );
+  }
+  const fg = item.tone === 'success' ? '#16A34A' : item.tone === 'warning' ? '#B45309' : '#0369A1';
+  const bg = item.tone === 'success' ? '#DCFCE7' : item.tone === 'warning' ? '#FEF3C7' : '#E0F2FE';
+  const d = item.details || {};
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: bg, display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={20} color={fg} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              {item.title}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+              {d.summary || item.body}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} color="#64748B" />
+          </IconButton>
+        </Stack>
+      </Box>
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        {Array.isArray(d.stats) && d.stats.length > 0 && (
+          <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${d.stats.length}, 1fr)`, gap: 0.75, mb: 1.25 }}>
+            {d.stats.map((s, i) => (
+              <Box
+                key={i}
+                sx={{
+                  border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff', textAlign: 'left'
+                }}
+              >
+                <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                  {s.value}
+                </Typography>
+                <Typography variant="caption" sx={{ display: 'block', color: '#64748B', mt: 0.25, lineHeight: 1.2 }}>
+                  {s.label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {Array.isArray(d.items) && d.items.length > 0 && (
+          <Stack spacing={0.75}>
+            {d.items.map((it, idx) => {
+              const stateTone = it.state === 'Completed' || it.state === 'Ready' ? 'success'
+                : it.state === 'In progress' ? 'info'
+                : it.state === 'Awaiting parts' ? 'warning'
+                : 'default';
+              const sBg = stateTone === 'success' ? '#DCFCE7'
+                : stateTone === 'info' ? '#E0F2FE'
+                : stateTone === 'warning' ? '#FEF3C7'
+                : '#F1F5F9';
+              const sFg = stateTone === 'success' ? '#15803D'
+                : stateTone === 'info' ? '#0369A1'
+                : stateTone === 'warning' ? '#92400E'
+                : '#475569';
+              return (
+                <Card key={idx} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                  <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                          {it.primary}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.25, mt: 0.125 }}>
+                          {it.secondary}
+                        </Typography>
+                      </Box>
+                      {it.state && (
+                        <Chip
+                          size="small"
+                          label={it.state}
+                          sx={{
+                            height: 18, fontSize: 10, fontWeight: 700,
+                            bgcolor: sBg, color: sFg,
+                            '.MuiChip-label': { px: 0.75 }
+                          }}
+                        />
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </Stack>
+        )}
+
+        {d.rollup && (
+          <Box sx={{ mt: 1, p: 0.875, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5 }}>
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Icon name="check_circle" size={15} color="#16A34A" />
+              <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                {d.rollup}
+              </Typography>
+            </Stack>
+          </Box>
+        )}
+      </Box>
+    </Drawer>
+  );
+}
+
+function PatternDetailSheet({ open, pattern, onClose, onAction }) {
+  if (!pattern) {
+    return (
+      <Drawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        PaperProps={{ sx: { borderTopLeftRadius: 20, borderTopRightRadius: 20 } }}
+      />
+    );
+  }
+  const stateBg = pattern.stateTone === 'success' ? '#DCFCE7'
+    : pattern.stateTone === 'warning' ? '#FEF3C7'
+    : pattern.stateTone === 'info' ? '#E0F2FE'
+    : '#F1F5F9';
+  const stateFg = pattern.stateTone === 'success' ? '#15803D'
+    : pattern.stateTone === 'warning' ? '#92400E'
+    : pattern.stateTone === 'info' ? '#0369A1'
+    : '#475569';
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="sensors" size={20} color="#4338CA" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              Learned pattern
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+              How Connected Community arrived at this assignment.
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} color="#64748B" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                {pattern.when}
+              </Typography>
+              {pattern.state && (
+                <Chip
+                  size="small"
+                  label={pattern.state}
+                  sx={{
+                    height: 18, fontSize: 10, fontWeight: 700,
+                    bgcolor: stateBg, color: stateFg,
+                    '.MuiChip-label': { px: 0.75 }
+                  }}
+                />
+              )}
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {pattern.title}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.375 }}>
+              {pattern.body}
+            </Typography>
+            {pattern.why && (
+              <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.625 }}>
+                <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+                <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600 }}>
+                  {pattern.why}
+                </Typography>
+              </Stack>
+            )}
+            {pattern.outcome && (
+              <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
+                <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Icon name="model_training" size={13} color="#64748B" sx={{ flexShrink: 0 }} />
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', lineHeight: 1.3 }}>
+                      What the AI learned
+                    </Typography>
+                  </Stack>
+                  <Button
+                    size="small"
+                    onClick={() => onAction && onAction('context', pattern)}
+                    startIcon={<Icon name="add_comment" size={13} color="#0369A1" />}
+                    sx={{
+                      px: 0.5, py: 0,
+                      textTransform: 'none', fontSize: 11.5, fontWeight: 600,
+                      color: '#0369A1', minHeight: 0, flexShrink: 0
+                    }}
+                  >
+                    Add context
+                  </Button>
+                </Stack>
+                <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35, display: 'block', mt: 0.5 }}>
+                  {pattern.outcome}
+                </Typography>
+              </Box>
+            )}
+            <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => onAction && onAction('confirm', pattern)}
+                sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+              >
+                Confirm pattern
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                onClick={() => onAction && onAction('dismiss', pattern)}
+                sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+              >
+                Dismiss
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
     </Drawer>
   );
 }
@@ -2726,6 +3916,153 @@ function StaffingConflictCard({ item, onApprove, onOverride }) {
   );
 }
 
+// Card for a brand-new incoming work order with an AI-suggested assignment.
+// Rendered at the top of Day 1 approvals — fresh, time-sensitive decision.
+function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContext, onViewStaff }) {
+  return (
+    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 34, height: 34, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#E0F2FE', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon} size={19} color="#0369A1" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
+              <Chip
+                size="small"
+                label="New"
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700,
+                  bgcolor: '#0F172A', color: '#fff',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+              <Chip
+                size="small"
+                label={item.priority}
+                sx={{
+                  height: 17, fontSize: 9.5, fontWeight: 700,
+                  bgcolor: '#FEF3C7', color: '#92400E',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                {item.id.toUpperCase()} · {item.receivedAgo}
+              </Typography>
+            </Stack>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
+              <Icon name="place" size={13} color="#94A3B8" />
+              <Typography variant="caption">{item.location}</Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.5 }}>
+              {item.body}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Box sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1, mt: 0.875 }}>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+            <Icon name="auto_awesome" size={13} color="#4338CA" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+              AI suggests
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.375 }}>
+            <Chip
+              size="small"
+              clickable={Boolean(onViewStaff)}
+              onClick={() => onViewStaff && onViewStaff(item.suggestion.tech)}
+              icon={<Icon name="person" size={11} color="#0369A1" sx={{ ml: 0.5 }} />}
+              label={item.suggestion.tech}
+              sx={{
+                height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#E0F2FE', color: '#0369A1',
+                '.MuiChip-label': { px: 0.625 }
+              }}
+            />
+            <Chip
+              size="small"
+              label={item.suggestion.open}
+              variant="outlined"
+              sx={{ height: 18, fontSize: 10, '.MuiChip-label': { px: 0.625 } }}
+            />
+            <Chip
+              size="small"
+              icon={<Icon name="schedule" size={11} sx={{ ml: 0.5 }} />}
+              label={item.suggestion.eta}
+              variant="outlined"
+              sx={{ height: 18, fontSize: 10, '.MuiChip-label': { px: 0.5 } }}
+            />
+          </Stack>
+          <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mb: 0.375 }}>
+            <Icon name="psychology" size={13} color="#475569" sx={{ mt: '1px', flexShrink: 0 }} />
+            <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
+              {item.suggestion.rationale}
+            </Typography>
+          </Stack>
+          <Typography variant="caption" sx={{ color: '#16A34A', fontWeight: 600 }}>
+            ✓ {item.suggestion.travel}
+          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.625 }}>
+            <Icon name="verified" size={12} color="#475569" />
+            <Typography variant="caption" sx={{ color: '#64748B' }}>
+              Confidence: {item.confidence}
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+            <Button
+              size="small"
+              variant="contained"
+              fullWidth
+              onClick={() => onApprove && onApprove(item)}
+            >
+              Approve
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              fullWidth
+              onClick={() => onReassign && onReassign(item)}
+              sx={{ bgcolor: '#fff' }}
+            >
+              Override
+            </Button>
+            <IconButton
+              size="small"
+              onClick={() => onContext && onContext(item)}
+              sx={{
+                border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff'
+              }}
+            >
+              <Icon name="add_comment" size={18} />
+            </IconButton>
+          </Stack>
+        </Box>
+
+        <Button
+          fullWidth
+          size="small"
+          variant="outlined"
+          color="inherit"
+          startIcon={<Icon name="snooze" size={15} />}
+          onClick={() => onSnooze && onSnooze(item)}
+          sx={{ mt: 1 }}
+        >
+          Snooze
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function PmTradeoffCard({ item, onApprove, onOverride }) {
   return (
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
@@ -2855,8 +4192,22 @@ function RoutineRollupCard({ data }) {
 function ReadinessSummaryRow({ item }) {
   const fg = item.tone === 'success' ? '#16A34A' : item.tone === 'warning' ? '#B45309' : '#0369A1';
   const bg = item.tone === 'success' ? '#DCFCE7' : item.tone === 'warning' ? '#FEF3C7' : '#E0F2FE';
+  const openReadiness = useOpenReadiness();
+  const clickable = Boolean(item.details && openReadiness);
   return (
-    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+    <Card
+      variant="outlined"
+      onClick={clickable ? () => openReadiness(item) : undefined}
+      sx={{
+        borderColor: '#E2E8F0',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'border-color 80ms, box-shadow 80ms, transform 80ms',
+        '&:hover': clickable ? {
+          borderColor: '#A5B4FC', boxShadow: '0 1px 3px rgba(67,56,202,0.12)'
+        } : {},
+        '&:active': clickable ? { transform: 'scale(0.995)' } : {}
+      }}
+    >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
           <Box
@@ -2875,6 +4226,9 @@ function ReadinessSummaryRow({ item }) {
               {item.body}
             </Typography>
           </Box>
+          {clickable && (
+            <Icon name="chevron_right" size={18} color="#CBD5E1" />
+          )}
         </Stack>
       </CardContent>
     </Card>
@@ -2926,7 +4280,7 @@ function StrategicRiskCard({ item }) {
   );
 }
 
-function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration, onDay1Metric }) {
+function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration, onDay1Metric, onViewStaff, onSnooze, onContext, onPatternsTile, onRisksTile, snoozedIds = [] }) {
   const mode = useMode();
   const day1 = mode === 'day1';
   const day30 = mode === 'day30';
@@ -2950,10 +4304,35 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
   return (
     <>
       <Box sx={{ px: 1.5, pt: 2 }}>
-        {/* Maturity banner */}
-        {day1 && <Day1Banner onMetric={onDay1Metric} />}
-        {day30 && <Day30Banner onReview={onCalibration} />}
-        {day90 && <Day90Banner onReview={onCalibration} />}
+        {/* Maturity banner — Day 1 sits on a light-purple section backdrop. */}
+        {day1 && (
+          <Box
+            sx={{
+              mx: -1.5, mt: -2, px: 1.5, pt: 2, pb: 0.5,
+              bgcolor: '#F5F3FF', mb: 1.5
+            }}
+          >
+            <Day1Banner onMetric={onDay1Metric} onSettings={onCalibration} />
+          </Box>
+        )}
+        {day30 && (
+          <Day30Banner
+            onReview={onCalibration}
+            onMetric={(k) => {
+              if (k === 'patterns') onPatternsTile && onPatternsTile();
+              else if (k === 'acceptance') onDay1Metric && onDay1Metric('accepted');
+            }}
+          />
+        )}
+        {day90 && (
+          <Day90Banner
+            onReview={onCalibration}
+            onMetric={(k) => {
+              if (k === 'patterns') onPatternsTile && onPatternsTile();
+              else if (k === 'risks') onRisksTile && onRisksTile();
+            }}
+          />
+        )}
 
         {/* ── DAY 1 ───────────────────────────────────────────────── */}
         {day1 && (
@@ -2966,41 +4345,26 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
             />
             <Stack spacing={1.25} sx={{ mb: 1.75 }}>
               <WeatherCard bare />
+              {!snoozedIds.includes(incomingWorkOrder.id) && (
+                <IncomingWorkOrderCard
+                  item={incomingWorkOrder}
+                  onApprove={onApprove}
+                  onSnooze={onSnooze}
+                  onReassign={openOverride}
+                  onContext={onContext}
+                  onViewStaff={onViewStaff}
+                />
+              )}
               {reviews.map((r) => (
                 <ReviewCard
                   key={r.id}
                   item={r}
                   onApprove={onApprove}
                   onOverride={openOverride}
+                  onViewStaff={onViewStaff}
                 />
               ))}
             </Stack>
-
-            <SectionHeader
-              icon="priority_high"
-              title="Operational priorities"
-              sub="Top operational items — review the AI's suggested action, then approve or override"
-            />
-            <Stack spacing={1} sx={{ mb: 1.75 }}>
-              {operationalPriorities.map((p) => (
-                <OperationalPriorityCard
-                  key={p.id}
-                  item={p}
-                  onApprove={onApprove}
-                  onOverride={openOverride}
-                  onReason={openReason}
-                />
-              ))}
-            </Stack>
-
-            <SectionHeader icon="group" title="Staffing" sub="One conflict worth a decision today" />
-            <Box sx={{ mb: 1.75 }}>
-              <StaffingConflictCard
-                item={day1StaffingConflict}
-                onApprove={onApprove}
-                onOverride={openOverride}
-              />
-            </Box>
 
             <SectionHeader icon="event_repeat" title="PM tradeoff" sub="One deferrable item the AI flagged" />
             <Box sx={{ mb: 1.75 }}>
@@ -3011,11 +4375,12 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
               />
             </Box>
 
-            <SectionHeader icon="model_training" title="Learning signal" sub="An early pattern — still calibrating, no action needed yet" />
-            <Box sx={{ mb: 1.75 }}>
-              <LearningHighlightCard item={day1LearningHighlight} />
-            </Box>
-
+            <SectionHeader
+              icon="check_circle"
+              title="Outcomes"
+              sub="What Connected Community handled for you in the background"
+              color="#16A34A"
+            />
             <Box sx={{ mb: 0.5 }}>
               <RoutineRollupCard data={routineRollup.day1} />
             </Box>
@@ -3026,23 +4391,12 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
         {day30 && (
           <>
             <SectionHeader
-              icon="dashboard"
-              title="Today's operational state"
-              sub="Grouped readiness summaries — routine work runs in the background"
-            />
-            <Stack spacing={1} sx={{ mb: 1.75 }}>
-              {day30Readiness.map((r) => (
-                <ReadinessSummaryRow key={r.id} item={r} />
-              ))}
-            </Stack>
-
-            <SectionHeader
               icon="report_problem"
               title="Exceptions requiring review"
               sub={`${exceptions.length} item${exceptions.length === 1 ? '' : 's'} the AI escalated — everything else is handled`}
               color="#B91C1C"
             />
-            <Stack spacing={1.25} sx={{ mb: 1.5 }}>
+            <Stack spacing={1.25} sx={{ mb: 1.75 }}>
               <WeatherCard bare />
               {exceptions.map((r) => (
                 <ReviewCard
@@ -3054,25 +4408,55 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
               ))}
             </Stack>
 
-            <Box sx={{ mb: 0.5 }}>
+            <SectionHeader
+              icon="dashboard"
+              title="Today's operational state"
+              sub="Grouped readiness summaries — routine work runs in the background"
+            />
+            <Stack spacing={1} sx={{ mb: 1.5 }}>
+              {day30Readiness.filter((r) => r.id !== 'r-backlog').map((r) => (
+                <ReadinessSummaryRow key={r.id} item={r} />
+              ))}
+            </Stack>
+
+            <SectionHeader
+              icon="check_circle"
+              title="Outcomes"
+              sub="What Connected Community handled for you in the background"
+              color="#16A34A"
+            />
+            <Stack spacing={1} sx={{ mb: 0.5 }}>
+              {day30Readiness.filter((r) => r.id === 'r-backlog').map((r) => (
+                <ReadinessSummaryRow key={r.id} item={r} />
+              ))}
               <RoutineRollupCard data={routineRollup.day30} />
-            </Box>
+            </Stack>
           </>
         )}
 
         {/* ── DAY 90 ──────────────────────────────────────────────── */}
         {day90 && (
           <>
-            <SectionHeader
-              icon="monitor_heart"
-              title="Operational health"
-              sub="Readiness and risk — what changed, what's trending"
-            />
-            <Stack spacing={1} sx={{ mb: 1.75 }}>
-              {day90Health.map((h) => (
-                <ReadinessSummaryRow key={h.id} item={h} />
-              ))}
-            </Stack>
+            {exceptions.length > 0 && (
+              <>
+                <SectionHeader
+                  icon="psychology_alt"
+                  title="Staffing insight"
+                  sub="One signal the AI couldn't decide on alone — everything else is handled"
+                  color="#4338CA"
+                />
+                <Stack spacing={1.25} sx={{ mb: 1.75 }}>
+                  {exceptions.map((r) => (
+                    <ReviewCard
+                      key={r.id}
+                      item={r}
+                      onApprove={onApprove}
+                      onOverride={openOverride}
+                    />
+                  ))}
+                </Stack>
+              </>
+            )}
 
             {strategicRisks.length > 0 && (
               <>
@@ -3089,27 +4473,23 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
               </>
             )}
 
-            {exceptions.length > 0 && (
-              <>
-                <SectionHeader
-                  icon="report_problem"
-                  title="Exception"
-                  sub="One decision the AI escalated — everything else is handled"
-                  color="#B91C1C"
-                />
-                <Stack spacing={1.25} sx={{ mb: 1.5 }}>
-                  {exceptions.map((r) => (
-                    <ReviewCard
-                      key={r.id}
-                      item={r}
-                      onApprove={onApprove}
-                      onOverride={openOverride}
-                    />
-                  ))}
-                </Stack>
-              </>
-            )}
+            <SectionHeader
+              icon="monitor_heart"
+              title="Operational health"
+              sub="Readiness and risk — what changed, what's trending"
+            />
+            <Stack spacing={1} sx={{ mb: 1.75 }}>
+              {day90Health.map((h) => (
+                <ReadinessSummaryRow key={h.id} item={h} />
+              ))}
+            </Stack>
 
+            <SectionHeader
+              icon="check_circle"
+              title="Outcomes"
+              sub="What Connected Community handled for you in the background"
+              color="#16A34A"
+            />
             <Box sx={{ mb: 0.5 }}>
               <RoutineRollupCard data={routineRollup.day90} />
             </Box>
@@ -3152,39 +4532,133 @@ Needs Your Review
   );
 }
 
-function KPIsTab() {
+function KPIsTab({ onPatternsTile }) {
+  const mode = useMode();
+  const aiMetrics = mode === 'day90' ? day90Status.metrics
+    : mode === 'day30' ? day30Status.metrics
+    : day1Status.metrics;
+  const aiSub = mode === 'day90' ? 'Predictive readiness and operational lift across 90 days.'
+    : mode === 'day30' ? 'How Connected Community is performing — calibration depth and operational lift.'
+    : 'Early calibration signals — the AI is still learning your building.';
   return (
-    <Box sx={{ px: 1.5, pt: 1.5 }}>
+    <Box sx={{ px: 1, pt: 1.5 }}>
+      {(
+        <Box sx={{ mb: 2 }}>
+          <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 1 }}>
+            <Icon name="auto_awesome" size={16} color="#4338CA" />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              AI Coordination KPIs
+            </Typography>
+          </Stack>
+          <Typography variant="caption" sx={{ display: 'block', color: '#64748B', mb: 1, lineHeight: 1.35 }}>
+            {aiSub}
+          </Typography>
+          {(() => {
+            // Treat any metric whose value starts with +/− (or -) as a trend.
+            const isTrend = (m) => /^[+−-]/.test(String(m.value));
+            const point = aiMetrics.filter((m) => !isTrend(m));
+            const trend = aiMetrics.filter(isTrend);
+            const trendWindow = mode === 'day90'
+              ? 'Trend · Apr 22 – May 22, 2026 vs. prior 90 days'
+              : 'Trend · Apr 22 – May 22, 2026 vs. prior 30 days';
+            const Tile = ({ m, wide }) => {
+              const isPatterns = /coordination patterns|operational patterns/i.test(m.label);
+              const clickable = isPatterns && Boolean(onPatternsTile);
+              return (
+                <Box
+                  onClick={clickable ? onPatternsTile : undefined}
+                  sx={{
+                    border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1, bgcolor: '#fff',
+                    gridColumn: wide ? '1 / -1' : 'auto',
+                    cursor: clickable ? 'pointer' : 'default',
+                    transition: 'border-color 80ms, box-shadow 80ms, transform 80ms',
+                    position: 'relative',
+                    '&:hover': clickable ? {
+                      borderColor: '#A5B4FC', boxShadow: '0 1px 3px rgba(67,56,202,0.12)'
+                    } : {},
+                    '&:active': clickable ? { transform: 'scale(0.98)' } : {}
+                  }}
+                >
+                  <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
+                    <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                      {m.value}
+                    </Typography>
+                    {clickable && <Icon name="chevron_right" size={14} color="#CBD5E1" />}
+                  </Stack>
+                  <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
+                    {m.label}
+                  </Typography>
+                  {m.sub && (
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10 }}>
+                      {m.sub}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            };
+            return (
+              <>
+                {point.length > 0 && (
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mb: trend.length > 0 ? 1.25 : 0 }}>
+                    {point.map((m, i) => (
+                      <Tile key={m.label} m={m} wide={point.length % 2 === 1 && i === point.length - 1} />
+                    ))}
+                  </Box>
+                )}
+                {trend.length > 0 && (
+                  <>
+                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.625 }}>
+                      <Icon name="timeline" size={13} color="#64748B" />
+                      <Typography
+                        variant="caption"
+                        sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}
+                      >
+                        {trendWindow}
+                      </Typography>
+                    </Stack>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+                      {trend.map((m, i) => (
+                        <Tile key={m.label} m={m} wide={trend.length % 2 === 1 && i === trend.length - 1} />
+                      ))}
+                    </Box>
+                  </>
+                )}
+              </>
+            );
+          })()}
+        </Box>
+      )}
+
       <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
         KPI Trajectory
       </Typography>
       <Stack spacing={1}>
         {readiness.filter((r) => r.suffix === '%').map((r) => (
           <Card key={r.label} variant="outlined">
-            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
+            <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+              <Stack direction="row" alignItems="center" spacing={1.25}>
                 <Box
                   sx={{
-                    width: 28, height: 28, borderRadius: '8px',
+                    width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
                     bgcolor: toneBg(r.tone), display: 'grid', placeItems: 'center'
                   }}
                 >
-                  <Icon name={r.icon} size={16} />
+                  <Icon name={r.icon} size={20} />
                 </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
                     {r.label}
                   </Typography>
                   <LinearProgress
                     variant="determinate"
                     value={r.value}
                     sx={{
-                      mt: 0.5, height: 6, borderRadius: 4, bgcolor: '#F1F5F9',
-                      '& .MuiLinearProgress-bar': { bgcolor: toneBg(r.tone) }
+                      mt: 0.75, height: 8, borderRadius: 4, bgcolor: '#F1F5F9',
+                      '& .MuiLinearProgress-bar': { bgcolor: toneBg(r.tone), borderRadius: 4 }
                     }}
                   />
                 </Box>
-                <Typography sx={{ fontWeight: 700 }}>
+                <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#0F172A', minWidth: 48, textAlign: 'right' }}>
                   {r.value}%
                 </Typography>
               </Stack>
@@ -3247,8 +4721,16 @@ function TaskListRow({ task }) {
       : overdue
         ? { icon: 'error', fg: '#DC2626', bg: '#FEE2E2' }
         : { icon: 'schedule', fg: '#0369A1', bg: '#E0F2FE' };
+  const highlight = useHighlight();
+  const openItem = useOpenItem();
+  const on = highlight === task.id;
   return (
-    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+    <Card
+      id={`row-${task.id}`}
+      variant="outlined"
+      onClick={() => openItem(task)}
+      sx={{ borderColor: '#E2E8F0', cursor: 'pointer', ...highlightSx(on) }}
+    >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
           <Box
@@ -3466,14 +4948,23 @@ const WO_STATUS_VISUAL = {
   Open: { icon: 'schedule', fg: '#0369A1', bg: '#E0F2FE' },
   Deferrable: { icon: 'schedule', fg: '#475569', bg: '#F1F5F9' },
   Unassigned: { icon: 'person_off', fg: '#64748B', bg: '#F1F5F9' },
-  'Awaiting parts': { icon: 'inventory_2', fg: '#B45309', bg: '#FEF3C7' }
+  'Awaiting parts': { icon: 'inventory_2', fg: '#B45309', bg: '#FEF3C7' },
+  Snoozed: { icon: 'snooze', fg: '#0369A1', bg: '#E0F2FE' }
 };
 
 function WorkOrderRow({ wo }) {
   const v = WO_STATUS_VISUAL[wo.status] || { icon: 'build', fg: '#475569', bg: '#F1F5F9' };
   const topLabel = wo.kind || wo.category || wo.kpi || 'Work order';
+  const highlight = useHighlight();
+  const openItem = useOpenItem();
+  const on = highlight === wo.id;
   return (
-    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+    <Card
+      id={`row-${wo.id}`}
+      variant="outlined"
+      onClick={() => openItem(wo)}
+      sx={{ borderColor: '#E2E8F0', cursor: 'pointer', ...highlightSx(on) }}
+    >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
           <Box
@@ -3532,19 +5023,23 @@ function WorkOrdersView() {
   const mode = useMode();
   const day90 = mode === 'day90';
   const day30 = mode === 'day30';
+  const extras = useExtraWorkOrders();
   const [showParts, setShowParts] = useState(false);
   const [showUnassigned, setShowUnassigned] = useState(false);
+  const [showSnoozed, setShowSnoozed] = useState(true);
   const [showActive, setShowActive] = useState(!day90);
   const all = [
+    ...extras,
     ...tiers.flatMap((t) => t.tasks).filter((w) => w.id.startsWith('wo-') || w.id.startsWith('qw-')),
     ...backlog,
     ...predictiveWorkOrders
   ];
+  const snoozed = all.filter((w) => w.status === 'Snoozed');
   const overdue = all.filter((w) => w.status === 'Overdue');
   const awaitingParts = all.filter((w) => w.status === 'Awaiting parts');
   const unassigned = all.filter((w) => w.status === 'Unassigned');
   const active = all.filter(
-    (w) => !['Overdue', 'Awaiting parts', 'Unassigned'].includes(w.status)
+    (w) => !['Overdue', 'Awaiting parts', 'Unassigned', 'Snoozed'].includes(w.status)
   );
   // At Day 30/90, only surface At risk / Critical actives by default.
   const exceptionsOnly = active.filter((w) => ['At risk', 'Critical', 'Monitor'].includes(w.status));
@@ -3565,6 +5060,18 @@ function WorkOrdersView() {
           sx={{ bgcolor: '#FEF3C7', color: '#92400E' }}
         />
       </Stack>
+
+      {snoozed.length > 0 && (
+        <BucketCard
+          icon="snooze" iconFg="#0369A1" iconBg="#E0F2FE"
+          borderColor="#BAE6FD" bg="#F0F9FF" chevronColor="#0369A1"
+          title="Snoozed"
+          sub={`${snoozed.length} held — resurfacing automatically`}
+          open={showSnoozed} onToggle={() => setShowSnoozed((v) => !v)}
+        >
+          {snoozed.map((w) => <WorkOrderRow key={w.id} wo={w} />)}
+        </BucketCard>
+      )}
 
       <BucketCard
         icon="inventory_2" iconFg="#B45309" iconBg="#FEF3C7"
@@ -3641,8 +5148,17 @@ const TURN_STATUS_VISUAL = {
 
 function UnitTurnRow({ turn }) {
   const v = TURN_STATUS_VISUAL[turn.status] || TURN_STATUS_VISUAL.Scheduled;
+  const highlight = useHighlight();
+  const openItem = useOpenItem();
+  const openPattern = useOpenPattern();
+  const on = highlight === turn.id;
   return (
-    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+    <Card
+      id={`row-${turn.id}`}
+      variant="outlined"
+      onClick={() => openItem(turn)}
+      sx={{ borderColor: '#E2E8F0', cursor: 'pointer', ...highlightSx(on) }}
+    >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
           <Box
@@ -3699,6 +5215,12 @@ function UnitTurnRow({ turn }) {
               {turn.learned && (
                 <Chip
                   size="small"
+                  clickable={Boolean(turn.patternId)}
+                  onClick={(e) => {
+                    if (!turn.patternId) return;
+                    e.stopPropagation(); // don't trigger the row's openItem
+                    openPattern(turn.patternId);
+                  }}
                   icon={<Icon name="model_training" size={10} color="#4338CA" sx={{ ml: 0.5 }} />}
                   label="Learned pattern"
                   sx={{
@@ -3791,8 +5313,16 @@ const SV_STATUS_VISUAL = {
 
 function ServiceRow({ svc }) {
   const v = SV_STATUS_VISUAL[svc.status] || { icon: 'handshake', fg: '#475569', bg: '#F1F5F9' };
+  const highlight = useHighlight();
+  const openItem = useOpenItem();
+  const on = highlight === svc.id;
   return (
-    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+    <Card
+      id={`row-${svc.id}`}
+      variant="outlined"
+      onClick={() => openItem(svc)}
+      sx={{ borderColor: '#E2E8F0', cursor: 'pointer', ...highlightSx(on) }}
+    >
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
           <Box
@@ -3935,20 +5465,15 @@ const WORK_SEGMENTS = [
   { id: 'services', label: 'Services' }
 ];
 
-function WorkTab() {
-  const [seg, setSeg] = useState('orders');
-  const mode = useMode();
-  const calibrated = mode === 'day30' || mode === 'day90';
+function WorkTab({ seg: segProp, onSegChange }) {
+  const [segLocal, setSegLocal] = useState('orders');
+  const seg = segProp || segLocal;
+  const setSeg = (v) => {
+    if (onSegChange) onSegChange(v);
+    else setSegLocal(v);
+  };
   return (
     <Box sx={{ px: 1.5, pt: 1.5 }}>
-      {calibrated && (
-        <Box sx={{ mb: 1.25 }}>
-          <RoutineRollupCard data={mode === 'day90' ? routineRollup.day90 : routineRollup.day30} />
-          <Typography variant="caption" sx={{ display: 'block', color: '#64748B', mt: 0.75, lineHeight: 1.35 }}>
-            Below: anything the AI couldn't fully coordinate on its own — overdue, at-risk, or unassigned.
-          </Typography>
-        </Box>
-      )}
       <ToggleButtonGroup
         size="small"
         exclusive
@@ -3982,6 +5507,211 @@ function WorkTab() {
       {seg === 'turns' && <UnitTurnsView />}
       {seg === 'services' && <ServicesView />}
     </Box>
+  );
+}
+
+// Unified detail drawer for any work row (work order, task, unit turn,
+// service). Reads fields flexibly to handle each row shape.
+function ItemDetailSheet({ open, item, onClose }) {
+  if (!item) return null;
+  const kind = item.kind || item.category || item.kpi || item.source || 'Work item';
+  const title = item.title || item.unit || item.vendor || 'Untitled';
+  const statusLabel = item.status || '—';
+  const location = item.location || item.target || (item.unit ? `Unit ${item.unit}` : '');
+  const assignee = item.assignee || item.tech || (item.vendor ? `${item.vendor} (vendor)` : 'Unassigned');
+  const eta = item.eta || item.dur || '—';
+  const note = item.note || item.reason || '';
+  const priority = item.priority;
+  const due = item.due;
+  const cadence = item.cadence;
+  const opened = item.opened;
+  const sla = item.sla;
+  const cost = item.cost;
+  const trade = item.trade;
+  const readiness = item.readiness;
+  const idLabel = (item.id || '').toUpperCase().replace(/^WO-/, 'WO-').replace(/^TK-/, 'TK-').replace(/^TURN-/, 'UT-').replace(/^SV-/, 'SV-');
+  const tone = item.tone || (statusLabel === 'Overdue' || statusLabel === 'At risk' || statusLabel === 'Critical' ? 'error'
+    : statusLabel === 'Completed' || statusLabel === 'On track' || statusLabel === 'Ready' ? 'success'
+    : statusLabel === 'In progress' || statusLabel === 'Awaiting parts' || statusLabel === 'Monitor' ? 'warning'
+    : 'info');
+  const statusBg = toneBg(tone);
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
+              bgcolor: statusBg, display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name={item.icon || 'build'} size={22} color="#0F172A" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }} flexWrap="wrap" useFlexGap>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                {idLabel || kind} · {kind}
+              </Typography>
+              <Chip
+                size="small"
+                label={statusLabel}
+                sx={{
+                  height: 17, fontSize: 10, fontWeight: 700, bgcolor: statusBg, color: '#0F172A',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+              {priority && (
+                <Chip
+                  size="small"
+                  label={priority}
+                  variant="outlined"
+                  sx={{ height: 17, fontSize: 10, '.MuiChip-label': { px: 0.625 } }}
+                />
+              )}
+            </Stack>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+              {title}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.25 }}>
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Stack divider={<Divider />} spacing={0.875}>
+              {location && <DetailRow icon="place" label="Location" value={location} />}
+              <DetailRow icon="person" label="Assignee" value={assignee} />
+              {(eta && eta !== '—') && <DetailRow icon="schedule" label="ETA" value={typeof eta === 'string' ? eta : formatDur(eta)} />}
+              {due && <DetailRow icon="event" label="Due" value={due} />}
+              {cadence && <DetailRow icon="event_repeat" label="Cadence" value={cadence} />}
+              {opened && <DetailRow icon="flag" label="Opened" value={opened} />}
+              {trade && <DetailRow icon="handyman" label="Trade" value={trade} />}
+              {sla && <DetailRow icon="schedule_send" label="SLA" value={sla} />}
+              {cost && <DetailRow icon="payments" label="Cost" value={cost} />}
+              {typeof readiness === 'number' && <DetailRow icon="meeting_room" label="Readiness" value={`${readiness}%`} />}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {note && (
+          <Box sx={{ mb: 1.25 }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.5 }}>
+              CONTEXT
+            </Typography>
+            <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                <Typography variant="body2" sx={{ color: '#334155', lineHeight: 1.4 }}>
+                  {note}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+
+        {item.tags && (
+          <Box sx={{ mb: 1.25 }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.5 }}>
+              TAGS
+            </Typography>
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+              {item.tags.split(';').map((t) => t.trim()).filter(Boolean).map((t) => (
+                <Chip
+                  key={t}
+                  size="small"
+                  label={t}
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: 10.5, '.MuiChip-label': { px: 0.75 } }}
+                />
+              ))}
+            </Stack>
+          </Box>
+        )}
+
+        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.5 }}>
+          ASSET HISTORY
+        </Typography>
+        <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.25 }}>
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Box sx={{ mb: 0.75 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {assetInfo(item).name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B' }}>
+                {assetInfo(item).desc}
+              </Typography>
+            </Box>
+            <Divider sx={{ mb: 0.75 }} />
+            <Stack spacing={0.75}>
+              <HistoryRow when="Apr 28" what="Last serviced · cleared in 1.2h" />
+              <HistoryRow when="Mar 14" what="Vendor dispatch — same asset" tone="warning" />
+              <HistoryRow when="Feb 02" what="Quarterly PM completed" />
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.5 }}>
+          ACTIVITY
+        </Typography>
+        <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.5 }}>
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Stack spacing={0.75}>
+              <ActivityRow who="AI" when="7:02 AM" body={`Sequenced as part of today’s plan${assignee ? ` for ${assignee}.` : '.'}`} />
+              {note && <ActivityRow who="AI" when="7:05 AM" body={note} />}
+              {statusLabel === 'In progress' && <ActivityRow who={assignee} when="7:30 AM" body="Started on-site." tone="warning" />}
+              {statusLabel === 'Completed' && <ActivityRow who={assignee} when="—" body="Marked complete." tone="success" />}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+          <Button fullWidth size="small" variant="outlined" startIcon={<Icon name="event_repeat" size={16} />}>
+            Reschedule
+          </Button>
+          <Button fullWidth size="small" variant="outlined" startIcon={<Icon name="person_add" size={16} />}>
+            Reassign
+          </Button>
+        </Stack>
+        <Stack direction="row" spacing={1}>
+          <Button fullWidth size="small" variant="outlined" startIcon={<Icon name="add_comment" size={16} />}>
+            Add note
+          </Button>
+          {statusLabel === 'Queued' && (
+            <Button
+              fullWidth size="small" variant="contained"
+              startIcon={<Icon name="play_arrow" size={16} color="#fff" />}
+              sx={{ color: '#fff', bgcolor: '#2563EB', '&:hover': { bgcolor: '#1D4ED8' } }}
+            >
+              Mark in-progress
+            </Button>
+          )}
+          {statusLabel === 'In progress' && (
+            <Button
+              fullWidth size="small" variant="contained" color="success"
+              startIcon={<Icon name="check" size={16} color="#fff" />}
+              sx={{ color: '#fff' }}
+            >
+              Mark complete
+            </Button>
+          )}
+        </Stack>
+      </Box>
+    </Drawer>
   );
 }
 
@@ -5044,178 +6774,137 @@ const AI_ACTION_ICON = {
   'Auto-closed': 'task_alt'
 };
 
-function AiActivityList() {
-  const [actioned, setActioned] = useState({});
-  const items = aiActivity;
+// Map a Day-30 AI activity item into the same visual shape as the
+// Day-1 metric drawer cards (timestamp + state pill, title, body, purple
+// "why" line, "What the AI did" panel with Add context, Undo footer).
+function AiActivityCard({ item, onContext, onUndo }) {
+  const done = item.status === 'completed';
+  const monitoring = item.status === 'monitoring';
+  const stateLabel = monitoring ? 'Monitoring'
+    : done ? 'Completed'
+    : item.status === 'in-progress' ? 'In progress'
+    : item.status === 'queued' ? 'Queued'
+    : item.status;
+  const stateTone = monitoring ? 'warning'
+    : done ? 'success'
+    : item.status === 'in-progress' ? 'info'
+    : 'default';
+  const stateBg = stateTone === 'success' ? '#DCFCE7'
+    : stateTone === 'warning' ? '#FEF3C7'
+    : stateTone === 'info' ? '#E0F2FE'
+    : '#F1F5F9';
+  const stateFg = stateTone === 'success' ? '#15803D'
+    : stateTone === 'warning' ? '#92400E'
+    : stateTone === 'info' ? '#0369A1'
+    : '#475569';
+  const undoable = !done && !monitoring;
   return (
-        <Stack spacing={0}>
-          {items.map((a, idx) => {
-            const tColor = {
-              error: '#DC2626', warning: '#D97706', info: '#0EA5E9',
-              success: '#16A34A', default: '#64748B'
-            }[a.tone] || '#64748B';
-            const done = a.status === 'completed';
-            const monitoring = a.status === 'monitoring';
-            const last = idx === items.length - 1;
-            const act = actioned[a.id];
-            return (
-              <Stack key={a.id} direction="row" spacing={1.25} alignItems="stretch">
-                {/* timeline rail */}
-                <Stack alignItems="center" sx={{ width: 22, flexShrink: 0 }}>
-                  <Box
-                    sx={{
-                      width: 22, height: 22, borderRadius: '50%', mt: 0.25,
-                      bgcolor: done ? '#DCFCE7' : '#EEF2FF',
-                      display: 'grid', placeItems: 'center'
-                    }}
-                  >
-                    <Icon
-                      name={done ? 'check' : AI_ACTION_ICON[a.action] || 'auto_awesome'}
-                      size={13}
-                      color={done ? '#16A34A' : '#4338CA'}
-                    />
-                  </Box>
-                  {!last && (
-                    <Box sx={{ flex: 1, width: '2px', bgcolor: '#E2E8F0', my: 0.25 }} />
-                  )}
-                </Stack>
-
-                <Box sx={{ flex: 1, minWidth: 0, pb: last ? 0 : 1.5 }}>
-                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
-                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
-                      {a.ago}
-                    </Typography>
-                    <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#CBD5E1' }} />
-                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
-                      {a.clock}
-                    </Typography>
-                  </Stack>
-                  <Card
-                    variant="outlined"
-                    sx={{
-                      borderColor: '#A5B4FC', borderWidth: 1.5, bgcolor: '#FCFCFF'
-                    }}
-                  >
-                    <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-                      <Stack
-                        direction="row"
-                        spacing={0.5}
-                        alignItems="center"
-                        flexWrap="wrap"
-                        useFlexGap
-                        sx={{ mb: 0.5 }}
-                      >
-                        <Chip
-                          size="small"
-                          label={a.action}
-                          sx={{
-                            height: 18, fontSize: 10, fontWeight: 700,
-                            bgcolor: toneBg(a.tone), color: '#0F172A',
-                            '.MuiChip-label': { px: 0.75 }
-                          }}
-                        />
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          icon={<Icon name="person" size={11} color="#475569" sx={{ ml: 0.5 }} />}
-                          label={`${a.assignee} · ${a.when}`}
-                          sx={{
-                            height: 18, fontSize: 10, fontWeight: 600,
-                            borderColor: '#CBD5E1', color: '#334155',
-                            '.MuiChip-label': { px: 0.5 }
-                          }}
-                        />
-                        {a.status === 'in-progress' && (
-                          <Chip
-                            size="small"
-                            label="In progress"
-                            sx={{
-                              height: 18, fontSize: 10, bgcolor: '#0F172A', color: '#fff',
-                              '.MuiChip-label': { px: 0.625 }
-                            }}
-                          />
-                        )}
-                        {monitoring && (
-                          <Chip
-                            size="small"
-                            icon={<Icon name="monitoring" size={11} color="#B45309" sx={{ ml: 0.5 }} />}
-                            label="Monitoring"
-                            sx={{
-                              height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#FEF3C7', color: '#B45309',
-                              '.MuiChip-label': { px: 0.5 }
-                            }}
-                          />
-                        )}
-                        {done && (
-                          <Typography variant="caption" sx={{ color: '#16A34A', fontWeight: 700 }}>
-                            Completed
-                          </Typography>
-                        )}
-                      </Stack>
-                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
-                        {a.title}
-                      </Typography>
-                      <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: '#475569' }}>
-                        {a.detail}
-                      </Typography>
-                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
-                        <Icon name="place" size={12} color="#94A3B8" />
-                        <Typography variant="caption">{a.target}</Typography>
-                      </Stack>
-
-                      {!done && !monitoring && (
-                        act ? (
-                          <Box
-                            sx={{
-                              mt: 1, p: 0.875, borderRadius: 1.5,
-                              bgcolor: '#F0FDF4', border: '1px solid #BBF7D0',
-                              display: 'flex', alignItems: 'center', gap: 0.75
-                            }}
-                          >
-                            <Icon name="check_circle" size={15} color="#16A34A" />
-                            <Typography variant="caption" sx={{ flex: 1, color: '#166534', fontWeight: 600 }}>
-                              {act}
-                            </Typography>
-                            <Button
-                              size="small"
-                              onClick={() => setActioned((s) => { const n = { ...s }; delete n[a.id]; return n; })}
-                              sx={{ minWidth: 0, px: 0.75, fontSize: 12 }}
-                            >
-                              Undo
-                            </Button>
-                          </Box>
-                        ) : (
-                          <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
-                            {[
-                              { k: 'reschedule', icon: 'event_repeat', label: 'Reschedule', msg: 'Rescheduled to tomorrow AM' },
-                              { k: 'reassign', icon: 'swap_horiz', label: 'Reassign', msg: 'Reassignment requested' },
-                              { k: 'snooze', icon: 'snooze', label: 'Snooze', msg: 'Snoozed 1 hr' }
-                            ].map((b) => (
-                              <Button
-                                key={b.k}
-                                size="small"
-                                variant="outlined"
-                                startIcon={<Icon name={b.icon} size={14} />}
-                                onClick={() => setActioned((s) => ({ ...s, [a.id]: b.msg }))}
-                                sx={{
-                                  flex: 1, py: 0.375, fontSize: 11.5,
-                                  borderColor: '#CBD5E1', color: '#334155',
-                                  '.MuiButton-startIcon': { mr: 0.375 }
-                                }}
-                              >
-                                {b.label}
-                              </Button>
-                            ))}
-                          </Stack>
-                        )
-                      )}
-                    </CardContent>
-                  </Card>
-                </Box>
-              </Stack>
-            );
-          })}
+    <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
+          <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+            {item.ago} · {item.clock}
+          </Typography>
+          <Chip
+            size="small"
+            label={stateLabel}
+            sx={{
+              height: 18, fontSize: 10, fontWeight: 700,
+              bgcolor: stateBg, color: stateFg,
+              '.MuiChip-label': { px: 0.75 }
+            }}
+          />
         </Stack>
+        <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+          {item.title}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.375 }}>
+          {item.detail}
+        </Typography>
+        <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.625 }}>
+          <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+          <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600 }}>
+            {item.action} · {item.target}
+          </Typography>
+        </Stack>
+        <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
+          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="space-between">
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+              <Icon name="model_training" size={13} color="#64748B" sx={{ flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', lineHeight: 1.3 }}>
+                What the AI did
+              </Typography>
+            </Stack>
+            <Button
+              size="small"
+              onClick={() => onContext && onContext(item)}
+              startIcon={<Icon name="add_comment" size={13} color="#0369A1" />}
+              sx={{
+                px: 0.5, py: 0,
+                textTransform: 'none', fontSize: 11.5, fontWeight: 600,
+                color: '#0369A1', minHeight: 0, flexShrink: 0
+              }}
+            >
+              Add context
+            </Button>
+          </Stack>
+          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35, display: 'block', mt: 0.5 }}>
+            Routed to {item.assignee} · {item.when}.
+          </Typography>
+        </Box>
+        <Button
+          fullWidth
+          size="small"
+          variant="contained"
+          disabled={!undoable}
+          startIcon={<Icon name="undo" size={14} />}
+          onClick={() => onUndo && onUndo(item)}
+          sx={{
+            mt: 1, textTransform: 'none', fontSize: 12,
+            '&.Mui-disabled': { bgcolor: '#F1F5F9', color: '#94A3B8' }
+          }}
+        >
+          {undoable ? 'Undo' : `${stateLabel} — can't undo`}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AiActivityList({ onContext, onUndo }) {
+  return (
+    <Stack spacing={1}>
+      {aiActivity.map((a) => (
+        <AiActivityCard key={a.id} item={a} onContext={onContext} onUndo={onUndo} />
+      ))}
+    </Stack>
+  );
+}
+
+// Full-page AI activity view (replaces the prior bottom-sheet drawer).
+function AiActivityTab({ onContext, onUndo }) {
+  return (
+    <Box sx={{ px: 1.5, pt: 1.5, pb: 1 }}>
+      <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 1.5 }}>
+        <Box
+          sx={{
+            width: 36, height: 36, borderRadius: '10px',
+            bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
+          }}
+        >
+          <Icon name="auto_awesome" size={20} color="#4338CA" />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="subtitle1" sx={{ lineHeight: 1.15, fontWeight: 700 }}>
+            AI activity
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#64748B' }}>
+            Last 24 hours · {aiActivity.length} actions · newest first
+          </Typography>
+        </Box>
+      </Stack>
+      <AiActivityList onContext={onContext} onUndo={onUndo} />
+    </Box>
   );
 }
 
@@ -5325,11 +7014,88 @@ export default function App() {
   const [overrideItem, setOverrideItem] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState('day1');
-  const [aiLogOpen, setAiLogOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   const [day1Metric, setDay1Metric] = useState(null);
+  const [undoItem, setUndoItem] = useState(null);
+  const [contextTarget, setContextTarget] = useState(null);
+  const [staffMember, setStaffMember] = useState(null);
+  const [openedPattern, setOpenedPattern] = useState(null);
+  const [coordPatternsOpen, setCoordPatternsOpen] = useState(false);
+  const [risksOpen, setRisksOpen] = useState(false);
+  const [snoozeTarget, setSnoozeTarget] = useState(null);
+  const [extraWorkOrders, setExtraWorkOrders] = useState([]);
+  const [readinessTarget, setReadinessTarget] = useState(null);
+
+  const openReadiness = React.useCallback((it) => setReadinessTarget(it), []);
+
+  // Resolve a pattern id (e.g. 'pt-4') against day1MetricDetails.patterns
+  // and open it in the PatternDetailSheet.
+  const openPattern = React.useCallback((id) => {
+    const found = day1MetricDetails?.patterns?.items?.find((p) => p.id === id);
+    if (found) setOpenedPattern(found);
+  }, []);
+
+  const handleSnoozeConfirm = ({ duration, reason }) => {
+    const original = snoozeTarget;
+    setSnoozeTarget(null);
+    if (!original) return;
+    // Adapt incoming-WO shape into the Work tab's row shape.
+    const snoozed = {
+      id: original.id,
+      kind: original.category || 'Work order',
+      category: original.category,
+      title: original.title,
+      location: original.location,
+      status: 'Snoozed',
+      assignee: original.suggestion?.tech || 'Unassigned',
+      eta: original.suggestion?.eta || '—',
+      priority: original.priority,
+      note: `${original.body}${reason ? `\nSnooze reason: ${reason.label}` : ''}\nWill resurface ${duration.until}.`,
+      snoozeReason: reason?.label || null,
+      snoozeUntil: duration.until
+    };
+    setExtraWorkOrders((prev) => prev.some((x) => x.id === snoozed.id) ? prev : [snoozed, ...prev]);
+    setSnack(
+      `Snoozed ${duration.label.toLowerCase()}${reason ? ` · "${reason.label}"` : ''} · in Work tab`
+    );
+  };
+
+  const handlePatternAction = (kind, p) => {
+    if (kind === 'context') {
+      setContextTarget({ id: p.id, when: p.when, title: p.title });
+      setOpenedPattern(null);
+      return;
+    }
+    setOpenedPattern(null);
+    setSnack(
+      kind === 'confirm' ? 'Pattern confirmed · AI will start using it'
+      : kind === 'dismiss' ? 'Pattern dismissed · AI will stop tracking it'
+      : 'Recorded'
+    );
+  };
+  const [workSeg, setWorkSeg] = useState('orders');
+  const [highlight, setHighlight] = useState(null);
+  const [openedItem, setOpenedItem] = useState(null);
   const [snack, setSnack] = useState(null);
+
+  // Memoized so its identity stays stable across renders for the context.
+  const openItem = React.useCallback((it) => setOpenedItem(it), []);
+
+  // Resolve a team member by name (used by the Staffing override CTA).
+  const openStaffByName = React.useCallback((name) => {
+    if (!name) return;
+    const first = name.split(/\s|\./)[0].toLowerCase();
+    const m = team.find((p) => p.name.toLowerCase().startsWith(first));
+    if (m) setStaffMember(m);
+  }, []);
+
+  // Highlight fades after ~3.5s — long enough to read the ring + label.
+  React.useEffect(() => {
+    if (!highlight) return;
+    const t = setTimeout(() => setHighlight(null), 3500);
+    return () => clearTimeout(t);
+  }, [highlight]);
   const calibrated = mode === 'day30' || mode === 'day90';
 
   const openReason = (t) => setReasonTask(t);
@@ -5362,21 +7128,82 @@ export default function App() {
     );
   };
 
-  const handleDay1Respond = ({ kind }) => {
-    // Add-context shouldn't dismiss the drawer — it's an inline note action.
-    if (kind !== 'context') setDay1Metric(null);
+  const handleDay1Respond = ({ kind, item }) => {
+    // Undo opens a confirmation drawer with the item context — don't act yet.
+    if (kind === 'undo') {
+      setUndoItem(item);
+      return;
+    }
+    // Add-context opens an input drawer on top of the metric drawer.
+    if (kind === 'context') {
+      setContextTarget(item);
+      return;
+    }
+    setDay1Metric(null);
     setSnack(
-      kind === 'context' ? 'Context recorded · AI will weight it on the next pass'
-      : kind === 'confirm' ? 'Pattern confirmed · AI will start using it'
+      kind === 'confirm' ? 'Pattern confirmed · AI will start using it'
       : kind === 'dismiss' ? 'Pattern dismissed · AI will stop tracking it'
       : kind === 'reinforce' ? 'Override reinforced · AI will treat it as a rule'
-      : kind === 'undo' ? 'Action undone · prior state restored'
+      : kind === 'ignore' ? 'Rule ignored · AI will not apply it going forward'
       : 'Decision queued'
     );
   };
 
+  const handleUndoAction = (kind) => {
+    const item = undoItem; // capture before clearing
+    setUndoItem(null);
+    if (kind === 'decline') {
+      setDay1Metric(null);
+      setSnack('Action undone · rule reverted · AI will not reuse it');
+    } else if (kind === 'accept') {
+      setSnack('Kept as-is · AI decision left in place');
+    } else if (kind === 'context') {
+      setContextTarget(item);
+    } else if (kind === 'open') {
+      const r = item?.route;
+      if (!r) { setSnack('Source item not available in this prototype'); return; }
+      // Resolve the underlying record across all data sources so the
+      // detail drawer renders with real fields, not a placeholder.
+      const allWorkOrders = [
+        ...tiers.flatMap((t) => t.tasks).filter((w) => w.id.startsWith('wo-') || w.id.startsWith('qw-') || w.id.startsWith('ut-')),
+        ...backlog,
+        ...predictiveWorkOrders
+      ];
+      const lookup = {
+        orders: allWorkOrders,
+        tasks: tasksList,
+        turns: unitTurns,
+        services: services
+      };
+      const pool = lookup[r.seg] || [];
+      const found = pool.find((x) => x.id === r.highlight);
+      if (found) {
+        setDay1Metric(null);
+        setOpenedItem(found);
+      } else {
+        // Fallback: still tab-switch + highlight so the MD can find it.
+        setDay1Metric(null);
+        setTab(r.tab);
+        setWorkSeg(r.seg);
+        setHighlight(r.highlight || null);
+        if (r.highlight) {
+          setTimeout(() => {
+            const el = document.getElementById(`row-${r.highlight}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 180);
+        }
+        setSnack(`Opening ${item.target}`);
+      }
+    }
+  };
+
   return (
    <ModeContext.Provider value={mode}>
+    <HighlightContext.Provider value={highlight}>
+    <ItemDetailContext.Provider value={openItem}>
+    <OpenPatternContext.Provider value={openPattern}>
+    <ExtraWorkOrdersContext.Provider value={extraWorkOrders}>
+    <OpenReadinessContext.Provider value={openReadiness}>
     <Box
       sx={{
         width: '100%',
@@ -5398,11 +7225,19 @@ export default function App() {
         onAdd={() => setSnack('New work order request — not in this prototype')}
       />
 
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} onViewStaff={openStaffByName} onSnooze={(it) => setSnoozeTarget(it)} onContext={(it) => setContextTarget({ id: it.id, when: it.receivedAgo || it.when, title: it.title })} onPatternsTile={() => setCoordPatternsOpen(true)} onRisksTile={() => setRisksOpen(true)} snoozedIds={extraWorkOrders.map((w) => w.id)} />}
       {tab === 1 && <ScheduleTab />}
-      {tab === 2 && <WorkTab />}
-      {tab === 3 && <KPIsTab />}
+      {tab === 2 && <WorkTab seg={workSeg} onSegChange={setWorkSeg} />}
+      {tab === 3 && <KPIsTab onPatternsTile={() => setCoordPatternsOpen(true)} />}
       {tab === 4 && <SettingsTab />}
+      {tab === 5 && (
+        <AiActivityTab
+          onContext={(it) => setContextTarget({
+            id: it.id, when: `${it.ago} · ${it.clock}`, title: it.title
+          })}
+          onUndo={(it) => setSnack(`Undid · ${it.title}`)}
+        />
+      )}
 
       <Paper
         elevation={0}
@@ -5475,7 +7310,7 @@ export default function App() {
             { label: 'Dispatch', icon: 'bolt', tab: 0 },
             { label: 'Schedule', icon: 'calendar_month', tab: 1 },
             { label: 'Work', icon: 'handyman', tab: 2 },
-            { label: 'AI activity', icon: 'auto_awesome', action: 'aiLog' },
+            { label: 'AI activity', icon: 'auto_awesome', tab: 5 },
             ...(calibrated
               ? [{ label: 'Coordination Settings', icon: 'verified_user', action: 'calibration' }]
               : []),
@@ -5495,8 +7330,7 @@ export default function App() {
                   spacing={1.5}
                   alignItems="center"
                   onClick={() => {
-                    if (m.action === 'aiLog') setAiLogOpen(true);
-                    else if (m.action === 'calibration') setCalOpen(true);
+                    if (m.action === 'calibration') setCalOpen(true);
                     else setTab(m.tab);
                     setMenuOpen(false);
                   }}
@@ -5531,7 +7365,6 @@ export default function App() {
         onClose={closeOverride}
         onChoose={handleOverrideChoice}
       />
-      <AiActivitySheet open={aiLogOpen} onClose={() => setAiLogOpen(false)} />
       <PriorityQueueSheet
         open={priorityOpen}
         onClose={() => setPriorityOpen(false)}
@@ -5544,6 +7377,22 @@ export default function App() {
         metricKey={day1Metric}
         onClose={() => setDay1Metric(null)}
         onRespond={handleDay1Respond}
+      />
+      <Day1UndoSheet
+        open={Boolean(undoItem)}
+        item={undoItem}
+        onClose={() => setUndoItem(null)}
+        onAction={handleUndoAction}
+      />
+      <AddContextSheet
+        open={Boolean(contextTarget)}
+        item={contextTarget}
+        onClose={() => setContextTarget(null)}
+        onSave={(text) => {
+          setContextTarget(null);
+          const preview = text.length > 40 ? `${text.slice(0, 40)}…` : text;
+          setSnack(`Context saved · "${preview}"`);
+        }}
       />
 
       <Snackbar
@@ -5562,6 +7411,55 @@ export default function App() {
         }}
       />
     </Box>
+    <ItemDetailSheet
+      open={Boolean(openedItem)}
+      item={openedItem}
+      onClose={() => setOpenedItem(null)}
+    />
+    <TeamMemberSheet
+      open={Boolean(staffMember)}
+      member={staffMember}
+      onClose={() => setStaffMember(null)}
+    />
+    <PatternDetailSheet
+      open={Boolean(openedPattern)}
+      pattern={openedPattern}
+      onClose={() => setOpenedPattern(null)}
+      onAction={handlePatternAction}
+    />
+    <SnoozeSheet
+      open={Boolean(snoozeTarget)}
+      item={snoozeTarget}
+      onClose={() => setSnoozeTarget(null)}
+      onConfirm={handleSnoozeConfirm}
+    />
+    <ReadinessDetailSheet
+      open={Boolean(readinessTarget)}
+      item={readinessTarget}
+      onClose={() => setReadinessTarget(null)}
+    />
+    <CoordinationPatternsSheet
+      open={coordPatternsOpen}
+      onClose={() => setCoordPatternsOpen(false)}
+      onContext={(p) => {
+        setCoordPatternsOpen(false);
+        setContextTarget({ id: p.id, when: p.learnedOn, title: p.title });
+      }}
+      onSnack={(msg) => setSnack(msg)}
+    />
+    <ForecastedRisksSheet
+      open={risksOpen}
+      onClose={() => setRisksOpen(false)}
+      onContext={(r) => {
+        setRisksOpen(false);
+        setContextTarget({ id: r.id, when: r.when, title: r.title });
+      }}
+    />
+    </OpenReadinessContext.Provider>
+    </ExtraWorkOrdersContext.Provider>
+    </OpenPatternContext.Provider>
+    </ItemDetailContext.Provider>
+    </HighlightContext.Provider>
    </ModeContext.Provider>
   );
 }
