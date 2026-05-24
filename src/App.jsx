@@ -782,7 +782,10 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
   const day90 = mode === 'day90'; // predictive operations
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
-  const [moreOpen, setMoreOpen] = useState(false);
+  // Day 1: keep reasoning visible by default — the MD is actively supervising.
+  // Day 30/90: collapsed behind a "More info" toggle to keep the page calm.
+  const day1 = mode === 'day1';
+  const [moreOpen, setMoreOpen] = useState(day1);
   const submit = (kind) => {
     setNoteOpen(false);
     setNote('');
@@ -878,18 +881,20 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
                   <Typography variant="caption" sx={lineSx}>
                     {rec.body}
                   </Typography>
-                  <Button
-                    size="small"
-                    onClick={() => setMoreOpen((v) => !v)}
-                    startIcon={<Icon name={moreOpen ? 'expand_less' : 'expand_more'} size={15} />}
-                    sx={{
-                      alignSelf: 'flex-start', textTransform: 'none',
-                      color: '#475569', fontWeight: 600, fontSize: 12,
-                      px: 0.5, mb: 0.25, mt: -0.25
-                    }}
-                  >
-                    {moreOpen ? 'Less info' : 'More info'}
-                  </Button>
+                  {!day1 && (
+                    <Button
+                      size="small"
+                      onClick={() => setMoreOpen((v) => !v)}
+                      startIcon={<Icon name={moreOpen ? 'expand_less' : 'expand_more'} size={15} />}
+                      sx={{
+                        alignSelf: 'flex-start', textTransform: 'none',
+                        color: '#475569', fontWeight: 600, fontSize: 12,
+                        px: 0.5, mb: 0.25, mt: -0.25
+                      }}
+                    >
+                      {moreOpen ? 'Less info' : 'More info'}
+                    </Button>
+                  )}
                   <Collapse in={moreOpen} unmountOnExit>
                     {rec.why && (
                       <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
@@ -957,18 +962,20 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
               <Typography variant="caption" sx={lineSx}>
                 {item.recommended}
               </Typography>
-              <Button
-                size="small"
-                onClick={() => setMoreOpen((v) => !v)}
-                startIcon={<Icon name={moreOpen ? 'expand_less' : 'expand_more'} size={15} />}
-                sx={{
-                  alignSelf: 'flex-start', textTransform: 'none',
-                  color: '#475569', fontWeight: 600, fontSize: 12,
-                  px: 0.5, mb: 0.25, mt: -0.25
-                }}
-              >
-                {moreOpen ? 'Less info' : 'More info'}
-              </Button>
+              {!day1 && (
+                <Button
+                  size="small"
+                  onClick={() => setMoreOpen((v) => !v)}
+                  startIcon={<Icon name={moreOpen ? 'expand_less' : 'expand_more'} size={15} />}
+                  sx={{
+                    alignSelf: 'flex-start', textTransform: 'none',
+                    color: '#475569', fontWeight: 600, fontSize: 12,
+                    px: 0.5, mb: 0.25, mt: -0.25
+                  }}
+                >
+                  {moreOpen ? 'Less info' : 'More info'}
+                </Button>
+              )}
               <Collapse in={moreOpen} unmountOnExit>
                 {item.why && (
                   <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
@@ -1600,7 +1607,7 @@ function Day90Banner({ onReview, onMetric }) {
           </Box>
         </Stack>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mt: 1.25 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 0.75, mt: 1.25 }}>
           {day90Status.metrics.map((m) => {
             const clickable = Boolean(onMetric && m.key);
             return (
@@ -1609,7 +1616,7 @@ function Day90Banner({ onReview, onMetric }) {
                 onClick={() => clickable && onMetric(m.key)}
                 sx={{
                   border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
-                  gridColumn: m.wide ? '1 / -1' : 'auto',
+                  gridColumn: m.wide ? 'span 3' : 'span 2',
                   cursor: clickable ? 'pointer' : 'default',
                   transition: 'transform 80ms, border-color 80ms, box-shadow 80ms',
                   '&:hover': clickable ? {
@@ -3086,12 +3093,11 @@ function CoordinationPatternsSheet({ open, onClose, onContext, onSnack }) {
                       size="small"
                       variant={paused ? 'contained' : 'outlined'}
                       color={paused ? 'primary' : 'inherit'}
-                      fullWidth
-                      startIcon={<Icon name={paused ? 'play_arrow' : 'pause'} size={14} />}
+                      startIcon={<Icon name={paused ? 'play_arrow' : 'block'} size={14} />}
                       onClick={() => togglePause(p.id)}
-                      sx={{ textTransform: 'none', fontSize: 12 }}
+                      sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
                     >
-                      {paused ? 'Resume rule' : 'Pause rule'}
+                      {paused ? 'Restore' : 'Ignore'}
                     </Button>
                     <Button
                       size="small"
@@ -3099,8 +3105,8 @@ function CoordinationPatternsSheet({ open, onClose, onContext, onSnack }) {
                       startIcon={<Icon name="add_comment" size={13} color="#0369A1" />}
                       onClick={() => onContext && onContext(p)}
                       sx={{
-                        textTransform: 'none', fontSize: 12, fontWeight: 600,
-                        color: '#0369A1', borderColor: '#BAE6FD', flex: 1
+                        flex: 1, textTransform: 'none', fontSize: 12, fontWeight: 600,
+                        color: '#0369A1', borderColor: '#BAE6FD'
                       }}
                     >
                       Add context
