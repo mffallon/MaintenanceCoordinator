@@ -1035,7 +1035,7 @@ export const day30Status = {
   metrics: [
     { key: 'acceptance', value: '82%', label: 'Recommendation acceptance', sub: 'last 30 days' },
     { key: 'patterns', value: '11', label: 'Learned coordination patterns', sub: 'active rules' },
-    { key: 'pm', value: '94%', label: 'PM tasks performed on time', sub: 'last 30 days' }
+    { value: '94%', label: 'PM tasks performed on time', sub: 'last 30 days' }
   ],
   capabilities: [
     'Routine PM coordination active',
@@ -1058,11 +1058,11 @@ export const day90Status = {
   sub: 'Connected Community has developed enough operational context to begin surfacing predictive readiness insights across staffing, maintenance, and compliance operations.',
   context: 'These insights are based on 90 days of staffing, maintenance, occupancy, and PM coordination patterns.',
   metrics: [
-    { key: 'stability', value: '94%', label: 'Readiness stability maintained' },
     { key: 'patterns', value: '23', label: 'Operational patterns learned' },
     { key: 'risks', value: '3', label: 'Forecasted risks prevented this week' },
-    { key: 'degradation', value: '−18%', label: 'PM degradation risk' },
-    { key: 'backlog', value: '42 days', label: 'Backlog stabilized — consecutive', wide: true }
+    { key: 'stability', value: '94%', label: 'Readiness stability maintained' },
+    { value: '−18%', label: 'PM degradation risk', wide: true },
+    { value: '42 days', label: 'Backlog stabilized — consecutive', wide: true }
   ],
   capabilities: [
     'Predictive PM insights available',
