@@ -4,7 +4,7 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails, incomingWorkOrder, coordinationPatterns, forecastedRisksPrevented, sickDayEvent, agentOutageEvent } from './data.js';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails, incomingWorkOrder, coordinationPatterns, forecastedRisksPrevented, sickDayEvent, agentOutageEvent, teamIntelligence, buildingIntelligence, observedPatterns, trustedKnowledge } from './data.js';
 import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow, Menu, MenuItem } from '@mui/material';
 import tierCriticalIcon from './assets/priority/critical.png';
 import tierHighIcon from './assets/priority/high.png';
@@ -9220,18 +9220,54 @@ function ScheduleTab() {
 }
 
 function SettingsTab() {
+  const mode = useMode();
+  const day30 = mode === 'day30';
+  const day90 = mode === 'day90';
+  // Trust-maturity copy that frames the sub-pages. Same data structure
+  // throughout; labels and accent change with the building's maturity.
+  const maturity = day90
+    ? { tag: 'Predictive operations', tag2: 'Day 90+', tone: '#16A34A', bg: '#DCFCE7' }
+    : day30
+      ? { tag: 'Calibrated', tag2: 'Day 30+', tone: '#0065BD', bg: '#DBEAFE' }
+      : { tag: 'Learning', tag2: 'Day 1', tone: '#9333EA', bg: '#F3E8FF' };
+  const [subView, setSubView] = React.useState('main');
+
+  if (subView === 'knowledge') {
+    return <OperationalKnowledgeScreen onBack={() => setSubView('main')} maturity={maturity} />;
+  }
+  if (subView === 'coordination') {
+    return <OperationalCoordinationScreen onBack={() => setSubView('main')} maturity={maturity} />;
+  }
+
   const rows = [
-    { i: 'manage_accounts', t: 'Account', s: 'Mike F. · Maintenance Director' },
-    { i: 'auto_awesome', t: 'AI behavior', s: 'Level 3 Delegator · Exception oversight' },
-    { i: 'notifications_active', t: 'Alerts', s: 'Critical push · High digest' },
-    { i: 'rule', t: 'Learned rules', s: '7 active · 2 awaiting confirmation' },
-    { i: 'support_agent', t: 'Preferred vendors', s: '4 configured' }
+    { id: 'account', i: 'manage_accounts', t: 'Account', s: 'Mike F. · Maintenance Director' },
+    {
+      id: 'coordination', i: 'hub', t: 'Operational Coordination',
+      s: 'How Connected Community coordinates routine work and escalations',
+      target: 'coordination'
+    },
+    { id: 'alerts', i: 'notifications_active', t: 'Alerts', s: 'Critical push · High digest' },
+    {
+      id: 'knowledge', i: 'school', t: 'Operational Knowledge',
+      s: `Review and refine what Connected Community has learned · ${maturity.tag}`,
+      target: 'knowledge'
+    },
+    { id: 'vendors', i: 'support_agent', t: 'Preferred vendors', s: '4 configured' }
   ];
   return (
     <Box sx={{ px: 1.5, pt: 1.5 }}>
       <Stack spacing={1}>
         {rows.map((r) => (
-          <Card key={r.t} variant="outlined">
+          <Card
+            key={r.id}
+            variant="outlined"
+            onClick={r.target ? () => setSubView(r.target) : undefined}
+            sx={{
+              cursor: r.target ? 'pointer' : 'default',
+              transition: 'border-color 80ms',
+              '&:hover': r.target ? { borderColor: '#94A3B8' } : undefined
+            }}
+          >
             <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
               <Stack direction="row" spacing={1.25} alignItems="center">
                 <Box
@@ -9242,7 +9278,7 @@ function SettingsTab() {
                 >
                   <Icon name={r.i} size={18} />
                 </Box>
-                <Box sx={{ flex: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{r.t}</Typography>
                   <Typography variant="caption">{r.s}</Typography>
                 </Box>
@@ -9252,6 +9288,607 @@ function SettingsTab() {
           </Card>
         ))}
       </Stack>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Operational Knowledge — full-page screen reached from Settings.
+// Sections (A) Learned Coordination Rules, (B) Team Intelligence,
+// (C) Building Intelligence, (D) Observed Patterns, (E) Learned
+// Patterns, (F) Trusted Operational Knowledge.
+// ─────────────────────────────────────────────────────────────────────
+function OperationalKnowledgeScreen({ onBack, maturity }) {
+  const mode = useMode();
+  const day1 = mode === 'day1' || mode === 'sickDay';
+  const day30 = mode === 'day30';
+  const day90 = mode === 'day90';
+  const [openTechId, setOpenTechId] = React.useState(null);
+  const openTech = openTechId ? team.find((t) => t.id === openTechId) : null;
+
+  // Per-mode framing copy. Sections always render; depth/labels adapt.
+  const framing = day90
+    ? {
+        focus: 'Forecasting · anomaly detection · strategic readiness',
+        emphasizeF: true,
+        emphasizeD: false
+      }
+    : day30
+      ? {
+          focus: 'Coordination · pattern usage · operational adaptation',
+          emphasizeF: false,
+          emphasizeD: false
+        }
+      : {
+          focus: 'Monitoring · observation · context gathering',
+          emphasizeF: false,
+          emphasizeD: true
+        };
+
+  return (
+    <Box sx={{ px: 1.5, pt: 1.25, pb: 2 }}>
+      {/* Back / page header */}
+      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1.25 }}>
+        <IconButton size="small" onClick={onBack} sx={{ color: '#0F172A', m: -0.5 }}>
+          <Icon name="arrow_back" size={20} />
+        </IconButton>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+          Operational Knowledge
+        </Typography>
+      </Stack>
+
+      <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.4, mb: 1.5 }}>
+        Review, refine, and teach Connected Community how your building operates.
+      </Typography>
+
+      {/* Trust-maturity banner */}
+      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: maturity.bg, mb: 1.5 }}>
+        <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Box
+              sx={{
+                bgcolor: '#fff', borderRadius: '4px',
+                px: 0.625, py: 0.125
+              }}
+            >
+              <Typography sx={{ fontSize: 9, fontWeight: 800, color: maturity.tone, letterSpacing: 0.4 }}>
+                {maturity.tag2.toUpperCase()}
+              </Typography>
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+                {maturity.tag}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.25, mt: 0.125 }}>
+                {framing.focus}
+              </Typography>
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {/* A. Learned Coordination Rules */}
+      <SectionHeader
+        icon="rule"
+        title="Learned Coordination Rules"
+        sub="Patterns Connected Community uses to coordinate routine work"
+        color="#0065BD"
+      />
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {learnedPatterns.slice(0, 4).map((p) => (
+          <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" alignItems="flex-start" spacing={1}>
+                <Icon name={p.icon || 'rule'} size={16} color="#0065BD" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                    {p.label || p.title}
+                  </Typography>
+                  {(p.detail || p.body) && (
+                    <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+                      {p.detail || p.body}
+                    </Typography>
+                  )}
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: '#64748B' }}>
+                      Confidence · {p.confidence || 'High'}
+                    </Typography>
+                    {p.lastApplied && (
+                      <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                        · last applied {p.lastApplied}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        ))}
+      </Stack>
+
+      {/* B. Team Intelligence — the depth section */}
+      <SectionHeader
+        icon="groups"
+        title="Team Intelligence"
+        sub="What Connected Community has observed about each team member"
+        color="#0065BD"
+      />
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {team.map((t) => {
+          const intel = teamIntelligence[t.id];
+          if (!intel) return null;
+          return (
+            <Card
+              key={t.id}
+              variant="outlined"
+              onClick={() => setOpenTechId(t.id)}
+              sx={{
+                borderColor: '#E2E8F0', cursor: 'pointer',
+                '&:hover': { borderColor: '#94A3B8' }
+              }}
+            >
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+                  <Avatar sx={{ bgcolor: '#E2E8F0', color: '#0F172A', width: 36, height: 36, fontSize: 13 }}>
+                    {getInitials(t.name)}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Stack direction="row" alignItems="center" spacing={0.625} flexWrap="wrap" useFlexGap>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>
+                        {t.name}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={`Confidence · ${intel.confidence}`}
+                        sx={{
+                          height: 17, fontSize: 10, fontWeight: 700,
+                          bgcolor: intel.confidence === 'High' ? '#DCFCE7'
+                            : intel.confidence === 'Medium' ? '#FEF3C7' : '#F1F5F9',
+                          color: intel.confidence === 'High' ? '#15803D'
+                            : intel.confidence === 'Medium' ? '#92400E' : '#475569',
+                          '.MuiChip-label': { px: 0.625 }
+                        }}
+                      />
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                      {t.role}
+                    </Typography>
+                    <Stack spacing={0.375} sx={{ mt: 0.625 }}>
+                      {intel.observed.slice(0, 2).map((line, i) => (
+                        <Stack key={i} direction="row" spacing={0.5} alignItems="flex-start">
+                          <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: '#94A3B8', mt: '7px', flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: '#334155', lineHeight: 1.35 }}>
+                            {line}
+                          </Typography>
+                        </Stack>
+                      ))}
+                      {intel.observed.length > 2 && (
+                        <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                          +{intel.observed.length - 2} more
+                        </Typography>
+                      )}
+                    </Stack>
+                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+                      {intel.usedFor.slice(0, 3).map((u, i) => (
+                        <Chip
+                          key={i}
+                          size="small"
+                          label={u}
+                          sx={{
+                            height: 18, fontSize: 10, fontWeight: 600,
+                            bgcolor: '#EFF6FF', color: '#0065BD',
+                            '.MuiChip-label': { px: 0.625 }
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                  <Icon name="chevron_right" size={18} color="#94A3B8" />
+                </Stack>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </Stack>
+
+      {/* C. Building Intelligence */}
+      <SectionHeader
+        icon="apartment"
+        title="Building Intelligence"
+        sub="What Connected Community has learned about the physical plant"
+        color="#0065BD"
+      />
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {buildingIntelligence.map((b) => (
+          <Card key={b.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" alignItems="flex-start" spacing={1}>
+                <Box
+                  sx={{
+                    width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
+                    bgcolor: '#EFF6FF', display: 'grid', placeItems: 'center'
+                  }}
+                >
+                  <Icon name={b.icon} size={15} color="#0065BD" />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={0.625} flexWrap="wrap" useFlexGap>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                      {b.title}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={b.confidence}
+                      sx={{
+                        height: 16, fontSize: 9.5, fontWeight: 700,
+                        bgcolor: b.confidence === 'High' ? '#DCFCE7' : '#FEF3C7',
+                        color: b.confidence === 'High' ? '#15803D' : '#92400E',
+                        '.MuiChip-label': { px: 0.5 }
+                      }}
+                    />
+                  </Stack>
+                  <Typography variant="caption" sx={{ color: '#475569', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+                    {b.body}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.375, fontStyle: 'italic' }}>
+                    {b.influence}
+                  </Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        ))}
+      </Stack>
+
+      {/* D. Observed Patterns (low confidence) — Day 1 prominence */}
+      <SectionHeader
+        icon="visibility"
+        title="Observed Patterns"
+        sub="Low-confidence signals · Connected Community is still gathering context"
+        color="#0065BD"
+      />
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {observedPatterns.map((p) => (
+          <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" alignItems="flex-start" spacing={1}>
+                <Icon name={p.icon} size={16} color="#64748B" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                    {p.title}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#475569', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+                    {p.body}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B', mt: 0.25, display: 'block' }}>
+                    Confidence · Low
+                  </Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        ))}
+      </Stack>
+
+      {/* E. Learned Patterns (medium confidence — reuse the rest of learnedPatterns) */}
+      {learnedPatterns.length > 4 && (
+        <>
+          <SectionHeader
+            icon="model_training"
+            title="Learned Patterns"
+            sub="Medium-confidence patterns Connected Community has calibrated"
+            color="#0065BD"
+          />
+          <Stack spacing={1} sx={{ mb: 2 }}>
+            {learnedPatterns.slice(4).map((p) => (
+              <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                  <Stack direction="row" alignItems="flex-start" spacing={1}>
+                    <Icon name={p.icon || 'model_training'} size={16} color="#4338CA" />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                        {p.label || p.title}
+                      </Typography>
+                      {(p.detail || p.body) && (
+                        <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
+                          {p.detail || p.body}
+                        </Typography>
+                      )}
+                      <Typography variant="caption" sx={{ color: '#64748B', mt: 0.25, display: 'block' }}>
+                        Confidence · Medium
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        </>
+      )}
+
+      {/* F. Trusted Operational Knowledge */}
+      <SectionHeader
+        icon="verified"
+        title="Trusted Operational Knowledge"
+        sub={framing.emphasizeF
+          ? 'Validated knowledge anchoring predictive coordination'
+          : 'High-confidence knowledge validated by repeated use'}
+        color="#0065BD"
+      />
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {trustedKnowledge.map((k) => (
+          <Card
+            key={k.id}
+            variant="outlined"
+            sx={{
+              borderColor: framing.emphasizeF ? '#86EFAC' : '#E2E8F0',
+              bgcolor: framing.emphasizeF ? '#F0FDF4' : '#fff'
+            }}
+          >
+            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Stack direction="row" alignItems="flex-start" spacing={1}>
+                <Icon name="verified" size={16} color="#16A34A" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                    {k.title}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#475569', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+                    {k.body}
+                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: '#15803D', fontWeight: 700 }}>
+                      Confidence · {k.confidence}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                      · {k.weight}
+                    </Typography>
+                  </Stack>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        ))}
+      </Stack>
+
+      {/* Learning Feedback Loop */}
+      <SectionHeader
+        icon="autorenew"
+        title="How Connected Community learns"
+        sub="Every decision you make shapes future coordination"
+        color="#0065BD"
+      />
+      <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#EEF2FF', mb: 1 }}>
+        <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+          <Stack spacing={0.75}>
+            {[
+              { a: '"Coordinate manually"', b: 'teaches the system this situation may require human judgment.' },
+              { a: '"Save as preference"', b: 'allows the system to apply this behavior to future similar situations.' },
+              { a: '"Mark as situational"', b: 'prevents over-generalization across the building.' },
+              { a: '"Add context"', b: 'improves building-specific understanding over time.' }
+            ].map((row, i) => (
+              <Stack key={i} direction="row" spacing={0.5} alignItems="flex-start">
+                <Icon name="check_circle" size={13} color="#4338CA" sx={{ mt: '2px', flexShrink: 0 }} />
+                <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.4 }}>
+                  <Box component="span" sx={{ fontWeight: 700 }}>{row.a}</Box> {row.b}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <TeamIntelligenceSheet
+        open={Boolean(openTechId)}
+        member={openTech}
+        intel={openTech ? teamIntelligence[openTech.id] : null}
+        onClose={() => setOpenTechId(null)}
+      />
+    </Box>
+  );
+}
+
+// Per-tech drawer — categorized observations, supporting history, and
+// the four documented actions (Edit Context / Mark Situational / Pause /
+// View Supporting History).
+function TeamIntelligenceSheet({ open, member, intel, onClose }) {
+  if (!member || !intel) return null;
+  const CATEGORIES = [
+    { key: 'skills',     title: 'Skills & specializations',    icon: 'build' },
+    { key: 'strengths',  title: 'Operational strengths',       icon: 'star' },
+    { key: 'workStyle',  title: 'Work style',                  icon: 'tune' },
+    { key: 'constraints',title: 'Operational constraints',     icon: 'block' }
+  ];
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          height: '92vh', pb: 'env(safe-area-inset-bottom)',
+          display: 'flex', flexDirection: 'column'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Avatar sx={{ bgcolor: '#E2E8F0', color: '#0F172A', width: 40, height: 40, fontSize: 14 }}>
+            {getInitials(member.name)}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              {member.name}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B' }}>
+              {member.role}
+            </Typography>
+          </Box>
+          <Chip
+            size="small"
+            label={`Confidence · ${intel.confidence}`}
+            sx={{
+              height: 18, fontSize: 10.5, fontWeight: 700,
+              bgcolor: intel.confidence === 'High' ? '#DCFCE7'
+                : intel.confidence === 'Medium' ? '#FEF3C7' : '#F1F5F9',
+              color: intel.confidence === 'High' ? '#15803D'
+                : intel.confidence === 'Medium' ? '#92400E' : '#475569',
+              '.MuiChip-label': { px: 0.75 }
+            }}
+          />
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ px: 1.5, py: 1.5, flex: 1, overflowY: 'auto' }}>
+        {/* Observations */}
+        <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mb: 0.75 }}>
+          Connected Community has observed
+        </Typography>
+        <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.5 }}>
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Stack spacing={0.625}>
+              {intel.observed.map((line, i) => (
+                <Stack key={i} direction="row" spacing={0.625} alignItems="flex-start">
+                  <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#64748B', mt: '7px', flexShrink: 0 }} />
+                  <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.4 }}>
+                    {line}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* Used for */}
+        <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mb: 0.75 }}>
+          Used for
+        </Typography>
+        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+          {intel.usedFor.map((u, i) => (
+            <Chip
+              key={i}
+              size="small"
+              label={u}
+              sx={{
+                height: 22, fontWeight: 600,
+                bgcolor: '#EFF6FF', color: '#0065BD',
+                '.MuiChip-label': { px: 0.875, fontSize: 11.5 }
+              }}
+            />
+          ))}
+        </Stack>
+
+        {/* Categorized observations */}
+        {CATEGORIES.map((cat) => {
+          const items = intel[cat.key] || [];
+          if (items.length === 0) return null;
+          return (
+            <Box key={cat.key} sx={{ mb: 1.25 }}>
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+                <Icon name={cat.icon} size={13} color="#64748B" />
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700 }}>
+                  {cat.title}
+                </Typography>
+              </Stack>
+              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                {items.map((it, i) => (
+                  <Chip
+                    key={i}
+                    size="small"
+                    label={it}
+                    sx={{
+                      height: 20, fontWeight: 600,
+                      bgcolor: '#F8FAFC', color: '#334155',
+                      border: '1px solid #E2E8F0',
+                      '.MuiChip-label': { px: 0.75, fontSize: 11 }
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          );
+        })}
+
+        {/* Human-authored notes */}
+        <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mt: 1.5, mb: 0.75 }}>
+          Your context
+        </Typography>
+        {intel.notes && intel.notes.length > 0 ? (
+          <Stack spacing={0.625} sx={{ mb: 1 }}>
+            {intel.notes.map((n) => (
+              <Card key={n.id} variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#FCFCFF' }}>
+                <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
+                    <Icon name="format_quote" size={13} color="#4338CA" />
+                    <Typography variant="caption" sx={{ color: '#64748B' }}>
+                      {n.author} · {n.when}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.35, fontStyle: 'italic' }}>
+                    "{n.body}"
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        ) : (
+          <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', display: 'block', mb: 1 }}>
+            No human context yet. Add one to shape how Connected Community uses these observations.
+          </Typography>
+        )}
+      </Box>
+
+      <Box sx={{ p: 1.5, borderTop: '1px solid #E2E8F0', bgcolor: '#fff' }}>
+        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+          <Button size="small" variant="contained" startIcon={<Icon name="add_comment" size={14} color="#fff" />} sx={{ textTransform: 'none', fontWeight: 700, flex: 1 }}>
+            Edit context
+          </Button>
+          <Button size="small" variant="outlined" color="inherit" startIcon={<Icon name="filter_alt" size={14} />} sx={{ textTransform: 'none', fontWeight: 600, flex: 1 }}>
+            Mark situational
+          </Button>
+          <Button size="small" variant="outlined" color="inherit" startIcon={<Icon name="pause" size={14} />} sx={{ textTransform: 'none', fontWeight: 600, flex: 1 }}>
+            Pause usage
+          </Button>
+        </Stack>
+        <Button size="small" variant="text" startIcon={<Icon name="history" size={14} />} sx={{ textTransform: 'none', fontWeight: 600, mt: 0.5, color: '#475569' }}>
+          View supporting history
+        </Button>
+      </Box>
+    </Drawer>
+  );
+}
+
+// Placeholder Operational Coordination screen — full build in next pass.
+function OperationalCoordinationScreen({ onBack }) {
+  return (
+    <Box sx={{ px: 1.5, pt: 1.25, pb: 2 }}>
+      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1.25 }}>
+        <IconButton size="small" onClick={onBack} sx={{ color: '#0F172A', m: -0.5 }}>
+          <Icon name="arrow_back" size={20} />
+        </IconButton>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+          Operational Coordination
+        </Typography>
+      </Stack>
+      <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.4, mb: 1.5 }}>
+        Manage how Connected Community coordinates routine operations, escalates exceptions, and supports readiness planning.
+      </Typography>
+      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Icon name="construction" size={18} color="#64748B" />
+            <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.4 }}>
+              Coming next: per-area coordination levels (Work Order Triage, PM & Compliance, Staffing, Unit Turns, Asset Health, Weather, Vendor Escalation, Forecasting).
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
     </Box>
   );
 }
