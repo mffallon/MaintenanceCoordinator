@@ -38,13 +38,13 @@ export const readiness = [
 
 export const aiBanner = {
   title: 'Unit 214 turn is at risk',
-  body: 'HVAC backlog + low ready-room stock threatens tomorrow’s 10 AM move-in — lost first-month revenue and a family escalation if it slips.',
+  body: 'HVAC backlog and low ready-room stock threaten tomorrow’s 10 AM move-in. First-month revenue and a family escalation are on the line if it slips.',
   confidence: 'High confidence'
 };
 
 export const weather = {
   headline: 'Cold snap expected tonight · 22°F low',
-  body: 'AI raised boiler + freeze-risk inspections to Critical — a freeze burst means resident heat loss and a major emergency repair bill.'
+  body: 'AI raised boiler and freeze-risk inspections to Critical. A freeze burst means resident heat loss and a major emergency repair bill.'
 };
 
 export const tiers = [
@@ -466,14 +466,24 @@ export const team = [
 export const reviews = [
   {
     id: 'rv-1',
-    kind: 'Competing critical issues',
+    kind: 'Competing critical priorities',
     icon: 'priority_high',
     summary:
-      'Fire panel trouble and boiler pre-freeze inspection both hit Critical within the same hour.',
-    recommended: 'Hold Jacob B. on Boiler #2; route Marco to fire panel first.',
-    why: 'Fire panel is a life-safety system with a state survey window opening Monday — an open trouble signal is a citable deficiency. The boiler has an 8-hr thermal buffer before the overnight low hits.',
-    tradeoff: 'Defers one Low PM to tomorrow AM — no PM Comp. or survey impact (due May 31).',
-    confidence: 'High · life-safety rule, 4 similar calls upheld this quarter'
+      '9:15 AM · Three Tier 1 priorities competing for limited resources this shift. All three cannot be completed today.',
+    priorities: [
+      { id: 'p-214', tier: 'T1', icon: 'hvac', label: 'Unit 214 HVAC failure', detail: 'Move-in tomorrow 10 AM', relatedId: 'ut-214' },
+      { id: 'p-boiler', tier: 'T1', icon: 'thermostat', label: 'Boiler #2 resident-comfort issue', detail: 'Active in occupied wing', relatedId: 'wo-1038' },
+      { id: 'p-pm', tier: 'T1', icon: 'event_repeat', label: 'Overdue PM compliance work', detail: 'Inside survey window, slack remaining', relatedId: 'tk-2' }
+    ],
+    recommended: 'Awaiting your sign-off before dispatching the service provider and reassigning the in-house tech.',
+    assignments: [
+      { icon: 'support_agent', primary: 'Service Provider → Unit 214 HVAC', secondary: 'Move-in 10 AM tomorrow · the in-house team cannot complete the repair in time' },
+      { icon: 'thermostat', primary: 'General tech → Boiler #2', secondary: 'Resident-comfort issue · ~2 hr resolution' },
+      { icon: 'event_repeat', primary: 'Overdue PM compliance → second shift', secondary: 'Stays inside the survey window' }
+    ],
+    why: 'Unit 214 has a 10 AM move-in tomorrow. HVAC repair is the only path that protects the turn, and the in-house team cannot complete it in time, so the work has to go to the outsourced service provider. Boiler is resident-comfort impact, not life-safety, but cannot wait through the shift. Overdue PM compliance still sits inside the survey window and has the most schedule flexibility. Reassigning the general tech to PM work would leave the boiler unattended through the morning.',
+    tradeoff: 'Move-in protected. Boiler resident-comfort restored in ~2 hrs. PM compliance slips into second shift but stays inside the survey window. No projected PM completion KPI miss. No projected survey readiness impact.',
+    confidence: 'High · move-in readiness and capacity rules applied · 4 similar three-way conflicts escalated and resolved this quarter'
   },
   {
     id: 'rv-2',
@@ -482,7 +492,7 @@ export const reviews = [
     summary:
       'Unit 214 HVAC has 3 repeat failures in 90 days; in-house ETA risks the 10 AM move-in.',
     recommended: 'Dispatch Apex Mechanical (preferred vendor, 2-hr response).',
-    why: 'Asset history shows 3 repeat HVAC failures in 90 days — a pattern in-house repair hasn’t resolved. Apex is the preferred vendor with a 2-hr SLA, the only path that protects the 10 AM move-in.',
+    why: 'Asset history shows 3 repeat HVAC failures in 90 days, a pattern in-house repair hasn’t resolved. Apex is the preferred vendor with a 2-hr SLA, the only path that protects the 10 AM move-in.',
     tradeoff: '$640 vendor spend vs. a missed move-in: lost first-month revenue, family escalation, and a unit not survey-ready.',
     confidence: 'High · within approved vendor budget; repeat-failure threshold met',
     vendor: true
@@ -492,19 +502,19 @@ export const reviews = [
     kind: 'Staffing overload',
     icon: 'groups',
     summary:
-      'Jacob B. is sequenced 1.5 hrs over capacity — that’s unplanned overtime cost and burnout risk if left as-is.',
+      'Jacob B. is sequenced 1.5 hrs over capacity. That’s unplanned overtime cost and burnout risk if left as-is.',
     confidence: 'High · capacity math from today’s assigned durations',
     recommendations: [
       {
         label: 'Recommended',
-        body: 'Reassign Floor 3 filter PM to Diane K. — has 2.2 hrs open today.',
+        body: 'Reassign Floor 3 filter PM to Diane K. She has 2.2 hrs open today.',
         why: 'Diane has the most open time on the team and is already routed through Floor 3, so the reassignment adds zero travel and keeps the PM on schedule.',
         tradeoff: 'Avoids 1.5 hrs OT; PM stays on today. Diane cross-trains on the AHU. No KPI impact.'
       },
       {
         label: 'Alternative',
         body: 'Move PM filter replacement to Saturday AM.',
-        why: 'It’s a deferrable PM with no compliance deadline this week — the lowest-risk item to move when everyone is at capacity.',
+        why: 'It’s a deferrable PM with no compliance deadline this week, the lowest-risk item to move when everyone is at capacity.',
         tradeoff: 'Avoids OT today; no PM Comp. impact unless it slips past month-end (May 31).'
       }
     ]
@@ -1030,8 +1040,8 @@ export const learningSignals = [
 // Day 30 — "Operationally Calibrated." The AI has learned the building's
 // rhythms; the MD now manages exceptions, not every task.
 export const day30Status = {
-  headline: 'Connected Community is operationally calibrated to Cedar Ridge',
-  sub: 'Coordination is steady and the AI is learning fast — ready to widen what it handles next?',
+  headline: 'Coordination calibrated · 30 days at Cedar Ridge',
+  sub: 'Routine PM, quick-win batching, and staffing balancing handled. Ready to widen what it covers?',
   metrics: [
     { key: 'acceptance', value: '82%', label: 'Recommendation acceptance', sub: 'last 30 days' },
     { key: 'patterns', value: '11', label: 'Learned coordination patterns', sub: 'active rules' },
@@ -1043,7 +1053,7 @@ export const day30Status = {
     'Staffing balancing calibrated'
   ],
   nextStep: {
-    action: 'Allow Connected Community to coordinate routine technician reassignment automatically.',
+    action: 'Let the AI handle routine technician reassignment without sign-off.',
     because: [
       '92% of reassignment recommendations were accepted',
       'No critical reassignment overrides in the last 14 days'
@@ -1054,9 +1064,9 @@ export const day30Status = {
 // Day 90 — "Predictive Operations Mode." The AI quietly protects readiness;
 // the MD oversees flow and is alerted only to meaningful anomalies.
 export const day90Status = {
-  headline: 'Connected Community is beginning to anticipate operational readiness risks.',
-  sub: 'Connected Community has developed enough operational context to begin surfacing predictive readiness insights across staffing, maintenance, and compliance operations.',
-  context: 'These insights are based on 90 days of staffing, maintenance, occupancy, and PM coordination patterns.',
+  headline: 'Forecasting active · 90 days of pattern data',
+  sub: 'PM, staffing, occupancy, and compliance trends are tracked. Forecasts surface when something needs your read.',
+  context: 'Based on 90 days of staffing, PM, occupancy, and work-order data.',
   metrics: [
     { key: 'patterns', value: '23', label: 'Operational patterns learned' },
     { key: 'risks', value: '3', label: 'Forecasted risks prevented this week' },
@@ -1320,7 +1330,7 @@ export const incomingWorkOrder = {
   icon: 'water_drop',
   title: 'Toilet running continuously',
   location: 'Bldg A · Floor 2 · Unit 209',
-  body: 'Wasting water continuously and disturbing the resident — satisfaction risk if it goes overnight.',
+  body: 'Wasting water and waking the resident. Fix today.',
   suggestion: {
     tech: 'Sasha P.',
     open: '2.4 hrs open',
@@ -1336,7 +1346,7 @@ export const operationalPriorities = [
   {
     id: 'op-1', icon: 'meeting_room', tone: 'warning',
     title: 'Unit 214 HVAC is impacting move-in readiness',
-    body: '10 AM move-in tomorrow — in-house ETA is at risk after 3 repeat failures in 90 days.',
+    body: '10 AM move-in tomorrow. In-house ETA is at risk after 3 repeat failures in 90 days.',
     impact: 'Move-in readiness',
     action: 'Dispatch Apex Mechanical',
     approveLabel: 'Approve dispatch'
@@ -1370,7 +1380,7 @@ export const day1StaffingConflict = {
 
 export const day1PmTradeoff = {
   id: 'pm-1', icon: 'event_repeat',
-  title: 'Floor 3 filter replacement — deferrable PM',
+  title: 'Floor 3 filter replacement · deferrable PM',
   body: 'No compliance deadline before May 31. Lowest-risk item to move when today is at capacity.',
   hint: 'AI suggests moving to Saturday AM.'
 };
@@ -1379,34 +1389,34 @@ export const day1PmTradeoff = {
 export const day1LearningHighlight = {
   id: 'ls-1', icon: 'model_training',
   title: 'Luis may be faster on unit turns during move-in spikes',
-  body: 'Early pattern from 6 unit turns — still calibrating before suggesting reassignments.'
+  body: 'Early pattern from 6 unit turns. Still calibrating before suggesting reassignments.'
 };
 
 // Counts shown in the "Routine coordinated" rollup card (varies by mode).
 export const routineRollup = {
   day1: {
-    headline: 'Routine work coordinated quietly in the background',
+    headline: 'Routine work coordinated',
     items: [
-      { label: 'routine work orders coordinated', count: 17 },
-      { label: 'PM tasks scheduled automatically', count: 8 },
+      { label: 'work orders sequenced', count: 17 },
+      { label: 'PMs scheduled', count: 8 },
       { label: 'quick-wins bundled onto existing routes', count: 4 }
     ]
   },
   day30: {
-    headline: 'Routine operations coordinated automatically',
+    headline: 'Routine work coordinated',
     items: [
       { label: 'work orders sequenced and assigned', count: 24 },
-      { label: 'PM tasks scheduled and routed', count: 11 },
-      { label: 'staffing reassignments resolved from learned rules', count: 6 },
+      { label: 'PMs scheduled and routed', count: 11 },
+      { label: 'staffing reassignments resolved by learned rules', count: 6 },
       { label: 'quick-wins batched onto existing routes', count: 5 }
     ]
   },
   day90: {
-    headline: 'Routine operations protected automatically',
+    headline: 'Routine work coordinated',
     items: [
-      { label: 'work orders, PM, and quick-wins coordinated', count: 46 },
-      { label: 'staffing reassignments resolved automatically', count: 12 },
-      { label: 'vendor escalations sequenced ahead of risk', count: 3 }
+      { label: 'work orders, PMs, and quick-wins coordinated', count: 46 },
+      { label: 'staffing reassignments resolved by rules', count: 12 },
+      { label: 'vendor escalations queued ahead of failure', count: 3 }
     ]
   }
 };
@@ -1641,3 +1651,173 @@ export const strategicRisks = [
     horizon: 'Next 14 days'
   }
 ];
+
+// Error-mode payload: the scheduling agent is unreachable. Used by the
+// Error (sickDay) dispatch surface to brief the MD on when service went
+// down, what the team looked like at that moment, what came in during
+// the outage, and what's at risk while routing is paused.
+export const agentOutageEvent = {
+  startedAt: '7:42 AM',
+  ago: '38 min ago',
+  status: 'Reconnecting · last attempt 6 sec ago',
+  // Typical disruptions for this service last about 2 hours from onset.
+  etaRestore: '9:45 AM',
+  etaIn: '~1 hr 25 min',
+  etaRange: 'Disruptions typically last ~2 hr',
+  title: 'Scheduling agent unreachable',
+  detail: 'Connected Community can’t reach the scheduling agent. Routing, batching, and capacity balancing are paused until service is restored. Manual scheduling required for new and re-routed work.',
+  // Snapshot of the team at the moment routing stopped.
+  teamStateAtOutage: {
+    techsOnShift: 4,
+    techsOverCap: 1,
+    plannedHours: 31.2,
+    inProgress: 3,
+    summary: 'Marco on fire panel · Jacob over by 1.5h · Sasha staging Unit 119 turn'
+  },
+  // Risks accumulating while the agent is down.
+  risks: [
+    { id: 'r-1', icon: 'meeting_room', label: 'Unit 214 move-in tomorrow 10 AM', sub: 'HVAC repair status unknown' },
+    { id: 'r-2', icon: 'ac_unit', label: 'Boiler #2 freeze inspection', sub: 'Due before tonight’s 22°F low' },
+    { id: 'r-3', icon: 'event_repeat', label: 'Weekly regulatory log gaps', sub: 'Compliance window narrowing each hour' }
+  ],
+  // Work orders that arrived during the outage and weren’t auto-routed.
+  unscheduledWorkOrders: [
+    {
+      id: 'uo-1', title: 'Emergency door alarm tripped · East wing',
+      category: 'Life Safety', priority: 'Critical', tier: 'T1',
+      receivedAt: '8:19 AM', location: 'East wing exit',
+      icon: 'door_front', tone: 'error',
+      body: 'Door propped open · resident wandering risk until secured.'
+    },
+    {
+      id: 'uo-2', title: 'Refrigerator unit warming · Memory Care kitchen',
+      category: 'HVAC', priority: 'High', tier: 'T2',
+      receivedAt: '7:58 AM', location: 'Memory Care · Kitchen',
+      icon: 'kitchen', tone: 'warning',
+      body: 'Reading 48°F · resident meals at risk if not addressed by lunch.'
+    },
+    {
+      id: 'uo-3', title: 'Resident reports tub won’t drain · Apt 308',
+      category: 'Plumbing', priority: 'Medium', tier: 'T3',
+      receivedAt: '8:11 AM', location: 'Apt 308',
+      icon: 'water_drop', tone: 'info',
+      body: 'Standing water · resident waiting on bath. No leak reported.'
+    },
+    {
+      id: 'uo-4', title: 'Hallway light fixture flickering · Floor 2',
+      category: 'Electrical', priority: 'Low', tier: 'T4',
+      receivedAt: '8:14 AM', location: 'Floor 2 corridor',
+      icon: 'lightbulb', tone: 'default',
+      body: 'Intermittent · not at an egress location.'
+    }
+  ]
+};
+
+// Live-event payload used by the sickDay mode. A scheduling agent picks
+// up Sasha's absence and proposes a 3-day rebalance: critical work stays
+// today and gets distributed across the team; everything else flows into
+// Sunday and Monday.
+export const sickDayEvent = {
+  id: 'sd-1',
+  who: 'Sasha P.',
+  reason: 'Called in sick',
+  reportedAt: '6:42 AM',
+  // Streamed during the "thinking" phase. Each step takes ~700ms.
+  agentSteps: [
+    { id: 's1', label: 'Pulling Sasha’s shift', detail: '11 items · 7.5h across Sat' },
+    { id: 's2', label: 'Tagging critical work', detail: '5 items must stay today' },
+    { id: 's3', label: 'Checking Marco’s capacity', detail: '+0.8h open after fire panel walkthrough' },
+    { id: 's4', label: 'Checking Diane’s capacity', detail: 'Floor 2 already on her route' },
+    { id: 's5', label: 'Checking Jacob’s Sunday', detail: '6.5h open · ideal for turn work' },
+    { id: 's6', label: 'Sequencing Unit 117 handoff', detail: 'Touch-up → QA → walkthrough' },
+    { id: 's7', label: 'Flagging compliance risk', detail: 'Generator inspection inside survey window' },
+    { id: 's8', label: 'Drafting changes', detail: '10 reassignments across Sat–Mon' }
+  ],
+  // Headline numbers shown on the review card and at the top of the drawer.
+  summary: {
+    totalChanges: 10,
+    staysToday: 5,
+    bumpsSun: 4,
+    bumpsMon: 1
+  },
+  // Per-day proposed changes. Each change carries the original task plus
+  // the AI's "after" assignment, so the review drawer can render a
+  // before/after diff per row and tap-through to the work order detail.
+  changes: [
+    // ── Today (Sat, May 16) — must stay today ─────────────────────────
+    {
+      id: 'sd-c1', day: 'Today · Sat, May 16', dayKey: 'today',
+      before: { tech: 'Sasha P.', time: '2:00 PM', dur: '1h' },
+      after:  { tech: 'Diane K.', time: '2:00 PM', dur: '1h' },
+      task: { title: 'Generator visual inspection + logbook', location: 'Emergency Power Generators', kind: 'High', tone: 'warning' },
+      reason: 'Inside the survey window · Diane already routed for regulatory logs'
+    },
+    {
+      id: 'sd-c2', day: 'Today · Sat, May 16', dayKey: 'today',
+      before: { tech: 'Sasha P.', time: '10:00 AM', dur: '1h 30m' },
+      after:  { tech: 'Marco D.', time: '11:30 AM', dur: '1h 30m' },
+      task: { title: 'Unit 117 paint touch-up', location: 'Unit 117', kind: 'High', tone: 'success' },
+      reason: 'Marco has open time after the fire panel walkthrough · Unit 117 move-in ties this to today'
+    },
+    {
+      id: 'sd-c3', day: 'Today · Sat, May 16', dayKey: 'today',
+      before: { tech: 'Sasha P.', time: '1:00 PM', dur: '45m' },
+      after:  { tech: 'Marco D.', time: '1:00 PM', dur: '45m' },
+      task: { title: 'Unit 117 final QA pass', location: 'Unit 117', kind: 'QA', tone: 'info' },
+      reason: 'Sequenced after Marco’s touch-up · keeps the 117 handoff intact'
+    },
+    {
+      id: 'sd-c4', day: 'Today · Sat, May 16', dayKey: 'today',
+      before: { tech: 'Sasha P.', time: '4:00 PM', dur: '30m' },
+      after:  { tech: 'Marco D.', time: '4:00 PM', dur: '30m' },
+      task: { title: 'Move-in walkthrough · Unit 117', location: 'Unit 117', kind: 'Resident', tone: 'info' },
+      reason: 'Resident orientation · same tech owns the full Unit 117 sequence'
+    },
+    {
+      id: 'sd-c5', day: 'Today · Sat, May 16', dayKey: 'today',
+      before: { tech: 'Sasha P.', time: '12:30 PM', dur: '30m' },
+      after:  { tech: 'Diane K.', time: '12:45 PM', dur: '30m' },
+      task: { title: 'Apt 204 door adjust', location: 'Apt 204', kind: 'Resident', tone: 'default' },
+      reason: 'Diane’s afternoon route already passes Floor 2'
+    },
+
+    // ── Sun (May 17) — turn work pulled forward to keep Mon clean ─────
+    {
+      id: 'sd-c6', day: 'Sun, May 17', dayKey: 'sun',
+      before: { tech: 'Sasha P.', time: 'Sat · 8:30 AM', dur: '30m' },
+      after:  { tech: 'Jacob B.', time: 'Sun · 8:30 AM', dur: '30m' },
+      task: { title: 'Stage paint + touch-up kit', location: 'Shop floor', kind: 'Prep', tone: 'default' },
+      reason: 'Batched with Jacob’s Sunday turn-day setup'
+    },
+    {
+      id: 'sd-c7', day: 'Sun, May 17', dayKey: 'sun',
+      before: { tech: 'Sasha P.', time: 'Sat · 9:00 AM', dur: '1h' },
+      after:  { tech: 'Jacob B.', time: 'Sun · 9:00 AM', dur: '1h' },
+      task: { title: 'Unit 119 turn · punch list', location: 'Unit 119', kind: 'Turn', tone: 'default' },
+      reason: 'Sunday turn slot · Jacob is the next-best fit for turn work'
+    },
+    {
+      id: 'sd-c8', day: 'Sun, May 17', dayKey: 'sun',
+      before: { tech: 'Sasha P.', time: 'Sat · 11:30 AM', dur: '30m' },
+      after:  { tech: 'Jacob B.', time: 'Sun · 10:30 AM', dur: '30m' },
+      task: { title: 'Stage materials · Unit 121 turn', location: 'Unit 121', kind: 'Prep', tone: 'default' },
+      reason: 'Setup for the Unit 121 turn that follows'
+    },
+    {
+      id: 'sd-c9', day: 'Sun, May 17', dayKey: 'sun',
+      before: { tech: 'Sasha P.', time: 'Sat · 3:00 PM', dur: '45m' },
+      after:  { tech: 'Jacob B.', time: 'Sun · 11:00 AM', dur: '45m' },
+      task: { title: 'Unit 121 paint + caulk', location: 'Unit 121', kind: 'Turn', tone: 'default' },
+      reason: 'Pulled forward to keep Jacob’s Sunday compact'
+    },
+
+    // ── Mon (May 18) — cleanup task lands when Sasha is expected back ─
+    {
+      id: 'sd-c10', day: 'Mon, May 18', dayKey: 'mon',
+      before: { tech: 'Sasha P.', time: 'Sat · 4:30 PM', dur: '30m' },
+      after:  { tech: 'Sasha P.', time: 'Mon · 8:00 AM', dur: '30m' },
+      task: { title: 'Turn QA photos · upload to TELS', location: 'Office', kind: 'QA', tone: 'default' },
+      reason: 'Holds for Sasha when she’s back · admin task with no compliance window'
+    }
+  ]
+};

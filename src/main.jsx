@@ -47,11 +47,14 @@ function DeviceStage({ children }) {
   );
 }
 
+// DSX brand theme — `#0065bd` primary, orange secondary, Inter, 4px radius,
+// 8px spacing unit. Nav surfaces (AppBar, BottomNav) keep their existing
+// styling via per-component overrides where needed.
 const theme = createTheme({
   palette: {
     mode: 'light',
-    primary: { main: '#0F172A' },
-    secondary: { main: '#2563EB' },
+    primary: { main: '#0065BD', dark: '#004A8A', light: '#3389D0', contrastText: '#FFFFFF' },
+    secondary: { main: '#E87722', dark: '#B85A12', light: '#F19A55', contrastText: '#FFFFFF' },
     success: { main: '#16A34A' },
     warning: { main: '#D97706' },
     error: { main: '#DC2626' },
@@ -62,27 +65,40 @@ const theme = createTheme({
   typography: {
     fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
     h6: { fontWeight: 700, letterSpacing: -0.2 },
-    subtitle1: { fontWeight: 600 },
-    subtitle2: { fontWeight: 600 },
+    subtitle1: { fontWeight: 700 },
+    subtitle2: { fontWeight: 700 },
     body2: { fontSize: 13, lineHeight: 1.25 },
     caption: { fontSize: 11.5, color: '#64748B', lineHeight: 1.2 },
     button: { textTransform: 'none', fontWeight: 600 }
   },
-  shape: { borderRadius: 12 },
+  shape: { borderRadius: 4 },
+  spacing: 8,
   components: {
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
-    MuiCard: { styleOverrides: { root: { borderRadius: 14 } } },
-    MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
-    MuiButton: { defaultProps: { disableElevation: true } },
+    MuiCard: { styleOverrides: { root: { borderRadius: 4 } } },
+    MuiChip: { styleOverrides: { root: { fontWeight: 600, borderRadius: 4 } } },
+    MuiButton: {
+      defaultProps: { disableElevation: true },
+      styleOverrides: { root: { borderRadius: 4 } }
+    },
+    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 4 } } },
+    // AppBar / BottomNavigation are left at their black brand color so the
+    // nav surfaces don't pick up the DSX blue — only body content does.
     MuiAppBar: { styleOverrides: { root: { backgroundImage: 'none' } } },
     // Stop MUI from applying scrollbar-compensation padding to body and
     // .mui-fixed elements when overlays open. That padding was making the
     // fixed AppBar look inset from the iPhone-frame edges.
-    MuiDrawer: { defaultProps: { disableScrollLock: true } },
-    MuiDialog: { defaultProps: { disableScrollLock: true } },
-    MuiModal: { defaultProps: { disableScrollLock: true } },
-    MuiPopover: { defaultProps: { disableScrollLock: true } },
-    MuiMenu: { defaultProps: { disableScrollLock: true } }
+    //
+    // `disablePortal` keeps overlays mounted inside the React tree (inside
+    // DeviceStage), so their position:fixed children pin to the iPhone
+    // frame's `transform: translateZ(0)` containing block instead of the
+    // browser viewport. This prevents drawers/menus from extending wider
+    // than the phone bounds on desktop.
+    MuiDrawer: { defaultProps: { disableScrollLock: true, disablePortal: true } },
+    MuiDialog: { defaultProps: { disableScrollLock: true, disablePortal: true } },
+    MuiModal: { defaultProps: { disableScrollLock: true, disablePortal: true } },
+    MuiPopover: { defaultProps: { disableScrollLock: true, disablePortal: true } },
+    MuiMenu: { defaultProps: { disableScrollLock: true, disablePortal: true } }
   }
 });
 
