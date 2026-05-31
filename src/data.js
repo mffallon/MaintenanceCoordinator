@@ -1821,3 +1821,179 @@ export const sickDayEvent = {
     }
   ]
 };
+
+// ──────────────────────────────────────────────────────────────────
+// Operational Knowledge — what Connected Community has observed,
+// learned, and validated about the building and its people.
+// ──────────────────────────────────────────────────────────────────
+
+// B. Team Intelligence — per-tech observations the MD can review,
+// refine, and pause. Keyed by `team.id`.
+export const teamIntelligence = {
+  'tm-1': {  // Marco D.
+    confidence: 'High',
+    observed: [
+      'Strong fire-panel and life-safety systems experience — leads ' +
+        'most regulatory documentation work.',
+      'Performs best on dayshift with planned compliance work.',
+      'Frequently selected by the MD to lead survey-window prep.'
+    ],
+    usedFor: ['Critical / life-safety routing', 'Compliance documentation', 'Mentoring routing'],
+    skills: ['Life Safety', 'HVAC', 'Compliance'],
+    strengths: ['High quality', 'Strong documentation', 'Resident communication'],
+    workStyle: ['Performs well under pressure', 'Strong with planned work'],
+    constraints: ['Best on dayshift'],
+    notes: [
+      { id: 'n-1', author: 'Mike F.', when: '12 days ago', body: 'Marco prefers to handle the survey paperwork himself — keep him on it.' }
+    ]
+  },
+  'tm-2': {  // Jacob B.
+    confidence: 'High',
+    observed: [
+      'Specialized HVAC + boiler troubleshooting; resolves repeat faults faster than team avg.',
+      'Tends to run hot — frequently over capacity on freeze-risk days.',
+      'Cooling-tower and rooftop systems are his strongest assets.'
+    ],
+    usedFor: ['HVAC routing', 'Boiler escalation', 'Freeze-prep coordination'],
+    skills: ['HVAC', 'Boilers', 'Rooftop systems'],
+    strengths: ['Fast completion', 'Strong with reactive work'],
+    workStyle: ['Performs well under pressure', 'Better with reactive work'],
+    constraints: ['Requires vendor support on chillers', 'Avoid after-hours assignments'],
+    notes: []
+  },
+  'tm-3': {  // Sasha P.
+    confidence: 'High',
+    observed: [
+      'Completes unit turns 18% faster than team average during occupancy pressure.',
+      'Performs best when assigned consecutive unit-turn blocks.',
+      'Frequently selected by the MD during move-in readiness situations.'
+    ],
+    usedFor: ['Unit turn staffing', 'Occupancy readiness', 'Move-in coordination'],
+    skills: ['Unit Turns', 'Painting', 'Punch-list work'],
+    strengths: ['Fast completion', 'Strong with planned work'],
+    workStyle: ['Prefers uninterrupted work blocks', 'Strong with planned work'],
+    constraints: ['Limited availability during back-to-back move-ins'],
+    notes: [
+      { id: 'n-2', author: 'Mike F.', when: '5 days ago', body: 'Only assign Sasha consecutive turns when occupancy pressure is high.' }
+    ]
+  },
+  'tm-4': {  // Diane K.
+    confidence: 'Medium',
+    observed: [
+      'Strong on resident-facing work; bundles quick wins efficiently along routes.',
+      'Best with regulatory log-keeping (water temps, food-safety).',
+      'Tends to absorb stretch capacity when the team is over.'
+    ],
+    usedFor: ['Quick-win batching', 'Regulatory log routing', 'Resident requests'],
+    skills: ['General Maintenance', 'Plumbing', 'Compliance'],
+    strengths: ['Strong documentation', 'Resident communication'],
+    workStyle: ['Better with reactive work'],
+    constraints: [],
+    notes: []
+  },
+  'tm-5': {  // Luis M.
+    confidence: 'Low',
+    observed: [
+      'New apprentice — early signs of strength on Memory Care layouts.',
+      'Still calibrating around routine PM cadence and unit-turn pace.'
+    ],
+    usedFor: ['Shadowing routing', 'Memory Care familiarization'],
+    skills: ['Memory Care areas'],
+    strengths: [],
+    workStyle: ['Strong with planned work'],
+    constraints: ['Avoid after-hours assignments', 'Requires senior pairing on critical work'],
+    notes: []
+  }
+};
+
+// C. Building Intelligence — what the AI has observed about the
+// physical plant and its operational rhythms.
+export const buildingIntelligence = [
+  {
+    id: 'bi-1',
+    icon: 'ac_unit',
+    title: 'Memory Care East HVAC failures increasing',
+    body: 'Three HVAC service calls in the last 90 days vs. one in the prior 90. Pattern correlates with a single rooftop unit.',
+    confidence: 'Medium',
+    influence: 'Used in vendor-escalation timing and freeze-prep coordination.'
+  },
+  {
+    id: 'bi-2',
+    icon: 'event_repeat',
+    title: 'Boiler PM delays correlate with winter emergency work orders',
+    body: 'Quarterly PM slip during Nov–Feb has been followed by an emergency call ~3 weeks later in 2 of the last 3 winters.',
+    confidence: 'Medium',
+    influence: 'Used to protect winter PM blocks from being deferred.'
+  },
+  {
+    id: 'bi-3',
+    icon: 'meeting_room',
+    title: 'Occupancy spikes increase PM deferrals',
+    body: 'PM completion drops ~8% on weeks with three or more move-ins.',
+    confidence: 'Medium',
+    influence: 'Used to pre-shift PM cadence around scheduled move-ins.'
+  },
+  {
+    id: 'bi-4',
+    icon: 'fact_check',
+    title: 'Survey readiness drops when staffing utilization exceeds 90%',
+    body: 'Regulatory log gaps appear in 4 of the last 5 weeks where team utilization sustained above 90%.',
+    confidence: 'High',
+    influence: 'Used to flag staffing risk to readiness score.'
+  }
+];
+
+// D. Observed Patterns — low-confidence signals Connected Community is
+// still gathering context on.
+export const observedPatterns = [
+  {
+    id: 'op-1',
+    icon: 'engineering',
+    title: 'Possible technician specialization · Luis on Memory Care',
+    body: 'Two consecutive Memory Care turn completions came in below average time. Continuing to monitor.',
+    confidence: 'Low'
+  },
+  {
+    id: 'op-2',
+    icon: 'group',
+    title: 'Emerging staffing trend · Friday afternoon overflow',
+    body: 'Last three Fridays the team has finished 1.5–2 hours over capacity. Cause unclear.',
+    confidence: 'Low'
+  },
+  {
+    id: 'op-3',
+    icon: 'plumbing',
+    title: 'Potential repeat asset issue · Apt 308 plumbing',
+    body: 'Two non-overlapping resident requests for the same fixture in 6 weeks.',
+    confidence: 'Low'
+  }
+];
+
+// F. Trusted Operational Knowledge — high-confidence, validated
+// knowledge being used in coordination decisions.
+export const trustedKnowledge = [
+  {
+    id: 'tk-1',
+    icon: 'verified',
+    title: 'Marco leads regulatory documentation',
+    body: 'Validated across 14 consecutive survey-window weeks. Used to anchor compliance routing.',
+    confidence: 'High',
+    weight: 'Strong influence'
+  },
+  {
+    id: 'tk-2',
+    icon: 'verified',
+    title: 'Sasha + consecutive turns under occupancy pressure',
+    body: 'Validated across 9 move-in spikes since calibration. Bundled into the unit-turn coordination rule.',
+    confidence: 'High',
+    weight: 'Strong influence'
+  },
+  {
+    id: 'tk-3',
+    icon: 'verified',
+    title: 'Boiler PMs are not deferrable below 28°F forecast',
+    body: 'Building-specific operational rule. Confirmed by the MD twice; auto-applied since.',
+    confidence: 'High',
+    weight: 'Strong influence'
+  }
+];
