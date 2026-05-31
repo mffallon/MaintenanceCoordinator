@@ -4,8 +4,34 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails, incomingWorkOrder, coordinationPatterns, forecastedRisksPrevented } from './data.js';
-import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow } from '@mui/material';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails, incomingWorkOrder, coordinationPatterns, forecastedRisksPrevented, sickDayEvent, agentOutageEvent } from './data.js';
+import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow, Menu, MenuItem } from '@mui/material';
+import tierCriticalIcon from './assets/priority/critical.png';
+import tierHighIcon from './assets/priority/high.png';
+import tierMediumIcon from './assets/priority/medium.png';
+import tierLowIcon from './assets/priority/low.png';
+
+// DSX brand tier badges — sourced from the TELS Figma design system.
+// Critical (T1) = red triangle, High (T2) = orange circle, Medium (T3) =
+// yellow circle, Low (T4) = subtle exclamation glyph.
+function TierIcon({ tier, size = 18 }) {
+  const src = tier === 'T1' ? tierCriticalIcon
+    : tier === 'T2' ? tierHighIcon
+    : tier === 'T3' ? tierMediumIcon
+    : tier === 'T4' ? tierLowIcon
+    : null;
+  if (!src) return null;
+  return (
+    <Box
+      component="img"
+      src={src}
+      alt={`${tier} priority`}
+      sx={{
+        width: size, height: size, flexShrink: 0, display: 'block'
+      }}
+    />
+  );
+}
 
 // Trust Maturity Mode — the relationship evolves over time.
 // 'day1' = original prototype, unchanged. 'day30' = calibrated. 'day90' = predictive operations.
@@ -18,6 +44,16 @@ const useHighlight = () => React.useContext(HighlightContext);
 // Callback that opens a unified item-detail drawer for any work row.
 const ItemDetailContext = React.createContext(() => {});
 const useOpenItem = () => React.useContext(ItemDetailContext);
+
+// Per-item resolution map + recorder. Lets a child drawer (e.g. OverrideSheet)
+// learn what was decided when an item is opened, reassigned and saved.
+const ItemResolutionsContext = React.createContext({ resolutions: {}, recordResolution: () => {} });
+const useItemResolutions = () => React.useContext(ItemResolutionsContext);
+
+// Mark-out callback for tech absences. Plumbed via context so any
+// TeamMemberSheet (Schedule tab, Today review card) can fire it.
+const MarkOutContext = React.createContext(() => {});
+const useMarkOut = () => React.useContext(MarkOutContext);
 
 // Callback that opens a learned-pattern detail drawer by pattern id.
 const OpenPatternContext = React.createContext(() => {});
@@ -232,7 +268,11 @@ function DayBar({ tasks, capacity }) {
     (s, t) => s + (t.kind === 'Break' ? 0 : parseDur(t.dur)),
     0
   );
-  const scale = Math.max(cap, totalWork) || 1;
+  // Visual layout includes breaks (they take real time), but breaks don't
+  // count toward "work planned" math. The scale ensures the bar can fit
+  // the full chronological day even when breaks push us past cap.
+  const totalAll = ordered.reduce((s, t) => s + parseDur(t.dur), 0);
+  const scale = Math.max(cap, totalWork, totalAll) || 1;
   const capPct = (cap / scale) * 100;
   const toneMap = {
     error: '#DC2626', warning: '#D97706', info: '#0EA5E9',
@@ -253,12 +293,20 @@ function DayBar({ tasks, capacity }) {
         }}
       >
         {ordered.map((t, i) => {
-          const dur = t.kind === 'Break' ? 0 : parseDur(t.dur);
+          const dur = parseDur(t.dur);
           if (!dur) return null;
+          const isBreak = t.kind === 'Break';
           const left = (offset / scale) * 100;
           const width = (dur / scale) * 100;
           offset += dur;
           const base = toneMap[t.tone] || toneMap.default;
+          // White 1px right-edge divider separates adjacent segments. The
+          // last fitting segment skips it so we don't draw a divider against
+          // the empty track or the capacity tick.
+          const isLastFit = i === ordered.findLastIndex((x) => x._fits && parseDur(x.dur) > 0);
+          // Breaks render as a 45° grey hatch instead of a solid color so
+          // they read as "blocked time" without dominating the load view.
+          const breakBg = 'repeating-linear-gradient(45deg, #94A3B8 0 3px, #CBD5E1 3px 6px)';
           return (
             <Box
               key={i}
@@ -268,28 +316,31 @@ function DayBar({ tasks, capacity }) {
                 left: `${left}%`,
                 width: `${width}%`,
                 height: '100%',
-                bgcolor: t._fits ? base : 'transparent',
-                opacity: t._fits ? 0.9 : 1,
+                bgcolor: isBreak ? 'transparent' : (t._fits ? base : 'transparent'),
+                backgroundImage: isBreak ? breakBg : 'none',
+                opacity: t._fits ? (isBreak ? 0.7 : 0.9) : 1,
                 border: t._fits ? 'none' : '1.5px dashed #DC2626',
+                borderRight: t._fits && !isLastFit ? '1px solid #FFFFFF' : (t._fits ? 'none' : '1.5px dashed #DC2626'),
                 boxSizing: 'border-box'
               }}
             />
           );
         })}
       </Box>
-      {capPct < 100 && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: `${capPct}%`,
-            width: 0,
-            borderLeft: '2px dotted #0F172A',
-            zIndex: 2
-          }}
-        />
-      )}
+      {/* Always show the shift-capacity tick — even when work fits inside
+          the shift, the line marks where the planned shift ends. */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: `${capPct}%`,
+          width: 0,
+          borderLeft: '2px dotted #0F172A',
+          transform: capPct >= 100 ? 'translateX(-2px)' : 'none',
+          zIndex: 2
+        }}
+      />
     </Box>
   );
 }
@@ -308,7 +359,11 @@ const toneBg = (tone) => {
 const TRUST_MODES = [
   { id: 'day1', n: '1', disabled: false },
   { id: 'day30', n: '30', disabled: false },
-  { id: 'day90', n: '90', disabled: false }
+  { id: 'day90', n: '90', disabled: false },
+  // "Error" mode mirrors Day 1 content but is the entry point for live
+  // events (tech calls in sick, etc.). Internal id is 'sickDay' for
+  // historical reasons; we'll generalize it as the surface grows.
+  { id: 'sickDay', n: 'Error', disabled: false }
 ];
 
 // Compact day-mode control that sits in the status-bar row,
@@ -784,7 +839,8 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
   const [note, setNote] = useState('');
   // Day 1: keep reasoning visible by default — the MD is actively supervising.
   // Day 30/90: collapsed behind a "More info" toggle to keep the page calm.
-  const day1 = mode === 'day1';
+  // Error (sickDay) mode mirrors Day 1 — same active-supervision UX.
+  const day1 = mode === 'day1' || mode === 'sickDay';
   const [moreOpen, setMoreOpen] = useState(day1);
   const submit = (kind) => {
     setNoteOpen(false);
@@ -808,20 +864,17 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
         <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
-          <Box
-            sx={{
-              width: 32, height: 32, borderRadius: '10px',
-              bgcolor: item.vendor ? '#EDE9FE' : '#FEE2E2',
-              display: 'grid', placeItems: 'center', flexShrink: 0
-            }}
-          >
-            <Icon name={item.icon} size={18} color={item.vendor ? '#6D28D9' : '#991B1B'} />
-          </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                {item.kind}
-              </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
+              <Chip
+                size="small"
+                label={item.kind}
+                sx={{
+                  height: 20, bgcolor: '#0F172A', color: '#fff',
+                  fontWeight: 700,
+                  '.MuiChip-label': { px: 0.875, fontSize: 11 }
+                }}
+              />
               {day30 && (
                 <Chip
                   size="small"
@@ -841,14 +894,65 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
             <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
               {item.summary}
             </Typography>
+            {item.priorities && (
+              <Stack spacing={0.625} sx={{ mt: 0.875 }}>
+                {item.priorities.map((p, i) => (
+                  <Stack key={i} direction="row" spacing={0.75} alignItems="flex-start">
+                    <Box sx={{ width: 24, height: 24, flexShrink: 0, display: 'grid', placeItems: 'center', mt: '1px' }}>
+                      {p.tier === 'T1' || p.tier === 'T2' || p.tier === 'T3' || p.tier === 'T4' ? (
+                        <TierIcon tier={p.tier} size={20} />
+                      ) : (
+                        <Icon name={p.icon} size={14} color="#B91C1C" />
+                      )}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.3 }}
+                      >
+                        {p.label}
+                      </Typography>
+                      {p.detail && (
+                        <Typography
+                          variant="caption"
+                          sx={{ display: 'block', color: '#64748B', lineHeight: 1.3, mt: 0.125 }}
+                        >
+                          {p.detail}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
           </Box>
         </Stack>
         <Box
           sx={{
-            bgcolor: '#F8FAFC', borderRadius: 1.5, p: 1,
-            border: '1px solid #E2E8F0'
+            bgcolor: '#F8FAFC',
+            borderRadius: 1.5,
+            border: '1px solid #E2E8F0',
+            overflow: 'hidden'
           }}
         >
+          {mode === 'sickDay' && (
+            // Error mode — slim red top strip flags the recommendation as
+            // stale. Card body stays neutral so the reasoning still reads
+            // as the standard AI rec, just out-of-date.
+            <Box
+              sx={{
+                bgcolor: '#FEE2E2', borderBottom: '1px solid #FCA5A5',
+                px: 1, py: 0.375,
+                display: 'flex', alignItems: 'center', gap: 0.5
+              }}
+            >
+              <Icon name="cloud_off" size={12} color="#B91C1C" />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C', fontSize: 10.5, lineHeight: 1.2 }}>
+                Stale · last computed {agentOutageEvent.startedAt} (pre-outage)
+              </Typography>
+            </Box>
+          )}
+          <Box sx={{ p: 1 }}>
           <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
             <Icon name="auto_awesome" size={14} color="#4338CA" />
             <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
@@ -959,6 +1063,38 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
             </Stack>
           ) : (
             <>
+              {item.assignments && (
+                <Stack spacing={0.625} sx={{ mb: 0.75 }}>
+                  {item.assignments.map((a, i) => (
+                    <Stack key={i} direction="row" spacing={0.75} alignItems="flex-start">
+                      <Box
+                        sx={{
+                          width: 24, height: 24, borderRadius: '6px', flexShrink: 0,
+                          bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', mt: '1px'
+                        }}
+                      >
+                        <Icon name={a.icon} size={14} color="#4338CA" />
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.3 }}
+                        >
+                          {a.primary}
+                        </Typography>
+                        {a.secondary && (
+                          <Typography
+                            variant="caption"
+                            sx={{ display: 'block', color: '#64748B', lineHeight: 1.3, mt: 0.125 }}
+                          >
+                            {a.secondary}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
               <Typography variant="caption" sx={lineSx}>
                 {item.recommended}
               </Typography>
@@ -998,11 +1134,11 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
                 <Button
                   size="small"
                   variant="outlined"
-                  color="error"
+                  color={mode === 'sickDay' ? 'inherit' : 'error'}
                   onClick={() => onOverride(item)}
                   fullWidth
                 >
-                  Override
+                  {mode === 'sickDay' ? 'Decide manually' : 'Override'}
                 </Button>
                 <IconButton
                   size="small"
@@ -1064,6 +1200,7 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
               </Stack>
             </Box>
           </Collapse>
+          </Box>
         </Box>
       </CardContent>
     </Card>
@@ -1370,11 +1507,80 @@ function ReasonRow({ icon, label, body, tone }) {
   );
 }
 
+// Helper used by the multi-priority override flow to look up the related
+// work order, backlog item, task, or unit turn so its detail drawer can
+// open from inside the OverrideSheet.
+function findRelated(id) {
+  if (!id) return null;
+  const allWOs = [
+    ...tiers.flatMap((t) => t.tasks),
+    ...backlog,
+    ...predictiveWorkOrders
+  ];
+  return allWOs.find((w) => w.id === id)
+    || tasksList.find((t) => t.id === id)
+    || unitTurns.find((u) => u.id === id)
+    || null;
+}
+
 function OverrideSheet({ open, item, onClose, onChoose }) {
+  const openItem = useOpenItem();
+  const { resolutions } = useItemResolutions();
   const subject = item?.kind || item?.title || 'this recommendation';
   const rec =
     item?.recommendations ? item.recommendations[0]?.body
     : item?.recommended || item?.reason || null;
+  const hasPriorities = Array.isArray(item?.priorities) && item.priorities.length > 0;
+  // Track which priorities the MD has opened (so we can show "Reviewed,
+  // no decision" sub-text on open-then-cancel). Cleared each time the
+  // sheet opens.
+  const [decisions, setDecisions] = React.useState({});
+  React.useEffect(() => {
+    if (open) setDecisions({});
+  }, [open, item?.id]);
+  // A priority is only "resolved" when a real resolution (with an
+  // assignee + schedule) has been recorded from the work-order detail.
+  // Opening the work order alone is not enough.
+  const resolutionFor = (p) => resolutions[p.relatedId];
+  const allResolved = hasPriorities
+    && item.priorities.every((p) => Boolean(resolutionFor(p)));
+
+  // Detect scheduling conflicts: two priorities resolved to the same
+  // assignee + scheduled day + start time → that person can't be in two
+  // places at once. Surface as a top-level error and highlight each
+  // conflicting card.
+  const conflictMap = React.useMemo(() => {
+    if (!hasPriorities) return { ids: new Set(), groups: [] };
+    const buckets = {};
+    item.priorities.forEach((p) => {
+      const r = resolutionFor(p);
+      if (!r?.assignee) return;
+      const key = `${r.assignee}__${r.when || ''}__${r.startTime || ''}`;
+      (buckets[key] ||= []).push(p);
+    });
+    const conflictIds = new Set();
+    const groups = [];
+    Object.values(buckets).forEach((bucket) => {
+      if (bucket.length > 1) {
+        bucket.forEach((p) => conflictIds.add(p.id));
+        groups.push(bucket);
+      }
+    });
+    return { ids: conflictIds, groups };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.priorities, resolutions]);
+
+  const handlePriorityTap = (p) => {
+    // Record that the MD opened the priority — used only to subtly
+    // mark the row as "reviewed" if they back out without assigning.
+    setDecisions((prev) => ({
+      ...prev,
+      [p.id]: { opened: true }
+    }));
+    const found = findRelated(p.relatedId);
+    if (found) openItem(found);
+  };
+
   return (
     <Drawer
       anchor="bottom"
@@ -1383,6 +1589,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
       PaperProps={{
         sx: {
           borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh',
           pb: 'env(safe-area-inset-bottom)'
         }
       }}
@@ -1390,19 +1597,22 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
       <Box sx={{ pt: 1 }}>
         <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
       </Box>
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 2, overflowY: 'auto' }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Avatar sx={{ bgcolor: '#FEF3C7', color: '#92400E', width: 36, height: 36 }}>
             <Icon name="model_training" size={20} color="#92400E" />
           </Avatar>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" sx={{ lineHeight: 1.2 }}>Override recorded</Typography>
+            <Typography variant="subtitle1" sx={{ lineHeight: 1.2 }}>
+              {hasPriorities ? 'Handle each priority' : 'Override recorded'}
+            </Typography>
             <Typography variant="caption">{subject}</Typography>
           </Box>
           <IconButton size="small" onClick={onClose} sx={{ color: '#64748B', m: -0.5 }}>
             <Icon name="close" size={20} />
           </IconButton>
         </Stack>
+
         {rec && (
           <Box
             sx={{
@@ -1418,29 +1628,204 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
             </Typography>
           </Box>
         )}
-        <Typography variant="body2" sx={{ color: '#475569', mb: 1.5 }}>
-          You overrode the AI’s call here. Should I treat this as a one-time
-          exception or remember it as a rule for similar situations?
-        </Typography>
-        <Stack spacing={1}>
-          <Button
-            variant="contained"
-            onClick={() => onChoose('remember')}
-            startIcon={<Icon name="bookmark_add" size={18} color="#fff" />}
-          >
-            Remember rule
-          </Button>
-          <Button variant="outlined" onClick={() => onChoose('once')}>
-            One-time only
-          </Button>
-          <Button
-            variant="text"
-            onClick={() => onChoose('context')}
-            startIcon={<Icon name="add_comment" size={18} />}
-          >
-            Add context
-          </Button>
-        </Stack>
+
+        {hasPriorities ? (
+          <>
+            <Typography variant="caption" sx={{ display: 'block', color: '#475569', mb: 0.75, lineHeight: 1.4 }}>
+              Tap each priority to open the work order and decide how to handle it. Once all three are resolved you can lock in or shape the rule.
+            </Typography>
+
+            {/* Scheduling-conflict banner — surfaces double-bookings before
+                the MD locks in the rule. */}
+            {conflictMap.groups.length > 0 && (
+              <Box
+                sx={{
+                  border: '1px solid #FCA5A5', bgcolor: '#FEF2F2',
+                  borderRadius: 1.5, p: 1, mb: 1
+                }}
+              >
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.375 }}>
+                  <Icon name="error" size={15} color="#B91C1C" />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C' }}>
+                    Scheduling conflict
+                  </Typography>
+                </Stack>
+                {conflictMap.groups.map((group, gi) => {
+                  const r = resolutionFor(group[0]);
+                  return (
+                    <Typography
+                      key={gi}
+                      variant="caption"
+                      sx={{ display: 'block', color: '#7F1D1D', lineHeight: 1.3, mt: gi ? 0.375 : 0 }}
+                    >
+                      {r?.assignee} is double-booked on {r?.when} at {r?.startTime} · {group.map((g) => g.label).join(' + ')}
+                    </Typography>
+                  );
+                })}
+              </Box>
+            )}
+
+            <Stack spacing={0.875} sx={{ mb: 1.5 }}>
+              {item.priorities.map((p) => {
+                const d = decisions[p.id];
+                const r = resolutionFor(p);
+                const resolved = Boolean(r);
+                const opened = Boolean(d?.opened);
+                const inConflict = conflictMap.ids.has(p.id);
+                // Resolution from the work-order Save takes priority — it
+                // carries the assigned tech and the scheduled date.
+                const pillLabel = r?.assignee || (opened ? 'No decision' : 'Pending');
+                const subLine = r
+                  ? `${r.when || 'Scheduled'} · ${r.startTime || ''}`.replace(/ · $/, '')
+                  : p.detail;
+                return (
+                  <Card
+                    key={p.id}
+                    variant="outlined"
+                    onClick={() => handlePriorityTap(p)}
+                    sx={{
+                      borderColor: inConflict ? '#FCA5A5' : resolved ? '#BBF7D0' : '#E2E8F0',
+                      bgcolor: inConflict ? '#FEF2F2' : resolved ? '#F0FDF4' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'border-color 80ms, background-color 80ms',
+                      '&:hover': { borderColor: inConflict ? '#F87171' : resolved ? '#86EFAC' : '#A5B4FC' }
+                    }}
+                  >
+                    <CardContent sx={{ p: 1.125, '&:last-child': { pb: 1.125 } }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {/* Resolved → green check, conflict → red error, else
+                            → TELS priority badge for the priority's tier. */}
+                        {resolved ? (
+                          <Box
+                            sx={{
+                              width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
+                              bgcolor: '#DCFCE7', display: 'grid', placeItems: 'center'
+                            }}
+                          >
+                            <Icon name="check_circle" size={16} color="#15803D" />
+                          </Box>
+                        ) : inConflict ? (
+                          <Box
+                            sx={{
+                              width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
+                              bgcolor: '#FECACA', display: 'grid', placeItems: 'center'
+                            }}
+                          >
+                            <Icon name="error" size={16} color="#B91C1C" />
+                          </Box>
+                        ) : (
+                          <Box sx={{ width: 28, height: 28, flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+                            <TierIcon tier={p.tier} size={22} />
+                          </Box>
+                        )}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <Typography
+                              variant="caption"
+                              sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25, flex: 1 }}
+                            >
+                              {p.label}
+                            </Typography>
+                            <Chip
+                              size="small"
+                              label={pillLabel}
+                              sx={{
+                                height: 18, fontSize: 10, fontWeight: 700,
+                                bgcolor: inConflict ? '#FEE2E2' : resolved ? '#DCFCE7' : '#FEF3C7',
+                                color: inConflict ? '#B91C1C' : resolved ? '#15803D' : '#92400E',
+                                '.MuiChip-label': { px: 0.625 }
+                              }}
+                            />
+                          </Stack>
+                          <Typography
+                            variant="caption"
+                            sx={{ display: 'block', color: '#64748B', lineHeight: 1.25, mt: 0.125 }}
+                          >
+                            {subLine}
+                          </Typography>
+                        </Box>
+                        <Icon name="chevron_right" size={18} color="#CBD5E1" />
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+
+            {allResolved ? (
+              <>
+                <Box
+                  sx={{
+                    bgcolor: '#EEF2FF', border: '1px solid #C7D2FE',
+                    borderRadius: 1.5, p: 1, mb: 1.25
+                  }}
+                >
+                  <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Icon name="model_training" size={14} color="#4338CA" />
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+                      The AI noticed
+                    </Typography>
+                  </Stack>
+                  <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.25, display: 'block' }}>
+                    You handled all three priorities yourself. Should I treat this as a one-time exception, remember it as a rule for similar three-way conflicts, or hold while you add context?
+                  </Typography>
+                </Box>
+                <Stack spacing={0.75}>
+                  <Button
+                    variant="contained"
+                    onClick={() => onChoose('remember')}
+                    startIcon={<Icon name="bookmark_add" size={18} color="#fff" />}
+                  >
+                    Remember rule
+                  </Button>
+                  <Button variant="outlined" onClick={() => onChoose('once')}>
+                    One-time only
+                  </Button>
+                  <Button
+                    variant="text"
+                    onClick={() => onChoose('context')}
+                    startIcon={<Icon name="add_comment" size={18} />}
+                  >
+                    Add context
+                  </Button>
+                </Stack>
+              </>
+            ) : (
+              <Typography
+                variant="caption"
+                sx={{ display: 'block', color: '#94A3B8', textAlign: 'center', lineHeight: 1.4 }}
+              >
+                {`${item.priorities.filter((p) => resolutionFor(p)).length} of ${item.priorities.length} resolved · tap a priority above to continue`}
+              </Typography>
+            )}
+          </>
+        ) : (
+          <>
+            <Typography variant="body2" sx={{ color: '#475569', mb: 1.5 }}>
+              You overrode the AI’s call here. Should I treat this as a one-time
+              exception or remember it as a rule for similar situations?
+            </Typography>
+            <Stack spacing={1}>
+              <Button
+                variant="contained"
+                onClick={() => onChoose('remember')}
+                startIcon={<Icon name="bookmark_add" size={18} color="#fff" />}
+              >
+                Remember rule
+              </Button>
+              <Button variant="outlined" onClick={() => onChoose('once')}>
+                One-time only
+              </Button>
+              <Button
+                variant="text"
+                onClick={() => onChoose('context')}
+                startIcon={<Icon name="add_comment" size={18} />}
+              >
+                Add context
+              </Button>
+            </Stack>
+          </>
+        )}
       </Box>
     </Drawer>
   );
@@ -2209,6 +2594,88 @@ function OperationalForecast() {
   );
 }
 
+// Error mode — banner that explains the scheduling agent is down,
+// briefs the MD on the team's state at that moment, the risks accruing,
+// and offers a "Try to reconnect" CTA. The reconnect status ticks live
+// to convey the system is continuously retrying.
+function AgentOutageBanner() {
+  const e = agentOutageEvent;
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        borderColor: '#FCA5A5', bgcolor: '#FEF2F2', mb: 1.5,
+        borderLeftWidth: 4, borderLeftColor: '#DC2626'
+      }}
+    >
+      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 1 }}>
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
+              bgcolor: '#FEE2E2', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="cloud_off" size={20} color="#B91C1C" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mb: 0.125 }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 700, color: '#7F1D1D', lineHeight: 1.2 }}>
+                {e.title}
+              </Typography>
+              <Chip
+                size="small"
+                label="System error"
+                sx={{
+                  height: 17, fontSize: 10, fontWeight: 700,
+                  bgcolor: '#FEE2E2', color: '#B91C1C',
+                  border: '1px solid #FCA5A5',
+                  '.MuiChip-label': { px: 0.625 }
+                }}
+              />
+            </Stack>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+              <Icon name="schedule" size={13} color="#7F1D1D" />
+              <Typography variant="caption" sx={{ color: '#7F1D1D', fontWeight: 600 }}>
+                Down since {e.startedAt} · {e.ago}
+              </Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ color: '#7F1D1D', display: 'block', lineHeight: 1.35 }}>
+              {e.detail}
+            </Typography>
+          </Box>
+        </Stack>
+
+        {/* Status pill — vendor-acknowledged outage with the ETA folded
+            into a secondary line so the whole thing reads as one card. */}
+        <Box
+          sx={{
+            display: 'flex', alignItems: 'flex-start', gap: 0.75,
+            bgcolor: '#fff', border: '1px solid #FCA5A5', borderRadius: 1.5,
+            px: 1, py: 0.625, mb: 1
+          }}
+        >
+          <Box sx={{ bgcolor: '#FEE2E2', borderRadius: '4px', px: 0.625, py: 0.125, mt: 0.125 }}>
+            <Typography sx={{ fontSize: 9, fontWeight: 800, color: '#B91C1C', letterSpacing: 0.4 }}>
+              STATUS
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#7F1D1D', fontWeight: 700, display: 'block', lineHeight: 1.25 }}>
+              TELS is aware and working on it
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.25, mt: 0.125 }}>
+              Back by ~{e.etaRestore} · {e.etaIn} · {e.etaRange.toLowerCase()}
+            </Typography>
+          </Box>
+        </Box>
+
+
+      </CardContent>
+    </Card>
+  );
+}
+
 // Day 1 — "Learning your building" status banner.
 function Day1Banner({ onMetric, onSettings }) {
   return (
@@ -2835,6 +3302,484 @@ function SnoozeSheet({ open, item, onClose, onConfirm }) {
             </Button>
           )}
         </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+// HVAC service-provider directory used by the "Requesting service" picker.
+// Lightweight constant — would come from a vendor table in production.
+const HVAC_PROVIDERS = [
+  {
+    id: 'apex',
+    name: 'Apex Mechanical',
+    badge: 'Preferred',
+    rating: 4.8,
+    distance: '6 mi',
+    eta: '~45 min',
+    sub: 'Commercial HVAC · 24/7 emergency · Net-30 on file'
+  },
+  {
+    id: 'northstar',
+    name: 'Northstar Heating & Cooling',
+    rating: 4.6,
+    distance: '8 mi',
+    eta: '~1.2 hr',
+    sub: 'Boiler specialists · weekend rates apply'
+  },
+  {
+    id: 'summit',
+    name: 'Summit Climate Solutions',
+    rating: 4.5,
+    distance: '11 mi',
+    eta: '~1.5 hr',
+    sub: 'Same-day available · diagnostic fee waived on repair'
+  },
+  {
+    id: 'ridgeline',
+    name: 'Ridgeline HVAC Services',
+    rating: 4.3,
+    distance: '14 mi',
+    eta: '~2 hr',
+    sub: 'New vendor · introductory pricing'
+  }
+];
+
+// Drawer that lists HVAC service providers. Each provider exposes two
+// actions: have the AI dispatch on the MD's behalf, or contact directly.
+// Drawer surfaced when the MD taps "Queue for agent" on an unscheduled
+// work order during the outage. Confirms the request will be picked up
+// when the scheduling agent reconnects, and lets the MD pick a reminder
+// window in case the agent hasn't done it in time.
+function QueueForAgentSheet({ open, item, onClose, onConfirm }) {
+  const [reminder, setReminder] = React.useState('1hr');
+  React.useEffect(() => { if (open) setReminder('1hr'); }, [open, item?.id]);
+  if (!item) return null;
+  const REMINDER_OPTIONS = [
+    { id: '1hr',    icon: 'schedule',     label: '1 hour',         sub: 'Around 9:30 AM' },
+    { id: 'eod',    icon: 'wb_twilight',  label: 'End of day',     sub: 'Around 5:00 PM' },
+    { id: 'next',   icon: 'today',        label: 'Next morning',   sub: 'Sun, May 17 · 7:30 AM' },
+    { id: 'none',   icon: 'notifications_off', label: 'Don’t remind me', sub: 'I’ll keep an eye on it' }
+  ];
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '88vh', pb: 'env(safe-area-inset-bottom)',
+          display: 'flex', flexDirection: 'column'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
+              bgcolor: '#EFF6FF', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="snooze" size={22} color="#0065BD" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+              Queue for agent
+            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+              {item.title}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
+        <Box
+          sx={{
+            bgcolor: '#EFF6FF', border: '1px solid #BFDBFE',
+            borderRadius: 1.5, p: 1.25, mb: 1.5
+          }}
+        >
+          <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.375 }}>
+            <Icon name="auto_awesome" size={14} color="#0065BD" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#0065BD' }}>
+              We’ll hold this for the agent
+            </Typography>
+          </Stack>
+          <Typography variant="caption" sx={{ color: '#0F172A', display: 'block', lineHeight: 1.35 }}>
+            Once the scheduling agent comes back online, it’ll pick this up and handle the routing for you.
+          </Typography>
+        </Box>
+
+        <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mb: 0.75 }}>
+          Remind me if it’s not handled by…
+        </Typography>
+        <Stack spacing={0.75}>
+          {REMINDER_OPTIONS.map((opt) => {
+            const active = reminder === opt.id;
+            return (
+              <Card
+                key={opt.id}
+                variant="outlined"
+                onClick={() => setReminder(opt.id)}
+                sx={{
+                  borderColor: active ? '#0065BD' : '#E2E8F0',
+                  bgcolor: active ? '#EFF6FF' : '#fff',
+                  cursor: 'pointer'
+                }}
+              >
+                <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
+                        bgcolor: active ? '#DBEAFE' : '#F1F5F9',
+                        display: 'grid', placeItems: 'center'
+                      }}
+                    >
+                      <Icon name={opt.icon} size={16} color={active ? '#0065BD' : '#475569'} />
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                        {opt.label}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.125, lineHeight: 1.3 }}>
+                        {opt.sub}
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        border: '2px solid',
+                        borderColor: active ? '#0065BD' : '#CBD5E1',
+                        display: 'grid', placeItems: 'center'
+                      }}
+                    >
+                      {active && <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#0065BD' }} />}
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, borderTop: '1px solid #E2E8F0', bgcolor: '#fff' }}>
+        <Stack direction="row" spacing={0.75}>
+          <Button
+            variant="outlined"
+            size="medium"
+            color="inherit"
+            onClick={onClose}
+            sx={{ textTransform: 'none', fontWeight: 600, flex: '0 0 auto', px: 1.75 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            size="medium"
+            onClick={() => onConfirm(reminder, REMINDER_OPTIONS.find((o) => o.id === reminder)?.label)}
+            sx={{ textTransform: 'none', fontWeight: 700, flex: '1 1 auto', whiteSpace: 'nowrap' }}
+          >
+            Queue for agent
+          </Button>
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+function ServiceProviderListSheet({ open, item, onClose, onBack, onAiDispatch, onManualCreate }) {
+  if (!item) return null;
+  const target = (item.assignments || []).find((a) => /service provider/i.test(a.primary || ''));
+  const targetLabel = target?.primary?.replace(/^.*?→\s*/, '') || item.title || 'this work order';
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          height: '92vh', pb: 'env(safe-area-inset-bottom)',
+          display: 'flex', flexDirection: 'column'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 1.5, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {onBack && (
+            <IconButton size="small" onClick={onBack} sx={{ color: '#475569' }}>
+              <Icon name="arrow_back" size={20} />
+            </IconButton>
+          )}
+          <Box
+            sx={{
+              width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="engineering" size={22} color="#3730A3" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+              Requesting service · HVAC
+            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+              {targetLabel}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
+        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+          AVAILABLE PROVIDERS · {HVAC_PROVIDERS.length}
+        </Typography>
+        <Stack spacing={1}>
+          {HVAC_PROVIDERS.map((p) => (
+            <Card key={p.id} variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                <Stack direction="row" alignItems="flex-start" spacing={1}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap" useFlexGap>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                        {p.name}
+                      </Typography>
+                      {p.badge && (
+                        <Chip
+                          size="small"
+                          label={p.badge}
+                          sx={{
+                            height: 17, fontSize: 10, fontWeight: 700,
+                            bgcolor: '#DCFCE7', color: '#15803D',
+                            '.MuiChip-label': { px: 0.625 }
+                          }}
+                        />
+                      )}
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ mt: 0.375 }}>
+                      <Stack direction="row" spacing={0.25} alignItems="center">
+                        <Icon name="star" size={12} color="#F59E0B" />
+                        <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                          {p.rating}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" spacing={0.25} alignItems="center">
+                        <Icon name="place" size={12} color="#94A3B8" />
+                        <Typography variant="caption" sx={{ color: '#475569' }}>
+                          {p.distance}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" spacing={0.25} alignItems="center">
+                        <Icon name="schedule" size={12} color="#94A3B8" />
+                        <Typography variant="caption" sx={{ color: '#475569' }}>
+                          {p.eta}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.375, lineHeight: 1.35 }}>
+                      {p.sub}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="contained"
+                    startIcon={<Icon name="auto_awesome" size={13} color="#fff" />}
+                    onClick={() => onAiDispatch(p.name)}
+                    sx={{
+                      textTransform: 'none', fontWeight: 700, fontSize: 12,
+                      bgcolor: '#4338CA', '&:hover': { bgcolor: '#3730A3' }
+                    }}
+                  >
+                    Have AI contact
+                  </Button>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Icon name="phone" size={13} color="#4338CA" />}
+                    onClick={() => onManualCreate(p.name)}
+                    sx={{
+                      textTransform: 'none', fontWeight: 700, fontSize: 12,
+                      color: '#4338CA', borderColor: '#A5B4FC',
+                      '&:hover': { borderColor: '#4338CA', bgcolor: '#E0E7FF' }
+                    }}
+                  >
+                    Contact myself
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+// Drawer that opens after Approve when the approved item involves an
+// outsourced service-provider dispatch. Offers two paths: let the AI
+// contact the vendor on the MD's behalf, or create the request manually.
+function ServiceProviderSheet({ open, item, onClose, onAiDispatch, onManualCreate, onViewMore }) {
+  if (!item) return null;
+  const vendor = item.serviceProvider || 'Apex Mechanical';
+  const target = (item.assignments || []).find((a) => /service provider/i.test(a.primary || ''));
+  const targetLabel = target?.primary?.replace(/^.*?→\s*/, '') || item.title || 'this work order';
+  const targetSub = target?.secondary || item.summary || '';
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '92vh', pb: 'env(safe-area-inset-bottom)'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
+              bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+            }}
+          >
+            <Icon name="support_agent" size={22} color="#3730A3" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+              Service provider dispatch
+            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+              {targetLabel}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, overflowY: 'auto' }}>
+        {targetSub && (
+          <Box sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1, mb: 1.5 }}>
+            <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.4 }}>
+              {targetSub}
+            </Typography>
+          </Box>
+        )}
+
+        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+          HOW DO YOU WANT TO DISPATCH?
+        </Typography>
+
+        {/* AI-dispatch option — primary recommendation */}
+        <Card
+          variant="outlined"
+          onClick={() => onAiDispatch(vendor)}
+          sx={{
+            borderColor: '#A5B4FC', bgcolor: '#EEF2FF', mb: 1,
+            cursor: 'pointer',
+            transition: 'border-color 80ms, background-color 80ms',
+            '&:hover': { borderColor: '#4338CA', bgcolor: '#E0E7FF' }
+          }}
+        >
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <Box
+                sx={{
+                  width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
+                  bgcolor: '#fff', border: '1px solid #C7D2FE',
+                  display: 'grid', placeItems: 'center'
+                }}
+              >
+                <Icon name="auto_awesome" size={17} color="#4338CA" />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#3730A3', lineHeight: 1.25 }}>
+                  Have AI contact {vendor}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#3730A3', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+                  AI sends the request, attaches unit access details, confirms ETA, and notifies you when accepted. Typical turnaround · under 10 min.
+                </Typography>
+              </Box>
+              <Icon name="chevron_right" size={18} color="#4338CA" />
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* Manual-dispatch option */}
+        <Card
+          variant="outlined"
+          onClick={() => onManualCreate(vendor)}
+          sx={{
+            borderColor: '#E2E8F0', bgcolor: '#fff', mb: 0.5,
+            cursor: 'pointer',
+            transition: 'border-color 80ms',
+            '&:hover': { borderColor: '#94A3B8' }
+          }}
+        >
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <Box
+                sx={{
+                  width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
+                  bgcolor: '#F1F5F9', border: '1px solid #E2E8F0',
+                  display: 'grid', placeItems: 'center'
+                }}
+              >
+                <Icon name="edit_note" size={17} color="#0F172A" />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                  I'll send the request myself
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+                  Opens a service-request form pre-filled with work order details. You manage the call and ETA.
+                </Typography>
+              </Box>
+              <Icon name="chevron_right" size={18} color="#CBD5E1" />
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Button
+          fullWidth
+          size="small"
+          variant="text"
+          endIcon={<Icon name="chevron_right" size={16} color="#4338CA" />}
+          onClick={onViewMore}
+          sx={{
+            textTransform: 'none', fontWeight: 700, mt: 0.5,
+            color: '#4338CA', '&:hover': { bgcolor: '#E0E7FF' }
+          }}
+        >
+          View other service providers
+        </Button>
       </Box>
     </Drawer>
   );
@@ -3490,7 +4435,7 @@ function PatternDetailSheet({ open, pattern, onClose, onAction }) {
               Learned pattern
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
-              How Connected Community arrived at this assignment.
+              How the AI arrived at this assignment.
             </Typography>
           </Box>
           <IconButton size="small" onClick={onClose}>
@@ -3924,6 +4869,7 @@ function StaffingConflictCard({ item, onApprove, onOverride }) {
 // Card for a brand-new incoming work order with an AI-suggested assignment.
 // Rendered at the top of Day 1 approvals — fresh, time-sensitive decision.
 function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContext, onViewStaff }) {
+  const mode = useMode();
   return (
     <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -3973,13 +4919,34 @@ function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContex
           </Box>
         </Stack>
 
-        <Box sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1, mt: 0.875 }}>
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
-            <Icon name="auto_awesome" size={13} color="#4338CA" />
-            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-              AI suggests
-            </Typography>
-          </Stack>
+        <Box
+          sx={{
+            bgcolor: mode === 'sickDay' ? '#FEF2F2' : '#F8FAFC',
+            border: '1px solid',
+            borderColor: mode === 'sickDay' ? '#FCA5A5' : '#E2E8F0',
+            borderRadius: 1.5, p: 1, mt: 0.875
+          }}
+        >
+          {mode === 'sickDay' ? (
+            <Box sx={{ mb: 0.75 }}>
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
+                <Icon name="cloud_off" size={13} color="#B91C1C" />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C' }}>
+                  Stale suggestion · last computed {agentOutageEvent.startedAt}
+                </Typography>
+              </Stack>
+              <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.3 }}>
+                Capacity and ETA below were calculated before the agent went down. Staff schedules may have shifted since.
+              </Typography>
+            </Box>
+          ) : (
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+              <Icon name="auto_awesome" size={13} color="#4338CA" />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+                AI suggests
+              </Typography>
+            </Stack>
+          )}
           <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.375 }}>
             <Chip
               size="small"
@@ -4033,12 +5000,12 @@ function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContex
             <Button
               size="small"
               variant="outlined"
-              color="error"
+              color={mode === 'sickDay' ? 'inherit' : 'error'}
               fullWidth
               onClick={() => onReassign && onReassign(item)}
               sx={{ bgcolor: '#fff' }}
             >
-              Override
+              {mode === 'sickDay' ? 'Decide manually' : 'Override'}
             </Button>
             <IconButton
               size="small"
@@ -4069,6 +5036,8 @@ function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContex
 }
 
 function PmTradeoffCard({ item, onApprove, onOverride }) {
+  const mode = useMode();
+  const stale = mode === 'sickDay';
   return (
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -4088,20 +5057,39 @@ function PmTradeoffCard({ item, onApprove, onOverride }) {
             <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
               {item.body}
             </Typography>
-            <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
-              <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
-              <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
-                {item.hint}
-              </Typography>
-            </Stack>
+            {stale ? (
+              <Box
+                sx={{
+                  mt: 0.625, bgcolor: '#FEF2F2', border: '1px solid #FCA5A5',
+                  borderRadius: 1.5, p: 0.75
+                }}
+              >
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
+                  <Icon name="cloud_off" size={13} color="#B91C1C" sx={{ flexShrink: 0 }} />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C', lineHeight: 1.2 }}>
+                    Stale suggestion · last computed {agentOutageEvent.startedAt}
+                  </Typography>
+                </Stack>
+                <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.3 }}>
+                  {item.hint} The agent isn’t available to confirm the new slot is still open.
+                </Typography>
+              </Box>
+            ) : (
+              <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
+                <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+                <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
+                  {item.hint}
+                </Typography>
+              </Stack>
+            )}
           </Box>
         </Stack>
         <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
           <Button size="small" variant="contained" fullWidth onClick={() => onApprove && onApprove(item)}>
-            Approve defer
+            {stale ? 'Approve as proposed' : 'Approve defer'}
           </Button>
           <Button size="small" variant="outlined" color="inherit" fullWidth onClick={() => onOverride && onOverride(item)}>
-            Keep today
+            {stale ? 'Decide manually' : 'Keep today'}
           </Button>
         </Stack>
       </CardContent>
@@ -4285,9 +5273,16 @@ function StrategicRiskCard({ item }) {
   );
 }
 
-function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration, onDay1Metric, onViewStaff, onSnooze, onContext, onPatternsTile, onRisksTile, snoozedIds = [] }) {
+function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration, onDay1Metric, onViewStaff, onSnooze, onContext, onPatternsTile, onRisksTile, onDismiss, onQueueForAgent, snoozedIds = [], dispatchedIds = new Set() }) {
+  const isDispatched = (id) => dispatchedIds && dispatchedIds.has && dispatchedIds.has(id);
+  const openItem = useOpenItem();
+  const { resolutions } = useItemResolutions();
   const mode = useMode();
-  const day1 = mode === 'day1';
+  const sickDay = mode === 'sickDay';
+  // sickDay (Error) mode mirrors the Day 1 layout — same content density,
+  // section headers, and approval card list. Specific event cards layer
+  // on top via their own state.
+  const day1 = mode === 'day1' || sickDay;
   const day30 = mode === 'day30';
   const day90 = mode === 'day90';
   const calibrated = day30 || day90;
@@ -4297,20 +5292,34 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
   const exceptions = (() => {
     if (day90) {
       const predictive = predictiveReviews.slice(0, 1);
-      return predictive.length ? predictive : reviews.filter((r) => r.kind === 'Services Recommendation').slice(0, 1);
+      const list = predictive.length ? predictive : reviews.filter((r) => r.kind === 'Services Recommendation').slice(0, 1);
+      return list.filter((r) => !isDispatched(r.id));
     }
     if (day30) {
       const nonStaffing = reviews.filter((r) => r.kind !== 'Staffing overload');
-      return [...nonStaffing, ...predictiveReviews].slice(0, 2);
+      return [...nonStaffing, ...predictiveReviews].slice(0, 2).filter((r) => !isDispatched(r.id));
     }
-    return reviews;
+    return reviews.filter((r) => !isDispatched(r.id));
   })();
 
   return (
     <>
       <Box sx={{ px: 1.5, pt: 2 }}>
+        {/* Error mode — agent-outage banner sits above everything else so
+            the MD sees it first. The Day-1 banner is suppressed in this
+            mode (the outage IS the status). */}
+        {sickDay && (
+          <Box
+            sx={{
+              mx: -1.5, mt: -2, px: 1.5, pt: 2, pb: 0.5,
+              bgcolor: '#FEF2F2', mb: 1.5
+            }}
+          >
+            <AgentOutageBanner />
+          </Box>
+        )}
         {/* Maturity banner — Day 1 sits on a light-purple section backdrop. */}
-        {day1 && (
+        {day1 && !sickDay && (
           <Box
             sx={{
               mx: -1.5, mt: -2, px: 1.5, pt: 2, pb: 0.5,
@@ -4339,18 +5348,226 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
           />
         )}
 
+        {/* ── ERROR MODE — unscheduled work that came in during outage ── */}
+        {sickDay && (
+          <>
+            <SectionHeader
+              icon="inbox"
+              title="Unscheduled · came in during outage"
+              sub={`${agentOutageEvent.unscheduledWorkOrders.length} new work orders need to be routed manually until the agent reconnects`}
+              color="#B91C1C"
+            />
+            <Stack spacing={1} sx={{ mb: 1.75 }}>
+              {agentOutageEvent.unscheduledWorkOrders.map((wo) => {
+                // Hide cards the MD has explicitly dismissed (via the X on
+                // the collapsed view).
+                if (isDispatched(wo.id)) return null;
+                const resolution = resolutions[wo.id];
+                // Translate the unscheduled WO into the shape ItemDetailSheet
+                // expects so the standard reassign/reschedule flow takes over.
+                // `autoOpen` jumps straight into the Reassign drawer; the
+                // plain card tap drops the MD into the detail card.
+                const openWo = ({ autoOpen = false } = {}) => openItem && openItem({
+                  id: wo.id,
+                  kind: wo.category,
+                  title: wo.title,
+                  icon: wo.icon,
+                  tone: wo.tone,
+                  status: 'Unscheduled',
+                  location: wo.location,
+                  assignee: 'Reassign needed',
+                  time: wo.receivedAt,
+                  note: wo.body,
+                  priority: wo.priority,
+                  autoOpenReassign: autoOpen
+                });
+                // Once a resolution is recorded — either by assigning
+                // through the Reassign drawer or by queueing for the
+                // agent — collapse the card to a minimal one-line summary
+                // in the same slot. The MD can still tap to reopen, or
+                // X-dismiss.
+                if (resolution?.assignee || resolution?.queued) {
+                  const isQueued = Boolean(resolution.queued);
+                  const firstName = resolution.assignee
+                    ? resolution.assignee.split(/\s|\./)[0]
+                    : null;
+                  const subLine = isQueued
+                    ? (resolution.reminderId === 'none'
+                        ? 'Queued for agent · no reminder'
+                        : `Queued for agent · remind ${resolution.reminderLabel?.toLowerCase() || ''}`)
+                    : `Assigned ${firstName}${resolution.when ? ` · ${resolution.when}` : ''}`;
+                  return (
+                    <Card
+                      key={wo.id}
+                      variant="outlined"
+                      onClick={() => openWo()}
+                      sx={{
+                        // Resolved/queued rows recede into the background —
+                        // no tone accent, very light grey fill, soft border.
+                        borderColor: '#E2E8F0',
+                        bgcolor: '#F8FAFC',
+                        cursor: 'pointer',
+                        transition: 'border-color 80ms',
+                        '&:hover': { borderColor: '#CBD5E1' }
+                      }}
+                    >
+                      <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Box sx={{ flexShrink: 0, display: 'grid', placeItems: 'center', width: 22, height: 22 }}>
+                            {isQueued ? (
+                              <Icon name="snooze" size={18} color="#0065BD" />
+                            ) : wo.tier === 'T1' || wo.tier === 'T2' || wo.tier === 'T3' || wo.tier === 'T4' ? (
+                              <TierIcon tier={wo.tier} size={20} />
+                            ) : (
+                              <Icon name="check_circle" size={16} color="#16A34A" />
+                            )}
+                          </Box>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {wo.title}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.2 }}>
+                              {subLine}
+                            </Typography>
+                          </Box>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); onDismiss && onDismiss(wo.id); }}
+                            sx={{ color: '#94A3B8', flexShrink: 0 }}
+                            aria-label="Dismiss"
+                          >
+                            <Icon name="close" size={16} />
+                          </IconButton>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                return (
+                <Card
+                  key={wo.id}
+                  variant="outlined"
+                  onClick={() => openWo()}
+                  sx={{
+                    borderColor: '#E2E8F0',
+                    borderLeftWidth: 4,
+                    // Border color follows the TELS priority badge palette:
+                    // T1 red, T2 orange, T3 yellow, T4 slate. Falls back
+                    // to the tone-based mapping when no tier is set.
+                    borderLeftColor: wo.tier === 'T1' ? '#DC2626'
+                      : wo.tier === 'T2' ? '#F59E0B'
+                      : wo.tier === 'T3' ? '#FACC15'
+                      : wo.tier === 'T4' ? '#CBD5E1'
+                      : wo.tone === 'error' ? '#DC2626'
+                      : wo.tone === 'warning' ? '#F59E0B'
+                      : wo.tone === 'info' ? '#2563EB'
+                      : '#CBD5E1',
+                    cursor: 'pointer',
+                    transition: 'border-color 80ms',
+                    '&:hover': { borderColor: '#94A3B8' }
+                  }}
+                >
+                  <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                    {/* Top row — icon + meta on a single line. */}
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75, minWidth: 0 }}>
+                      <Box sx={{ flexShrink: 0, display: 'grid', placeItems: 'center', width: 24, height: 24 }}>
+                        {wo.tier === 'T1' || wo.tier === 'T2' || wo.tier === 'T3' || wo.tier === 'T4' ? (
+                          <TierIcon tier={wo.tier} size={22} />
+                        ) : (
+                          <Icon name={wo.icon} size={16} color="#64748B" />
+                        )}
+                      </Box>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: '#64748B', fontWeight: 600, flex: 1, minWidth: 0,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                        }}
+                      >
+                        <Box component="span" sx={{ color: '#64748B', fontWeight: 700 }}>
+                          {wo.category}
+                        </Box>
+                        <Box component="span" sx={{ color: '#94A3B8' }}>
+                          {' · received '}{wo.receivedAt}
+                        </Box>
+                      </Typography>
+                    </Stack>
+
+                    {/* Title and below flow at the full card width — no
+                        longer indented under the meta column. */}
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                      {wo.title}
+                    </Typography>
+                    <Stack direction="row" spacing={0.375} alignItems="center" sx={{ mt: 0.25, mb: 0.5 }}>
+                      <Icon name="place" size={12} color="#94A3B8" />
+                      <Typography variant="caption" sx={{ color: '#475569' }}>
+                        {wo.location}
+                      </Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.35 }}>
+                      {wo.body}
+                    </Typography>
+                    <Stack direction="row" spacing={0.625} sx={{ mt: 1 }}>
+                      <Button
+                        fullWidth
+                        size="small"
+                        variant="contained"
+                        startIcon={<Icon name="person_add" size={13} color="#fff" />}
+                        onClick={(e) => { e.stopPropagation(); openWo({ autoOpen: true }); }}
+                        sx={{
+                          textTransform: 'none', fontWeight: 700, fontSize: 12,
+                          bgcolor: '#0065BD', '&:hover': { bgcolor: '#004A8A' }
+                        }}
+                      >
+                        Assign manually
+                      </Button>
+                      <Button
+                        fullWidth
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Icon name="snooze" size={13} color="#0065BD" />}
+                        onClick={(e) => { e.stopPropagation(); onQueueForAgent && onQueueForAgent(wo); }}
+                        sx={{
+                          textTransform: 'none', fontWeight: 700, fontSize: 12,
+                          color: '#0065BD', borderColor: '#CBD5E1',
+                          '&:hover': { borderColor: '#0065BD', bgcolor: '#EFF6FF' }
+                        }}
+                      >
+                        Queue for agent
+                      </Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
+                );
+              })}
+            </Stack>
+          </>
+        )}
+
         {/* ── DAY 1 ───────────────────────────────────────────────── */}
         {day1 && (
           <>
             <SectionHeader
               icon="how_to_reg"
               title="Needs your approval"
-              sub="Decisions the AI surfaced for your sign-off — you're supervising"
+              sub="Decisions the AI surfaced for your sign-off. You're supervising."
               color="#B91C1C"
             />
             <Stack spacing={1.25} sx={{ mb: 1.75 }}>
+              {/* Competing critical priorities leads the section — it's the
+                  Module 3 behavioral-boundary moment and demands the MD's
+                  attention first. */}
+              {reviews.filter((r) => r.id === 'rv-1' && !isDispatched(r.id)).map((r) => (
+                <ReviewCard
+                  key={r.id}
+                  item={r}
+                  onApprove={onApprove}
+                  onOverride={openOverride}
+                  onViewStaff={onViewStaff}
+                />
+              ))}
               <WeatherCard bare />
-              {!snoozedIds.includes(incomingWorkOrder.id) && (
+              {!snoozedIds.includes(incomingWorkOrder.id) && !isDispatched(incomingWorkOrder.id) && (
                 <IncomingWorkOrderCard
                   item={incomingWorkOrder}
                   onApprove={onApprove}
@@ -4360,7 +5577,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                   onViewStaff={onViewStaff}
                 />
               )}
-              {reviews.map((r) => (
+              {reviews.filter((r) => r.id !== 'rv-1' && !isDispatched(r.id)).map((r) => (
                 <ReviewCard
                   key={r.id}
                   item={r}
@@ -4383,7 +5600,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
             <SectionHeader
               icon="check_circle"
               title="Outcomes"
-              sub="What Connected Community handled for you in the background"
+              sub="What the AI handled in the background"
               color="#16A34A"
             />
             <Box sx={{ mb: 0.5 }}>
@@ -4398,7 +5615,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
             <SectionHeader
               icon="report_problem"
               title="Exceptions requiring review"
-              sub={`${exceptions.length} item${exceptions.length === 1 ? '' : 's'} the AI escalated — everything else is handled`}
+              sub={`${exceptions.length} item${exceptions.length === 1 ? '' : 's'} the AI escalated · everything else is handled`}
               color="#B91C1C"
             />
             <Stack spacing={1.25} sx={{ mb: 1.75 }}>
@@ -4415,8 +5632,8 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
 
             <SectionHeader
               icon="dashboard"
-              title="Today's operational state"
-              sub="Grouped readiness summaries — routine work runs in the background"
+              title="Today's state"
+              sub="Routine work runs in the background. Tap any group for detail."
             />
             <Stack spacing={1} sx={{ mb: 1.5 }}>
               {day30Readiness.filter((r) => r.id !== 'r-backlog').map((r) => (
@@ -4427,7 +5644,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
             <SectionHeader
               icon="check_circle"
               title="Outcomes"
-              sub="What Connected Community handled for you in the background"
+              sub="What the AI handled in the background"
               color="#16A34A"
             />
             <Stack spacing={1} sx={{ mb: 0.5 }}>
@@ -4447,7 +5664,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                 <SectionHeader
                   icon="psychology_alt"
                   title="Staffing insight"
-                  sub="One signal the AI couldn't decide on alone — everything else is handled"
+                  sub="One signal the AI couldn't decide on alone · everything else is handled"
                   color="#4338CA"
                 />
                 <Stack spacing={1.25} sx={{ mb: 1.75 }}>
@@ -4481,7 +5698,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
             <SectionHeader
               icon="monitor_heart"
               title="Operational health"
-              sub="Readiness and risk — what changed, what's trending"
+              sub="Readiness and risk · what changed, what's trending"
             />
             <Stack spacing={1} sx={{ mb: 1.75 }}>
               {day90Health.map((h) => (
@@ -4492,7 +5709,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
             <SectionHeader
               icon="check_circle"
               title="Outcomes"
-              sub="What Connected Community handled for you in the background"
+              sub="What the AI handled in the background"
               color="#16A34A"
             />
             <Box sx={{ mb: 0.5 }}>
@@ -4542,9 +5759,9 @@ function KPIsTab({ onPatternsTile }) {
   const aiMetrics = mode === 'day90' ? day90Status.metrics
     : mode === 'day30' ? day30Status.metrics
     : day1Status.metrics;
-  const aiSub = mode === 'day90' ? 'Predictive readiness and operational lift across 90 days.'
-    : mode === 'day30' ? 'How Connected Community is performing — calibration depth and operational lift.'
-    : 'Early calibration signals — the AI is still learning your building.';
+  const aiSub = mode === 'day90' ? 'Predictive readiness · last 90 days.'
+    : mode === 'day30' ? 'Calibration depth and operational lift · last 30 days.'
+    : 'Early calibration signals · still learning the building.';
   return (
     <Box sx={{ px: 1, pt: 1.5 }}>
       {(
@@ -5518,15 +6735,91 @@ function WorkTab({ seg: segProp, onSegChange }) {
 // Unified detail drawer for any work row (work order, task, unit turn,
 // service). Reads fields flexibly to handle each row shape.
 function ItemDetailSheet({ open, item, onClose }) {
+  const mode = useMode();
+  // Reassignment panel state — declared before the early return so the
+  // hook order stays consistent across renders.
+  const [reassignOpen, setReassignOpen] = React.useState(false);
+  // When true, the Reassign drawer is the *only* surface the MD wanted to
+  // see (e.g. tapped "Assign manually" on an unscheduled WO). Closing the
+  // Reassign drawer should then close the parent ItemDetailSheet entirely
+  // — no need to drop them onto the detail card afterwards.
+  const [reassignIsPrimary, setReassignIsPrimary] = React.useState(false);
+  const closeReassign = React.useCallback(() => {
+    setReassignOpen(false);
+    if (reassignIsPrimary) {
+      setReassignIsPrimary(false);
+      onClose && onClose();
+    }
+  }, [reassignIsPrimary, onClose]);
+  const [reassignDate, setReassignDate] = React.useState(new Date(2026, 4, 16));
+  const [reassignTech, setReassignTech] = React.useState(null);
+  const [assignedTo, setAssignedTo] = React.useState(null);
+  // Local override of the item's priority/tier. Lets the MD reshape urgency
+  // straight from the detail card; defaults back to item.priority.
+  const [priorityOverride, setPriorityOverride] = React.useState(null);
+  const [priorityAnchor, setPriorityAnchor] = React.useState(null);
+  // Est. duration override + AI learning prompt that fires when the MD
+  // edits the duration the AI proposed. `durationOpen` controls the
+  // dedicated duration-editor drawer.
+  const [durationOverride, setDurationOverride] = React.useState(null);
+  const [durationOpen, setDurationOpen] = React.useState(false);
+  const [durationLearn, setDurationLearn] = React.useState(null);
+  // Dismiss the AI service-provider recommendation banner inside the
+  // Reassign drawer. Resets each time the sheet opens.
+  const [aiRecDismissed, setAiRecDismissed] = React.useState(false);
+  const { resolutions, recordResolution } = useItemResolutions();
+
+  // Reset state whenever the sheet opens or the underlying item changes.
+  // If a prior resolution exists for this item (e.g. assigned via the
+  // override flow), seed the panel with that assignee/date so the row
+  // reflects the saved decision instead of "Reassign needed".
+  React.useEffect(() => {
+    if (open) {
+      // `item.autoOpenReassign` lets the caller jump straight to the
+      // Reassign drawer (e.g. the "Assign manually" CTA on unscheduled
+      // WOs) without the MD having to tap through the detail card first.
+      // When auto-launched the Reassign becomes the *primary* surface —
+      // closing it also dismisses the parent detail sheet.
+      const auto = Boolean(item?.autoOpenReassign);
+      setReassignOpen(auto);
+      setReassignIsPrimary(auto);
+      setReassignTech(team[0]?.id || null);
+      const prior = item?.id ? resolutions[item.id] : null;
+      setAssignedTo(prior?.assignee || null);
+      setReassignDate(new Date(2026, 4, 16));
+      setPriorityOverride(null);
+      setPriorityAnchor(null);
+      setDurationOverride(null);
+      setDurationOpen(false);
+      setDurationLearn(null);
+      setAiRecDismissed(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item?.id]);
+
   if (!item) return null;
   const kind = item.kind || item.category || item.kpi || item.source || 'Work item';
   const title = item.title || item.unit || item.vendor || 'Untitled';
   const statusLabel = item.status || '—';
   const location = item.location || item.target || (item.unit ? `Unit ${item.unit}` : '');
-  const assignee = item.assignee || item.tech || (item.vendor ? `${item.vendor} (vendor)` : 'Unassigned');
+  const baseAssignee = item.assignee || item.tech || (item.vendor ? `${item.vendor} (vendor)` : 'Unassigned');
+  const assignee = assignedTo || baseAssignee;
+  const needsReassign = assignee === 'Reassign needed' || assignee === 'Unassigned';
+  const selectedTech = team.find((t) => t.id === reassignTech) || team[0];
+  const techShiftDay = (n) => setReassignDate(new Date(reassignDate.getFullYear(), reassignDate.getMonth(), reassignDate.getDate() + n));
+  const techLabel = reassignDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const eta = item.eta || item.dur || '—';
   const note = item.note || item.reason || '';
-  const priority = item.priority;
+  const priority = priorityOverride || item.priority || 'Medium';
+  // Tier color palette matches the TELS priority badge artwork —
+  // red triangle (T1), orange circle (T2), yellow circle (T3), neutral (T4).
+  const PRIORITY_OPTIONS = [
+    { tier: 'T1', label: 'Critical', fg: '#B91C1C', bg: '#FEE2E2', border: '#FCA5A5' },
+    { tier: 'T2', label: 'High',     fg: '#9A3412', bg: '#FFEDD5', border: '#FDBA74' },
+    { tier: 'T3', label: 'Medium',   fg: '#854D0E', bg: '#FEF9C3', border: '#FDE047' },
+    { tier: 'T4', label: 'Low',      fg: '#475569', bg: '#F1F5F9', border: '#CBD5E1' }
+  ];
+  const priorityMeta = PRIORITY_OPTIONS.find((o) => o.label === priority) || PRIORITY_OPTIONS[2];
   const due = item.due;
   const cadence = item.cadence;
   const opened = item.opened;
@@ -5557,14 +6850,6 @@ function ItemDetailSheet({ open, item, onClose }) {
       </Box>
       <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box
-            sx={{
-              width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
-              bgcolor: statusBg, display: 'grid', placeItems: 'center'
-            }}
-          >
-            <Icon name={item.icon || 'build'} size={22} color="#0F172A" />
-          </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }} flexWrap="wrap" useFlexGap>
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
@@ -5601,8 +6886,193 @@ function ItemDetailSheet({ open, item, onClose }) {
           <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
             <Stack divider={<Divider />} spacing={0.875}>
               {location && <DetailRow icon="place" label="Location" value={location} />}
-              <DetailRow icon="person" label="Assignee" value={assignee} />
-              {(eta && eta !== '—') && <DetailRow icon="schedule" label="ETA" value={typeof eta === 'string' ? eta : formatDur(eta)} />}
+              {/* Assignee row is interactive — taps open the full-height reassign drawer. */}
+              <Stack direction="row" spacing={1.25} alignItems="center" sx={{ py: 0.25 }}>
+                <Icon name="person" size={16} color="#94A3B8" />
+                <Typography variant="caption" sx={{ color: '#64748B', flex: '0 0 70px' }}>
+                  Assignee
+                </Typography>
+                <Box sx={{ flex: 1 }}>
+                  <Button
+                    size="small"
+                    variant={needsReassign ? 'contained' : 'outlined'}
+                    color={needsReassign ? 'primary' : 'inherit'}
+                    startIcon={needsReassign ? <Icon name="person_add" size={14} /> : null}
+                    onClick={() => setReassignOpen(true)}
+                    sx={{
+                      textTransform: 'none', fontWeight: 700, fontSize: 12.5,
+                      py: 0.375
+                    }}
+                  >
+                    {assignee}
+                  </Button>
+                </Box>
+              </Stack>
+              {!needsReassign && (
+                <Stack direction="row" spacing={1.25} alignItems="center" sx={{ py: 0.25 }}>
+                  <Icon name="event" size={16} color="#94A3B8" />
+                  <Typography variant="caption" sx={{ color: '#64748B', flex: '0 0 70px' }}>
+                    Scheduled
+                  </Typography>
+                  <Box sx={{ flex: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="inherit"
+                      onClick={() => setReassignOpen(true)}
+                      sx={{
+                        textTransform: 'none', fontWeight: 700, fontSize: 12.5,
+                        py: 0.375
+                      }}
+                    >
+                      {reassignDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </Button>
+                  </Box>
+                </Stack>
+              )}
+              {/* Priority / tier row — tap the pill to reassign urgency. */}
+              <Stack direction="row" spacing={1.25} alignItems="center" sx={{ py: 0.25 }}>
+                <Icon name="flag" size={16} color="#94A3B8" />
+                <Typography variant="caption" sx={{ color: '#64748B', flex: '0 0 70px' }}>
+                  Priority
+                </Typography>
+                <Box sx={{ flex: 1 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    onClick={(e) => setPriorityAnchor(e.currentTarget)}
+                    sx={{
+                      textTransform: 'none', fontWeight: 700, fontSize: 12.5,
+                      py: 0.375,
+                      borderColor: priorityMeta.bg,
+                      bgcolor: priorityMeta.bg,
+                      color: priorityMeta.fg,
+                      '&:hover': { bgcolor: priorityMeta.bg, borderColor: priorityMeta.fg }
+                    }}
+                  >
+                    {priorityMeta.tier} · {priorityMeta.label}
+                  </Button>
+                  <Menu
+                    anchorEl={priorityAnchor}
+                    open={Boolean(priorityAnchor)}
+                    onClose={() => setPriorityAnchor(null)}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                    transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  >
+                    {PRIORITY_OPTIONS.map((opt) => (
+                      <MenuItem
+                        key={opt.tier}
+                        selected={opt.label === priority}
+                        onClick={() => {
+                          setPriorityOverride(opt.label);
+                          setPriorityAnchor(null);
+                        }}
+                        sx={{ fontSize: 13, py: 0.625, gap: 1 }}
+                      >
+                        <Box
+                          sx={{
+                            width: 20, height: 20, borderRadius: '6px',
+                            bgcolor: opt.bg, display: 'grid', placeItems: 'center'
+                          }}
+                        >
+                          <Icon name={opt.icon} size={13} color={opt.fg} />
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>
+                            {opt.tier} · {opt.label}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                </Box>
+              </Stack>
+              {(eta && eta !== '—') && (
+                <Box sx={{ py: 0.25 }}>
+                  <Stack direction="row" spacing={1.25} alignItems="center">
+                    <Icon name="schedule" size={16} color="#94A3B8" />
+                    <Typography variant="caption" sx={{ color: '#64748B', flex: '0 0 70px' }}>
+                      Est. duration
+                    </Typography>
+                    <Box sx={{ flex: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        onClick={() => setDurationOpen(true)}
+                        sx={{
+                          textTransform: 'none', fontWeight: 700, fontSize: 12.5,
+                          py: 0.375
+                        }}
+                      >
+                        {durationOverride || (typeof eta === 'string' ? eta : formatDur(eta))}
+                      </Button>
+                    </Box>
+                  </Stack>
+                  {/* AI learning prompt — sits inline under the duration
+                      row so the change and the follow-up question read as
+                      one interaction. */}
+                  {durationLearn && (
+                    <Box
+                      sx={{
+                        mt: 0.75,
+                        ml: '32px',
+                        bgcolor: '#EEF2FF', border: '1px solid #C7D2FE',
+                        borderRadius: 1.5, p: 1
+                      }}
+                    >
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.375 }}>
+                        <Icon name="model_training" size={13} color="#4338CA" />
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+                          The AI noticed
+                        </Typography>
+                      </Stack>
+                      <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.25, display: 'block', mb: 0.75 }}>
+                        Changed from {durationLearn.from} to {durationLearn.to}. Remember for next time, keep specific to {assignee?.split(' ')[0] || 'this tech'}, or one-off?
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<Icon name="bookmark_add" size={13} color="#fff" />}
+                          onClick={() => setDurationLearn(null)}
+                          sx={{
+                            textTransform: 'none', fontWeight: 700, fontSize: 11.5, py: 0.25, px: 0.875,
+                            bgcolor: '#4338CA', '&:hover': { bgcolor: '#3730A3' }
+                          }}
+                        >
+                          Remember
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<Icon name="person" size={13} color="#4338CA" />}
+                          onClick={() => setDurationLearn(null)}
+                          sx={{
+                            textTransform: 'none', fontWeight: 700, fontSize: 11.5, py: 0.25, px: 0.875,
+                            color: '#4338CA', borderColor: '#A5B4FC',
+                            '&:hover': { borderColor: '#4338CA', bgcolor: '#E0E7FF' }
+                          }}
+                        >
+                          Just for {assignee?.split(' ')[0] || 'this tech'}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => setDurationLearn(null)}
+                          sx={{
+                            textTransform: 'none', fontWeight: 700, fontSize: 11.5, py: 0.25, px: 0.875,
+                            color: '#4338CA', '&:hover': { bgcolor: '#E0E7FF' }
+                          }}
+                        >
+                          One-time
+                        </Button>
+                      </Stack>
+                    </Box>
+                  )}
+                </Box>
+              )}
               {due && <DetailRow icon="event" label="Due" value={due} />}
               {cadence && <DetailRow icon="event_repeat" label="Cadence" value={cadence} />}
               {opened && <DetailRow icon="flag" label="Opened" value={opened} />}
@@ -5613,6 +7083,463 @@ function ItemDetailSheet({ open, item, onClose }) {
             </Stack>
           </CardContent>
         </Card>
+
+        {/* Full-height reassignment drawer — date picker + tech chips +
+            selected tech's bandwidth, mirroring the Schedule Team-view pattern.
+            Stacks on top of the ItemDetailSheet. */}
+        <Drawer
+          anchor="bottom"
+          open={reassignOpen}
+          onClose={closeReassign}
+          PaperProps={{
+            sx: {
+              borderTopLeftRadius: 20, borderTopRightRadius: 20,
+              height: '92vh', pb: 'env(safe-area-inset-bottom)',
+              display: 'flex', flexDirection: 'column'
+            }
+          }}
+        >
+          <Box sx={{ pt: 1 }}>
+            <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+          </Box>
+          <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+            <Stack direction="row" spacing={1.25} alignItems="center">
+              {/* Header icon — when the work has a tier (T1/T2/T3), show
+                  the TELS priority badge instead of the generic person_add
+                  glyph. Routine/unranked items still get the indigo square. */}
+              {priorityMeta?.tier && priorityMeta.tier !== 'T4' ? (
+                <Box sx={{ width: 40, height: 40, flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+                  <TierIcon tier={priorityMeta.tier} size={32} />
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    width: 40, height: 40, borderRadius: '12px', flexShrink: 0,
+                    bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center'
+                  }}
+                >
+                  <Icon name="person_add" size={22} color="#3730A3" />
+                </Box>
+              )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }} flexWrap="wrap" useFlexGap>
+                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                    Reassign · {idLabel || kind}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={statusLabel}
+                    sx={{
+                      height: 17, fontSize: 10, fontWeight: 700, bgcolor: statusBg, color: '#0F172A',
+                      '.MuiChip-label': { px: 0.625 }
+                    }}
+                  />
+                </Stack>
+                <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+                  {title}
+                </Typography>
+                {(eta && eta !== '—') && (
+                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.375 }}>
+                    <Icon name="schedule" size={13} color="#64748B" />
+                    <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                      Est. duration · {typeof eta === 'string' ? eta : formatDur(eta)}
+                    </Typography>
+                  </Stack>
+                )}
+              </Box>
+              <IconButton size="small" onClick={closeReassign}>
+                <Icon name="close" size={20} />
+              </IconButton>
+            </Stack>
+          </Box>
+
+          <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
+            {/* AI recommendation banner — only shown when (a) the work
+                actually warrants outsourced HVAC service (i.e. the
+                Unit 214 HVAC scenario) and (b) the agent is reachable. */}
+            {!aiRecDismissed
+              && mode !== 'sickDay'
+              && (item?.aiOutsourceRec === true
+                  || /hvac|recommission/i.test(`${item?.kind || ''} ${item?.title || ''}`)) && (
+            <Card
+              variant="outlined"
+              sx={{
+                borderColor: '#A5B4FC', bgcolor: '#EEF2FF', mb: 1.5
+              }}
+            >
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                <Stack direction="row" spacing={1} alignItems="flex-start">
+                  <Box
+                    sx={{
+                      width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
+                      bgcolor: '#fff', border: '1px solid #C7D2FE',
+                      display: 'grid', placeItems: 'center'
+                    }}
+                  >
+                    <Icon name="auto_awesome" size={15} color="#4338CA" />
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 700, display: 'block', lineHeight: 1.2 }}>
+                      AI recommends · Outsource to Service Provider
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#3730A3', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
+                      In-house team can't complete the repair before tomorrow's 10 AM move-in. Apex Mechanical has same-day availability.
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    size="small"
+                    onClick={() => setAiRecDismissed(true)}
+                    sx={{ color: '#4338CA', mt: -0.5, mr: -0.5 }}
+                    aria-label="Dismiss recommendation"
+                  >
+                    <Icon name="close" size={16} />
+                  </IconButton>
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="contained"
+                    startIcon={<Icon name="auto_awesome" size={14} color="#fff" />}
+                    onClick={() => {
+                      setAssignedTo('Apex Mechanical (AI dispatched)');
+                      closeReassign();
+                    }}
+                    sx={{
+                      textTransform: 'none', fontWeight: 700,
+                      bgcolor: '#4338CA', '&:hover': { bgcolor: '#3730A3' }
+                    }}
+                  >
+                    Have AI contact
+                  </Button>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Icon name="support_agent" size={14} color="#4338CA" />}
+                    onClick={() => {
+                      setAssignedTo('Apex Mechanical (vendor)');
+                      closeReassign();
+                    }}
+                    sx={{
+                      textTransform: 'none', fontWeight: 700,
+                      color: '#4338CA', borderColor: '#A5B4FC',
+                      '&:hover': { borderColor: '#4338CA', bgcolor: '#E0E7FF' }
+                    }}
+                  >
+                    Call directly
+                  </Button>
+                </Stack>
+                <Button
+                  fullWidth
+                  size="small"
+                  variant="text"
+                  endIcon={<Icon name="chevron_right" size={16} color="#4338CA" />}
+                  sx={{
+                    textTransform: 'none', fontWeight: 700, mt: 0.5,
+                    color: '#4338CA', '&:hover': { bgcolor: '#E0E7FF' }
+                  }}
+                >
+                  View other service providers
+                </Button>
+              </CardContent>
+            </Card>
+            )}
+
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+              DATE
+            </Typography>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+              <IconButton size="small" onClick={() => techShiftDay(-1)} sx={{ color: '#475569' }}>
+                <Icon name="chevron_left" size={20} />
+              </IconButton>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.5}
+                sx={{
+                  flex: 1, justifyContent: 'center',
+                  bgcolor: '#fff', border: '1px solid #E2E8F0',
+                  borderRadius: 999, py: 0.625, mx: 0.5
+                }}
+              >
+                <Icon name="calendar_today" size={14} color="#0F172A" />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>
+                  {techLabel}
+                </Typography>
+              </Stack>
+              <IconButton size="small" onClick={() => techShiftDay(1)} sx={{ color: '#475569' }}>
+                <Icon name="chevron_right" size={20} />
+              </IconButton>
+            </Stack>
+
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+              TECHNICIAN
+            </Typography>
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{
+                mb: 1.5,
+                overflowX: 'auto',
+                flexWrap: 'nowrap',
+                // Hide scrollbar for clean iOS-style horizontal scroll.
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': { display: 'none' },
+                // Let the row bleed slightly past the body padding so the
+                // last chip can clip naturally against the right edge.
+                mx: -1.5,
+                px: 1.5,
+                pb: 0.5
+              }}
+            >
+              {team.map((t) => {
+                const disabled = (t.capacity || 0) <= 0;
+                const active = !disabled && t.id === reassignTech;
+                const tLoad = scheduledHours(t.tasks);
+                const tCap = t.capacity || 0;
+                const tOver = tLoad > tCap;
+                const tDiff = Math.abs(tCap - tLoad);
+                const tSub = disabled
+                  ? 'Off'
+                  : tOver ? `Over by ${fmtHours(tDiff)}h` : `${fmtHours(tDiff)}h open`;
+                const subColor = active
+                  ? '#CBD5E1'
+                  : disabled ? '#94A3B8' : tOver ? '#B91C1C' : '#047857';
+                return (
+                  <Chip
+                    key={t.id}
+                    clickable={!disabled}
+                    disabled={disabled}
+                    onClick={disabled ? undefined : () => setReassignTech(t.id)}
+                    size="small"
+                    label={(
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1, py: 0.25 }}>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: 'inherit' }}>
+                          {t.name}
+                        </Typography>
+                        <Typography sx={{ fontSize: 10.5, fontWeight: 600, color: subColor, mt: 0.125 }}>
+                          {tSub}
+                        </Typography>
+                      </Box>
+                    )}
+                    sx={{
+                      height: 'auto',
+                      flexShrink: 0,
+                      bgcolor: active ? '#0F172A' : disabled ? '#F1F5F9' : '#fff',
+                      color: active ? '#fff' : disabled ? '#94A3B8' : '#334155',
+                      border: '1px solid',
+                      borderColor: active ? '#0F172A' : '#CBD5E1',
+                      opacity: disabled ? 0.7 : 1,
+                      '.MuiChip-label': { px: 1.25, py: 0.25 },
+                      '&:hover': { bgcolor: active ? '#1E293B' : disabled ? '#F1F5F9' : '#F8FAFC' },
+                      '&.Mui-disabled': { opacity: 0.7 }
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+
+            {selectedTech && (() => {
+              const loadHrs = scheduledHours(selectedTech.tasks);
+              const cap = selectedTech.capacity || 0;
+              const over = loadHrs > cap;
+              const diff = Math.abs(cap - loadHrs);
+              const openLabel = cap <= 0
+                ? selectedTech.status || 'Out today'
+                : over ? `Over by ${fmtHours(diff)}h` : `${fmtHours(diff)}h open`;
+              const openTone = cap <= 0 ? 'default' : over ? 'error' : 'success';
+              return (
+                <>
+                  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>
+                      {selectedTech.name.toUpperCase()} · {selectedTech.shift}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={openLabel}
+                      sx={{
+                        height: 20, fontSize: 11, fontWeight: 700,
+                        bgcolor: toneBg(openTone), color: '#0F172A',
+                        '.MuiChip-label': { px: 0.875 }
+                      }}
+                    />
+                  </Stack>
+                  <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                    <Stack divider={<Divider />}>
+                      {selectedTech.tasks.length === 0 && (
+                        <Box sx={{ p: 1.5 }}>
+                          <Typography variant="caption" sx={{ color: '#64748B' }}>
+                            No jobs scheduled.
+                          </Typography>
+                        </Box>
+                      )}
+                      {selectedTech.tasks.map((t, i) => {
+                        // Tone → tier mapping. Critical = T1, High = T2,
+                        // Medium = T3, everything else = unscored (PM, Prep,
+                        // Break, Logs, Walkthrough).
+                        const tone = t.tone || 'default';
+                        const tier = tone === 'error' ? 'T1'
+                          : tone === 'warning' ? 'T2'
+                          : tone === 'info' ? 'T3'
+                          : null;
+                        const isBreak = t.kind === 'Break' || /lunch|break/i.test(t.title || '');
+                        const barColor = tone === 'error' ? '#DC2626'
+                          : tone === 'warning' ? '#F59E0B'
+                          : tone === 'info' ? '#2563EB'
+                          : tone === 'success' ? '#10B981'
+                          : '#CBD5E1';
+                        const breakBarBg = 'repeating-linear-gradient(135deg, #94A3B8 0 3px, #CBD5E1 3px 6px)';
+                        return (
+                          <Stack
+                            key={i}
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            sx={{ pl: 1.5, pr: 1.25, py: 0.875, position: 'relative' }}
+                          >
+                            <Box
+                              sx={{
+                                position: 'absolute', top: 0, bottom: 0, left: 0,
+                                width: 4, flexShrink: 0,
+                                bgcolor: isBreak ? 'transparent' : barColor,
+                                backgroundImage: isBreak ? breakBarBg : 'none',
+                                backgroundSize: isBreak ? '4px 4px' : 'auto',
+                                borderRadius: '0 2px 2px 0'
+                              }}
+                            />
+                            {tier && (
+                              <Box sx={{ ml: 0.5, flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+                                <TierIcon tier={tier} size={20} />
+                              </Box>
+                            )}
+                            <Box sx={{ flex: 1, minWidth: 0, pl: tier ? 0.25 : 0.5 }}>
+                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', lineHeight: 1.2 }}>
+                                {t.time} · {formatDur(t.dur)}
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 600, lineHeight: 1.25, color: '#0F172A',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
+                                  WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
+                              >
+                                {t.title}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        );
+                      })}
+                    </Stack>
+                  </Card>
+                </>
+              );
+            })()}
+          </Box>
+
+          <Box sx={{ p: 1.5, borderTop: '1px solid #E2E8F0', bgcolor: '#fff' }}>
+            <Stack direction="row" spacing={0.75} alignItems="stretch">
+              <Button
+                variant="outlined"
+                size="medium"
+                color="inherit"
+                onClick={closeReassign}
+                sx={{ textTransform: 'none', fontWeight: 600, flex: '0 0 auto', px: 1.75 }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                size="medium"
+                disabled={!selectedTech}
+                onClick={() => {
+                  if (selectedTech) {
+                    setAssignedTo(selectedTech.name);
+                    closeReassign();
+                  }
+                }}
+                sx={{ textTransform: 'none', fontWeight: 700, flex: '1 1 auto', whiteSpace: 'nowrap' }}
+              >
+                {`Assign · ${selectedTech?.name?.split(' ')[0] || ''} · ${techLabel}`}
+              </Button>
+            </Stack>
+          </Box>
+        </Drawer>
+
+        {/* Duration editor drawer — preset list + AI feedback note. */}
+        {(() => {
+          const baseEta = typeof eta === 'string' ? eta : formatDur(eta);
+          const currentEta = durationOverride || baseEta;
+          const DURATION_OPTIONS = ['15m', '30m', '45m', '1h', '1h 30m', '2h', '2h 30m', '3h', '4h', '6h', '8h'];
+          return (
+            <Drawer
+              anchor="bottom"
+              open={durationOpen}
+              onClose={() => setDurationOpen(false)}
+              PaperProps={{
+                sx: {
+                  borderTopLeftRadius: 20, borderTopRightRadius: 20,
+                  maxHeight: '70vh', pb: 'env(safe-area-inset-bottom)',
+                  display: 'flex', flexDirection: 'column'
+                }
+              }}
+            >
+              <Box sx={{ pt: 1 }}>
+                <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+              </Box>
+              <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+                      Adjust estimated duration
+                    </Typography>
+                    <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+                      {title}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, mt: 0.25, display: 'block' }}>
+                      AI proposed · {baseEta}
+                    </Typography>
+                  </Box>
+                  <IconButton size="small" onClick={() => setDurationOpen(false)}>
+                    <Icon name="close" size={20} />
+                  </IconButton>
+                </Stack>
+              </Box>
+              <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
+                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+                  CHOOSE A DURATION
+                </Typography>
+                <Stack direction="row" spacing={0.625} flexWrap="wrap" useFlexGap>
+                  {DURATION_OPTIONS.map((opt) => {
+                    const active = opt === currentEta;
+                    return (
+                      <Chip
+                        key={opt}
+                        clickable
+                        onClick={() => {
+                          setDurationOverride(opt);
+                          setDurationOpen(false);
+                          if (opt !== baseEta) setDurationLearn({ from: baseEta, to: opt });
+                          else setDurationLearn(null);
+                        }}
+                        label={opt}
+                        sx={{
+                          height: 34, minWidth: 64,
+                          bgcolor: active ? '#0F172A' : '#fff',
+                          color: active ? '#fff' : '#334155',
+                          border: '1px solid',
+                          borderColor: active ? '#0F172A' : '#CBD5E1',
+                          fontWeight: 700,
+                          '.MuiChip-label': { px: 1.25, fontSize: 13 },
+                          '&:hover': { bgcolor: active ? '#1E293B' : '#F8FAFC' }
+                        }}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Box>
+            </Drawer>
+          );
+        })()}
 
         {note && (
           <Box sx={{ mb: 1.25 }}>
@@ -5685,35 +7612,35 @@ function ItemDetailSheet({ open, item, onClose }) {
         </Card>
 
         <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-          <Button fullWidth size="small" variant="outlined" startIcon={<Icon name="event_repeat" size={16} />}>
-            Reschedule
+          <Button fullWidth size="small" variant="outlined" startIcon={<Icon name="arrow_back" size={16} />} onClick={onClose}>
+            Back
           </Button>
-          <Button fullWidth size="small" variant="outlined" startIcon={<Icon name="person_add" size={16} />}>
-            Reassign
+          <Button
+            fullWidth
+            size="small"
+            variant="contained"
+            startIcon={<Icon name="check" size={16} color="#fff" />}
+            onClick={() => {
+              if (item?.id) {
+                // Always record the latest decisions (duration, priority)
+                // even when the assignee is still "Reassign needed" — the
+                // schedule consumers will apply whatever's present.
+                recordResolution(item.id, {
+                  ...(needsReassign ? {} : {
+                    assignee,
+                    when: reassignDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                    startTime: item.time || item.start || '11:00 AM'
+                  }),
+                  ...(durationOverride ? { duration: durationOverride } : {}),
+                  ...(priorityOverride ? { priority: priorityOverride } : {})
+                });
+              }
+              onClose();
+            }}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Save
           </Button>
-        </Stack>
-        <Stack direction="row" spacing={1}>
-          <Button fullWidth size="small" variant="outlined" startIcon={<Icon name="add_comment" size={16} />}>
-            Add note
-          </Button>
-          {statusLabel === 'Queued' && (
-            <Button
-              fullWidth size="small" variant="contained"
-              startIcon={<Icon name="play_arrow" size={16} color="#fff" />}
-              sx={{ color: '#fff', bgcolor: '#2563EB', '&:hover': { bgcolor: '#1D4ED8' } }}
-            >
-              Mark in-progress
-            </Button>
-          )}
-          {statusLabel === 'In progress' && (
-            <Button
-              fullWidth size="small" variant="contained" color="success"
-              startIcon={<Icon name="check" size={16} color="#fff" />}
-              sx={{ color: '#fff' }}
-            >
-              Mark complete
-            </Button>
-          )}
         </Stack>
       </Box>
     </Drawer>
@@ -6255,15 +8182,123 @@ function TimelineItem({ item }) {
   );
 }
 
-function TeamMemberSheet({ open, member, onClose }) {
+// Single task row used in TeamMemberSheet. Matches the polished list
+// pattern from the Reassign drawer: left tone bar + optional tier pill
+// + time/dur caption + title, no icon square.
+function ScheduleRow({ task, onClick, anchored = false }) {
+  const tone = task.tone || 'default';
+  const isBreak = task.kind === 'Break' || /lunch|break/i.test(task.title || '');
+  const tier = tone === 'error' ? 'T1'
+    : tone === 'warning' ? 'T2'
+    : tone === 'info' ? 'T3'
+    : null;
+  const barColor = tone === 'error' ? '#DC2626'
+    : tone === 'warning' ? '#F59E0B'
+    : tone === 'info' ? '#2563EB'
+    : tone === 'success' ? '#10B981'
+    : '#CBD5E1';
+  // Break rows use the same diagonal hatch as the DayBar break segment,
+  // rotated 90° (135° from the original 45° direction) so it reads as
+  // perpendicular to the bar version. Same #94A3B8 / #CBD5E1 palette.
+  const breakBarBg = 'repeating-linear-gradient(135deg, #94A3B8 0 3px, #CBD5E1 3px 6px)';
+  return (
+    <Stack
+      direction="row"
+      spacing={1}
+      alignItems="center"
+      onClick={onClick}
+      sx={{
+        pl: 1.5, pr: 1.25, py: 0.875, position: 'relative',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'background-color 80ms',
+        '&:hover': onClick ? { bgcolor: '#F8FAFC' } : undefined
+      }}
+    >
+      <Box
+        sx={{
+          position: 'absolute', top: 0, bottom: 0, left: 0,
+          width: 4, flexShrink: 0,
+          bgcolor: isBreak ? 'transparent' : barColor,
+          backgroundImage: isBreak ? breakBarBg : 'none',
+          backgroundSize: isBreak ? '4px 4px' : 'auto',
+          borderRadius: '0 2px 2px 0'
+        }}
+      />
+      {tier && (
+        <Box sx={{ ml: 0.5, flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+          <TierIcon tier={tier} size={20} />
+        </Box>
+      )}
+      <Box sx={{ flex: 1, minWidth: 0, pl: tier ? 0.25 : 0.5 }}>
+        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', lineHeight: 1.2 }}>
+          {anchored ? `${task.time} · ${formatDur(task.dur)}` : `~${formatDur(task.dur)}`}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 600, lineHeight: 1.25, color: '#0F172A',
+            overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
+            WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
+        >
+          {task.title}
+        </Typography>
+      </Box>
+      {onClick && <Icon name="chevron_right" size={18} color="#CBD5E1" />}
+    </Stack>
+  );
+}
+
+// Bottom drawer used to log a tech absence (e.g. called in sick). The
+// MD picks a scope; on Save the parent receives the absence payload and
+// can fire the rebalance flow (switch to sickDay mode, etc.).
+function AbsenceSheet({ open, member, onClose, onConfirm }) {
+  const [scope, setScope] = React.useState('today');
+  const [partWindow, setPartWindow] = React.useState('morning');
+  const [throughDay, setThroughDay] = React.useState('sun');
+  const [customFrom, setCustomFrom] = React.useState('09:00');
+  const [customTo, setCustomTo] = React.useState('13:00');
+  React.useEffect(() => {
+    if (open) {
+      setScope('today');
+      setPartWindow('morning');
+      setThroughDay('sun');
+      setCustomFrom('09:00');
+      setCustomTo('13:00');
+    }
+  }, [open, member?.id]);
   if (!member) return null;
-  const loadHrs = scheduledHours(member.tasks);
-  const ordered = withFit(member.tasks, member.capacity);
-  const fitItems = ordered.filter((t) => t._fits);
-  const overItems = ordered.filter((t) => !t._fits);
-  const overHrs = overItems.reduce((s, t) => s + parseDur(t.dur), 0);
-  const st = loadStatus(loadHrs, member.capacity);
-  const tone = st.tone;
+  const SCOPE_OPTIONS = [
+    { id: 'today',    icon: 'today',       label: 'Rest of today',  sub: 'Out for the remainder of Sat, May 16' },
+    { id: 'part',     icon: 'schedule',    label: 'Part of today',  sub: 'Pick a window (morning, afternoon, etc.)' },
+    { id: 'multi',    icon: 'date_range',  label: 'Multiple days',  sub: 'Out through a specific date' }
+  ];
+  const PART_OPTIONS = [
+    { id: 'morning',   label: 'Morning',       sub: 'Until 12 PM' },
+    { id: 'afternoon', label: 'Afternoon',     sub: '12 PM onward' },
+    { id: 'remainder', label: 'Rest of shift', sub: 'From now' },
+    { id: 'custom',    label: 'Custom',        sub: 'Pick a time range' }
+  ];
+  // Format `HH:MM` (24h) into `h:mm AM/PM` for the on-save summary copy.
+  const formatTime = (hhmm) => {
+    if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return hhmm;
+    const [h, m] = hhmm.split(':').map(Number);
+    const ap = h >= 12 ? 'PM' : 'AM';
+    const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${String(m).padStart(2, '0')} ${ap}`;
+  };
+  const THROUGH_OPTIONS = [
+    { id: 'sun', label: 'Through Sun, May 17' },
+    { id: 'mon', label: 'Through Mon, May 18' },
+    { id: 'tue', label: 'Through Tue, May 19' }
+  ];
+  const buildPayload = () => ({
+    member,
+    scope,
+    partWindow: scope === 'part' ? partWindow : null,
+    customRange: scope === 'part' && partWindow === 'custom'
+      ? { from: customFrom, to: customTo, fromLabel: formatTime(customFrom), toLabel: formatTime(customTo) }
+      : null,
+    throughDay: scope === 'multi' ? throughDay : null
+  });
   return (
     <Drawer
       anchor="bottom"
@@ -6272,7 +8307,308 @@ function TeamMemberSheet({ open, member, onClose }) {
       PaperProps={{
         sx: {
           borderTopLeftRadius: 20, borderTopRightRadius: 20,
-          maxHeight: '90vh', pb: 'env(safe-area-inset-bottom)'
+          maxHeight: '85vh', pb: 'env(safe-area-inset-bottom)',
+          display: 'flex', flexDirection: 'column'
+        }
+      }}
+    >
+      <Box sx={{ pt: 1 }}>
+        <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+      </Box>
+      <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+              Mark out · {member.name}
+            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+              When will {member.name.split(/\s|\./)[0]} be out?
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
+        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+          SCOPE
+        </Typography>
+        <Stack spacing={0.75}>
+          {SCOPE_OPTIONS.map((opt) => {
+            const active = scope === opt.id;
+            return (
+              <Card
+                key={opt.id}
+                variant="outlined"
+                onClick={() => setScope(opt.id)}
+                sx={{
+                  borderColor: active ? '#0065BD' : '#E2E8F0',
+                  bgcolor: active ? '#EFF6FF' : '#fff',
+                  cursor: 'pointer',
+                  transition: 'border-color 80ms, background-color 80ms'
+                }}
+              >
+                <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
+                        bgcolor: active ? '#DBEAFE' : '#F1F5F9',
+                        display: 'grid', placeItems: 'center'
+                      }}
+                    >
+                      <Icon name={opt.icon} size={16} color={active ? '#0065BD' : '#475569'} />
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.25 }}>
+                        {opt.label}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.125, lineHeight: 1.3 }}>
+                        {opt.sub}
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        border: '2px solid',
+                        borderColor: active ? '#0065BD' : '#CBD5E1',
+                        display: 'grid', placeItems: 'center'
+                      }}
+                    >
+                      {active && <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#0065BD' }} />}
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Stack>
+
+        {scope === 'part' && (
+          <>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mt: 1.5, mb: 0.75 }}>
+              WINDOW
+            </Typography>
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+              {PART_OPTIONS.map((p) => {
+                const active = partWindow === p.id;
+                const dynamicSub = p.id === 'custom' && active
+                  ? `${formatTime(customFrom)} – ${formatTime(customTo)}`
+                  : p.sub;
+                return (
+                  <Chip
+                    key={p.id}
+                    clickable
+                    onClick={() => setPartWindow(p.id)}
+                    size="small"
+                    label={(
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 0.25 }}>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: 'inherit' }}>
+                          {p.label}
+                        </Typography>
+                        <Typography sx={{ fontSize: 10.5, color: active ? '#CBD5E1' : '#64748B', mt: 0.125 }}>
+                          {dynamicSub}
+                        </Typography>
+                      </Box>
+                    )}
+                    sx={{
+                      height: 'auto',
+                      bgcolor: active ? '#0F172A' : '#fff',
+                      color: active ? '#fff' : '#334155',
+                      border: '1px solid',
+                      borderColor: active ? '#0F172A' : '#CBD5E1',
+                      '.MuiChip-label': { px: 1.25, py: 0.25 }
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+
+            {partWindow === 'custom' && (
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mb: 0.375 }}>
+                    From
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="time"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    inputProps={{ step: 900 }}
+                    sx={{
+                      '.MuiOutlinedInput-root': { bgcolor: '#fff', fontSize: 14, fontWeight: 700 },
+                      '.MuiOutlinedInput-input': { py: '8px' }
+                    }}
+                  />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mb: 0.375 }}>
+                    To
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="time"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    inputProps={{ step: 900 }}
+                    sx={{
+                      '.MuiOutlinedInput-root': { bgcolor: '#fff', fontSize: 14, fontWeight: 700 },
+                      '.MuiOutlinedInput-input': { py: '8px' }
+                    }}
+                  />
+                </Box>
+              </Stack>
+            )}
+          </>
+        )}
+
+        {scope === 'multi' && (
+          <>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mt: 1.5, mb: 0.75 }}>
+              OUT THROUGH
+            </Typography>
+            <Stack spacing={0.5}>
+              {THROUGH_OPTIONS.map((d) => {
+                const active = throughDay === d.id;
+                return (
+                  <Card
+                    key={d.id}
+                    variant="outlined"
+                    onClick={() => setThroughDay(d.id)}
+                    sx={{
+                      borderColor: active ? '#0065BD' : '#E2E8F0',
+                      bgcolor: active ? '#EFF6FF' : '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Box
+                          sx={{
+                            width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                            border: '2px solid',
+                            borderColor: active ? '#0065BD' : '#CBD5E1',
+                            display: 'grid', placeItems: 'center'
+                          }}
+                        >
+                          {active && <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#0065BD' }} />}
+                        </Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#0F172A' }}>
+                          {d.label}
+                        </Typography>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+          </>
+        )}
+
+        <Box sx={{ mt: 1.5, bgcolor: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 1.5, p: 1 }}>
+          <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.375 }}>
+            <Icon name="auto_awesome" size={13} color="#4338CA" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+              On save
+            </Typography>
+          </Stack>
+          <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.3, display: 'block' }}>
+            The scheduling agent will rebalance {member.name.split(/\s|\./)[0]}’s work across the team and across days. You’ll review the changes before anything commits.
+          </Typography>
+        </Box>
+      </Box>
+
+      <Box sx={{ p: 1.5, borderTop: '1px solid #E2E8F0', bgcolor: '#fff' }}>
+        <Stack direction="row" spacing={0.75}>
+          <Button
+            fullWidth
+            variant="outlined"
+            color="inherit"
+            onClick={onClose}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={() => onConfirm(buildPayload())}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Mark out
+          </Button>
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}
+
+function TeamMemberSheet({ open, member, onClose, onMarkOut }) {
+  const openItem = useOpenItem();
+  const { resolutions } = useItemResolutions();
+  const ctxMarkOut = useMarkOut();
+  const fireMarkOut = onMarkOut || ctxMarkOut;
+  const [absenceOpen, setAbsenceOpen] = React.useState(false);
+  React.useEffect(() => { if (!open) setAbsenceOpen(false); }, [open]);
+  if (!member) return null;
+  // Shared synthetic id so the same key is used both when opening a task
+  // and when reading saved overrides back out of the resolutions map.
+  const taskKey = (t, idx) => t.id || `${member.id}__task-${idx}`;
+  // Apply any saved overrides (duration, priority) on top of the raw
+  // schedule. Duration changes flow into scheduledHours, the DayBar, and
+  // the over-capacity math so the team view reflects edits live.
+  const liveTasks = member.tasks.map((t, idx) => {
+    const r = resolutions[taskKey(t, idx)];
+    if (!r) return t;
+    return {
+      ...t,
+      ...(r.duration ? { dur: r.duration } : {}),
+      ...(r.priority ? { kind: r.priority } : {})
+    };
+  });
+  const loadHrs = scheduledHours(liveTasks);
+  const ordered = withFit(liveTasks, member.capacity);
+  const fitItems = ordered.filter((t) => t._fits);
+  const overItems = ordered.filter((t) => !t._fits);
+  const overHrs = overItems.reduce((s, t) => s + parseDur(t.dur), 0);
+  const st = loadStatus(loadHrs, member.capacity);
+  const tone = st.tone;
+  // Translate a raw schedule task into the shape ItemDetailSheet expects.
+  // Provides a synthetic id (member + index) so resolutions stay scoped.
+  const openTask = (t, idx) => {
+    if (!openItem) return;
+    openItem({
+      id: taskKey(t, idx),
+      kind: t.kind || 'Scheduled task',
+      title: t.title,
+      icon: t.icon,
+      tone: t.tone,
+      status: t.kind === 'Critical' ? 'Critical' : 'Queued',
+      location: t.location,
+      assignee: member.name,
+      time: t.time,
+      eta: t.dur,
+      note: t.note,
+      priority: t.kind === 'Critical' ? 'Critical'
+        : t.kind === 'High' ? 'High'
+        : t.kind === 'Medium' ? 'Medium' : undefined
+    });
+  };
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          height: '92vh', pb: 'env(safe-area-inset-bottom)',
+          display: 'flex', flexDirection: 'column'
         }
       }}
     >
@@ -6292,6 +8628,22 @@ function TeamMemberSheet({ open, member, onClose }) {
               {member.shift}
             </Typography>
           </Box>
+          {fireMarkOut && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              startIcon={<Icon name="event_busy" size={14} />}
+              onClick={() => setAbsenceOpen(true)}
+              sx={{
+                textTransform: 'none', fontWeight: 700, fontSize: 12.5,
+                borderColor: '#CBD5E1', color: '#0F172A',
+                '&:hover': { borderColor: '#0F172A', bgcolor: '#F8FAFC' }
+              }}
+            >
+              Mark out
+            </Button>
+          )}
           <IconButton size="small" onClick={onClose}>
             <Icon name="close" size={20} />
           </IconButton>
@@ -6321,7 +8673,7 @@ function TeamMemberSheet({ open, member, onClose }) {
           </Box>
         )}
       </Box>
-      <Box sx={{ px: 2, pb: 2, overflowY: 'auto' }}>
+      <Box sx={{ px: 1.5, pb: 2, flex: 1, overflowY: 'auto' }}>
         {member.tasks.length === 0 ? (
           <Card variant="outlined" sx={{ bgcolor: '#F8FAFC', borderColor: '#E2E8F0' }}>
             <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -6334,26 +8686,58 @@ function TeamMemberSheet({ open, member, onClose }) {
             </CardContent>
           </Card>
         ) : (
-          <Stack spacing={1}>
-            {fitItems.map((t, i) => (
-              <TimelineItem key={`f-${i}`} item={t} />
-            ))}
-            {overItems.length > 0 && (
-              <>
-                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ pt: 0.5 }}>
-                  <Icon name="error" size={15} color="#DC2626" />
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C' }}>
-                    Won’t fit in an {member.capacity}h shift — reassign or defer
-                  </Typography>
-                </Stack>
+          <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+            <Stack divider={<Divider />}>
+              {fitItems.map((t, i) => {
+                // Only the day-opener and breaks (lunch) anchor to a clock
+                // time. Everything else floats between anchors.
+                const isBreak = t.kind === 'Break' || /lunch|break/i.test(t.title || '');
+                const anchored = i === 0 || isBreak;
+                return (
+                  <ScheduleRow
+                    key={`f-${i}`}
+                    task={t}
+                    anchored={anchored}
+                    onClick={() => openTask(t, i)}
+                  />
+                );
+              })}
+            </Stack>
+          </Card>
+        )}
+        {overItems.length > 0 && (
+          <>
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ pt: 1.25, pb: 0.5 }}>
+              <Icon name="error" size={15} color="#DC2626" />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C' }}>
+                Won’t fit in an {member.capacity}h shift · reassign or defer
+              </Typography>
+            </Stack>
+            <Card variant="outlined" sx={{ borderColor: '#FCA5A5', bgcolor: '#FEF2F2' }}>
+              <Stack divider={<Divider sx={{ borderColor: '#FCA5A5' }} />}>
                 {overItems.map((t, i) => (
-                  <TimelineItem key={`o-${i}`} item={t} />
+                  <ScheduleRow
+                    key={`o-${i}`}
+                    task={t}
+                    anchored={false}
+                    onClick={() => openTask(t, fitItems.length + i)}
+                  />
                 ))}
-              </>
-            )}
-          </Stack>
+              </Stack>
+            </Card>
+          </>
         )}
       </Box>
+      <AbsenceSheet
+        open={absenceOpen}
+        member={member}
+        onClose={() => setAbsenceOpen(false)}
+        onConfirm={(payload) => {
+          setAbsenceOpen(false);
+          if (fireMarkOut) fireMarkOut(payload);
+          onClose && onClose();
+        }}
+      />
     </Drawer>
   );
 }
@@ -6427,8 +8811,10 @@ function CalendarSheet({ open, value, onClose, onPick }) {
 
 function ScheduleTab() {
   const mode = useMode();
+  const sickDay = mode === 'sickDay'; // Error mode — agent unreachable
   const day30 = mode === 'day30' || mode === 'day90'; // calibrated (Day 30+)
   const day90 = mode === 'day90'; // predictive operations
+  const openItem = useOpenItem();
   const [view, setView] = useState('my');
   const [openMember, setOpenMember] = useState(null);
   const [date, setDate] = useState(new Date(2025, 4, 16));
@@ -6445,6 +8831,33 @@ function ScheduleTab() {
           Schedule
         </Typography>
       </Box>
+
+      {sickDay && (
+        // Error mode — outage notice anchored to the Schedule header so
+        // the MD knows the day order isn't being maintained automatically.
+        <Card
+          variant="outlined"
+          sx={{
+            mb: 1.25,
+            bgcolor: '#FEF2F2', borderColor: '#FCA5A5',
+            borderLeftWidth: 4, borderLeftColor: '#DC2626'
+          }}
+        >
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <Icon name="cloud_off" size={16} color="#B91C1C" />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="caption" sx={{ color: '#7F1D1D', fontWeight: 700, display: 'block', lineHeight: 1.25 }}>
+                  Scheduling agent unreachable
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.3, mt: 0.125 }}>
+                  Down since {agentOutageEvent.startedAt} · {agentOutageEvent.ago} · day order isn’t being maintained automatically
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       <Stack
         direction="row"
@@ -6483,6 +8896,9 @@ function ScheduleTab() {
         onPick={(d) => { setDate(d); setCalOpen(false); }}
       />
 
+      {/* DSX-MUI ButtonGroup (Default · Contained · Horizontal).
+          Track #E0E4E7 · 4 px radius · Inter Semi Bold 16/20 · 12 px pad ·
+          1 px vertical separators · selected state uses DSX primary blue. */}
       <ToggleButtonGroup
         size="small"
         exclusive
@@ -6491,18 +8907,33 @@ function ScheduleTab() {
         onChange={(_, v) => v && setView(v)}
         sx={{
           mb: 1.5,
-          bgcolor: '#F1F5F9',
-          border: '1px solid #CBD5E1',
-          borderRadius: 2,
-          p: 0.5,
+          bgcolor: '#E0E4E7',
+          borderRadius: '4px',
+          overflow: 'hidden',
           '.MuiToggleButton-root': {
-            flex: 1, py: 0.625, fontSize: 13, fontWeight: 600,
-            textTransform: 'none', border: 'none', borderRadius: '8px !important',
-            color: '#475569'
+            flex: 1,
+            py: '12px',
+            px: '12px',
+            fontSize: 16,
+            lineHeight: '20px',
+            letterSpacing: '-0.176px',
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontWeight: 600,
+            textTransform: 'none',
+            color: 'rgba(0,0,0,0.87)',
+            bgcolor: '#E0E4E7',
+            border: 'none',
+            borderRadius: 0,
+            // 1px vertical separator between segments (skipped on last).
+            '&:not(:last-of-type)': {
+              borderRight: '1px solid rgba(0,0,0,0.12)'
+            },
+            '&:hover': { bgcolor: '#D1D6DA' }
           },
           '.Mui-selected': {
-            bgcolor: '#fff !important', color: '#0F172A !important',
-            boxShadow: '0 1px 3px rgba(15,23,42,0.12)'
+            bgcolor: '#0065BD !important',
+            color: '#FFFFFF !important',
+            '&:hover': { bgcolor: '#004A8A !important' }
           }
         }}
       >
@@ -6512,20 +8943,53 @@ function ScheduleTab() {
 
       {view === 'my' ? (
         <Stack spacing={1}>
-          <Card variant="outlined" sx={{ bgcolor: '#F8FAFC', borderColor: '#E2E8F0' }}>
-            <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Icon name="auto_awesome" size={16} color="#4338CA" />
-                <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
-                  {day90
-                    ? 'Your day is reduced to operational oversight only'
-                    : day30
-                      ? 'Your day is reduced to approvals and exceptions'
-                      : 'AI ordered your day by priority — top items first'}
-                </Typography>
-              </Stack>
-            </CardContent>
-          </Card>
+          {/* Load summary bar — same DayBar pattern as TeamMemberSheet so
+              the MD sees their own commitment density at a glance. */}
+          {(() => {
+            const MD_SHIFT = 8;
+            const loadHrs = scheduledHours(mdSchedule);
+            const st = loadStatus(loadHrs, MD_SHIFT);
+            return (
+              <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                    <Chip
+                      size="small"
+                      label={st.label}
+                      sx={{
+                        height: 20, fontSize: 11, fontWeight: 700,
+                        bgcolor: toneBg(st.tone), color: '#0F172A',
+                        '.MuiChip-label': { px: 0.75 }
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      {fmtHours(loadHrs)}h planned / {MD_SHIFT}h shift
+                    </Typography>
+                  </Stack>
+                  <DayBar tasks={mdSchedule} capacity={MD_SHIFT} />
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5 }}>
+                    {`${fmtHours(MD_SHIFT - loadHrs)}h open in an ${MD_SHIFT}h shift`}
+                  </Typography>
+                </CardContent>
+              </Card>
+            );
+          })()}
+          {!sickDay && (
+            <Card variant="outlined" sx={{ bgcolor: '#F8FAFC', borderColor: '#E2E8F0' }}>
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Icon name="auto_awesome" size={16} color="#4338CA" />
+                  <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
+                    {day90
+                      ? 'Your day · oversight only · routine handled'
+                      : day30
+                        ? 'Your day · approvals and exceptions only'
+                        : 'Your day · ordered by priority · top items first'}
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
           {(() => {
             const ordered = orderByPriority(mdSchedule);
             // Day 30: show only Approval / Override review / Sign-off / Walkthrough on warning+
@@ -6539,11 +9003,41 @@ function ScheduleTab() {
                 ? ordered.filter(isStrategic)
                 : ordered;
             const hiddenCount = ordered.length - visible.length;
+            // Open the same ItemDetailSheet flow so the MD can drill into
+            // any of their own day's blocks.
+            const openMd = (it) => openItem && openItem({
+              id: it.id,
+              kind: it.kind,
+              title: it.title,
+              icon: it.icon,
+              tone: it.tone,
+              status: it.tone === 'error' ? 'Critical' : 'Queued',
+              location: it.location,
+              assignee: 'Mike F.',
+              time: it.time,
+              eta: it.dur,
+              note: it.note
+            });
             return (
               <>
-                {visible.map((item) => (
-                  <TimelineItem key={item.id} item={item} />
-                ))}
+                {visible.length > 0 && (
+                  <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+                    <Stack divider={<Divider />}>
+                      {visible.map((item, i) => {
+                        const isBreak = item.kind === 'Break' || /lunch|break/i.test(item.title || '');
+                        const anchored = i === 0 || isBreak;
+                        return (
+                          <ScheduleRow
+                            key={item.id}
+                            task={item}
+                            anchored={anchored}
+                            onClick={() => openMd(item)}
+                          />
+                        );
+                      })}
+                    </Stack>
+                  </Card>
+                )}
                 {hiddenCount > 0 && (
                   <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
                     <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -6568,7 +9062,7 @@ function ScheduleTab() {
               <Stack direction="row" spacing={1} alignItems="center">
                 <Icon name="auto_awesome" size={16} color="#4338CA" />
                 <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
-                  Operational coverage is balanced — the AI is monitoring drift, not assignments
+                  Coverage balanced. AI is watching drift, not assigning work
                 </Typography>
               </Stack>
             </CardContent>
@@ -6624,7 +9118,7 @@ function ScheduleTab() {
               <Stack direction="row" spacing={1} alignItems="center">
                 <Icon name="auto_awesome" size={16} color="#4338CA" />
                 <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
-                  AI pre-balanced the team from 30 days of completion patterns
+                  Team pre-balanced from 30 days of completion data
                 </Typography>
               </Stack>
             </CardContent>
@@ -6672,7 +9166,7 @@ function ScheduleTab() {
               <Stack direction="row" spacing={1} alignItems="center">
                 <Icon name="auto_awesome" size={16} color="#4338CA" />
                 <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600 }}>
-                  AI is recommending team assignments — still learning each tech's pace
+                  AI recommending assignments · still learning each tech's pace
                 </Typography>
               </Stack>
             </CardContent>
@@ -6872,10 +9366,25 @@ function AiActivityCard({ item, onContext, onUndo }) {
   );
 }
 
-function AiActivityList({ onContext, onUndo }) {
+function AiActivityList({ items, onContext, onUndo }) {
+  const list = items || aiActivity;
+  if (list.length === 0) {
+    return (
+      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Icon name="search_off" size={16} color="#64748B" />
+            <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+              No actions match your filters.
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Stack spacing={1}>
-      {aiActivity.map((a) => (
+      {list.map((a) => (
         <AiActivityCard key={a.id} item={a} onContext={onContext} onUndo={onUndo} />
       ))}
     </Stack>
@@ -6883,7 +9392,29 @@ function AiActivityList({ onContext, onUndo }) {
 }
 
 // Full-page AI activity view (replaces the prior bottom-sheet drawer).
+// Includes a search input and an action-type filter strip so the MD can
+// scan a longer window (72 hours) without losing the thread.
 function AiActivityTab({ onContext, onUndo }) {
+  const [query, setQuery] = React.useState('');
+  const [actionFilter, setActionFilter] = React.useState('all');
+  // Pull the unique action verbs from the activity log so the chip strip
+  // stays in sync with whatever data ships.
+  const actionTypes = React.useMemo(() => {
+    const seen = new Set();
+    aiActivity.forEach((a) => { if (a.action) seen.add(a.action); });
+    return ['all', ...Array.from(seen)];
+  }, []);
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return aiActivity.filter((a) => {
+      if (actionFilter !== 'all' && a.action !== actionFilter) return false;
+      if (!q) return true;
+      const hay = [a.title, a.detail, a.target, a.assignee, a.action, a.when]
+        .filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }, [query, actionFilter]);
+  const isFiltering = query.trim().length > 0 || actionFilter !== 'all';
   return (
     <Box sx={{ px: 1.5, pt: 1.5, pb: 1 }}>
       <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 1.5 }}>
@@ -6900,11 +9431,80 @@ function AiActivityTab({ onContext, onUndo }) {
             AI activity
           </Typography>
           <Typography variant="caption" sx={{ color: '#64748B' }}>
-            Last 24 hours · {aiActivity.length} actions · newest first
+            Last 72 hours · {isFiltering ? `${filtered.length} of ${aiActivity.length}` : `${aiActivity.length}`} actions · newest first
           </Typography>
         </Box>
       </Stack>
-      <AiActivityList onContext={onContext} onUndo={onUndo} />
+
+      {/* Search field — outlined per DSX, bold label above the field. */}
+      <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mb: 0.5 }}>
+        Search
+      </Typography>
+      <TextField
+        fullWidth
+        size="small"
+        placeholder="Search by work order, tech, location, action"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <Box sx={{ display: 'grid', placeItems: 'center', pr: 0.75 }}>
+              <Icon name="search" size={18} color="#64748B" />
+            </Box>
+          ),
+          endAdornment: query ? (
+            <IconButton size="small" onClick={() => setQuery('')} sx={{ mr: -0.5 }}>
+              <Icon name="close" size={16} />
+            </IconButton>
+          ) : null
+        }}
+        sx={{
+          mb: 1.25,
+          '.MuiOutlinedInput-root': { bgcolor: '#fff', fontSize: 13.5 },
+          '.MuiOutlinedInput-input': { py: '8px' }
+        }}
+      />
+
+      {/* Action-type filter strip — horizontally scrollable chip row. */}
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{
+          mb: 1.25,
+          overflowX: 'auto',
+          flexWrap: 'nowrap',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
+          mx: -1.5, px: 1.5, pb: 0.5
+        }}
+      >
+        {actionTypes.map((a) => {
+          const active = actionFilter === a;
+          const label = a === 'all' ? 'All' : a;
+          return (
+            <Chip
+              key={a}
+              clickable
+              onClick={() => setActionFilter(a)}
+              label={label}
+              size="small"
+              sx={{
+                height: 28,
+                flexShrink: 0,
+                bgcolor: active ? '#0065BD' : '#fff',
+                color: active ? '#fff' : '#334155',
+                border: '1px solid',
+                borderColor: active ? '#0065BD' : '#CBD5E1',
+                fontWeight: 700,
+                '.MuiChip-label': { px: 1.25, fontSize: 12.5 },
+                '&:hover': { bgcolor: active ? '#004A8A' : '#F8FAFC' }
+              }}
+            />
+          );
+        })}
+      </Stack>
+
+      <AiActivityList items={filtered} onContext={onContext} onUndo={onUndo} />
     </Box>
   );
 }
@@ -6940,7 +9540,7 @@ function AiActivitySheet({ open, onClose }) {
               AI activity
             </Typography>
             <Typography variant="caption">
-              Last 24 hours · {aiActivity.length} actions · newest first
+              Last 72 hours · {aiActivity.length} actions · newest first
             </Typography>
           </Box>
           <IconButton size="small" onClick={onClose}>
@@ -7024,6 +9624,17 @@ export default function App() {
   const [openedPattern, setOpenedPattern] = useState(null);
   const [coordPatternsOpen, setCoordPatternsOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
+  // Sick-day rebalance state machine.
+  //   sickEventState: 'idle' | 'running' | 'ready'
+  //   sickEventDetails: payload from AbsenceSheet (member, scope, …)
+  //   sickEventTraceIdx: how far the streaming reasoning has progressed.
+  const [sickEventState, setSickEventState] = useState('idle');
+  const [sickEventDetails, setSickEventDetails] = useState(null);
+  const [sickEventTraceIdx, setSickEventTraceIdx] = useState(0);
+  const [rebalanceReviewOpen, setRebalanceReviewOpen] = useState(false);
+  const [queueForAgentItem, setQueueForAgentItem] = useState(null);
+  const [spSheet, setSpSheet] = useState({ open: false, item: null });
+  const [spListSheet, setSpListSheet] = useState({ open: false, item: null });
   const [snoozeTarget, setSnoozeTarget] = useState(null);
   const [extraWorkOrders, setExtraWorkOrders] = useState([]);
   const [readinessTarget, setReadinessTarget] = useState(null);
@@ -7078,10 +9689,80 @@ export default function App() {
   const [workSeg, setWorkSeg] = useState('orders');
   const [highlight, setHighlight] = useState(null);
   const [openedItem, setOpenedItem] = useState(null);
+  // Snack accepts either a string ("hello") or an object
+  // ({ message, actionLabel, onAction }) so we can attach a CTA like
+  // "View in AI activity" to successful dispatch actions.
   const [snack, setSnack] = useState(null);
+  // Tracks items the MD has resolved (approved, overridden, dispatched).
+  // Hidden from the Dispatch screen for the rest of the session — refreshing
+  // the URL clears the set.
+  const [dispatchedIds, setDispatchedIds] = useState(() => new Set());
+  const markDispatched = React.useCallback((id) => {
+    if (!id) return;
+    setDispatchedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+  // Build a success snack with a deep-link back to AI activity (tab 5).
+  const successSnack = (message) => setSnack({
+    message,
+    actionLabel: 'View in AI activity',
+    onAction: () => { setTab(5); setSnack(null); }
+  });
 
   // Memoized so its identity stays stable across renders for the context.
   const openItem = React.useCallback((it) => setOpenedItem(it), []);
+
+  // Per-item resolution decisions made inside the ItemDetailSheet. Picked up
+  // by upstream drawers (OverrideSheet) so the priority row reflects what
+  // the MD just decided in the work-order detail.
+  const [itemResolutions, setItemResolutions] = useState({});
+  const recordResolution = React.useCallback((id, payload) => {
+    if (!id) return;
+    setItemResolutions((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...payload } }));
+  }, []);
+  const resolutionsValue = React.useMemo(
+    () => ({ resolutions: itemResolutions, recordResolution }),
+    [itemResolutions, recordResolution]
+  );
+
+  // Sick-day Mark-out → switch to Live mode, jump to Dispatch, kick off
+  // the scheduling-agent thinking flow. Steps stream in via a timed
+  // effect below.
+  const handleMarkOut = React.useCallback((payload) => {
+    setSickEventDetails(payload);
+    setSickEventState('running');
+    setSickEventTraceIdx(0);
+    setMode('sickDay');
+    setTab(0);
+    setStaffMember(null);
+    setSnack({
+      message: `${payload?.member?.name || 'Tech'} marked out · rebalancing the day`,
+    });
+  }, []);
+
+  // Streaming step animation while the agent is "thinking".
+  React.useEffect(() => {
+    if (sickEventState !== 'running') return undefined;
+    const steps = sickDayEvent.agentSteps.length;
+    if (sickEventTraceIdx >= steps) {
+      // Final beat — flip to "ready" so the review card replaces the
+      // running card on Dispatch.
+      const t = setTimeout(() => setSickEventState('ready'), 500);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setSickEventTraceIdx((i) => i + 1), 700);
+    return () => clearTimeout(t);
+  }, [sickEventState, sickEventTraceIdx]);
+
+  // Replay convenience — fires the agent loop again from step 0.
+  const replayRebalance = React.useCallback(() => {
+    setSickEventState('running');
+    setSickEventTraceIdx(0);
+  }, []);
 
   // Resolve a team member by name (used by the Staffing override CTA).
   const openStaffByName = React.useCallback((name) => {
@@ -7105,10 +9786,20 @@ export default function App() {
   const closeOverride = () => setOverrideOpen(false);
 
   const handleApprove = (item) => {
+    // Items that involve dispatching outsourced work open the service-
+    // provider sheet first so the MD can choose AI dispatch vs. manual.
+    const needsServiceProvider =
+      Array.isArray(item?.assignments)
+      && item.assignments.some((a) => /service provider/i.test(a.primary || a.label || ''));
+    if (needsServiceProvider) {
+      setSpSheet({ open: true, item });
+      return;
+    }
     const what =
       item?.recommendations ? item.recommendations[0]?.body
       : item?.recommended || item?.title || 'recommendation';
-    setSnack(`Approved · ${what}`);
+    markDispatched(item?.id);
+    successSnack(`Approved · ${what}`);
   };
 
   const handleFeedback = (kind) => {
@@ -7121,8 +9812,10 @@ export default function App() {
   };
 
   const handleOverrideChoice = (kind) => {
+    const id = overrideItem?.id;
     closeOverride();
-    setSnack(
+    markDispatched(id);
+    successSnack(
       kind === 'remember' ? 'New rule saved · AI will remember'
       : kind === 'once' ? 'Treated as one-time override'
       : 'Context added to this decision'
@@ -7202,6 +9895,8 @@ export default function App() {
    <ModeContext.Provider value={mode}>
     <HighlightContext.Provider value={highlight}>
     <ItemDetailContext.Provider value={openItem}>
+    <ItemResolutionsContext.Provider value={resolutionsValue}>
+    <MarkOutContext.Provider value={handleMarkOut}>
     <OpenPatternContext.Provider value={openPattern}>
     <ExtraWorkOrdersContext.Provider value={extraWorkOrders}>
     <OpenReadinessContext.Provider value={openReadiness}>
@@ -7237,7 +9932,7 @@ export default function App() {
           '&::-webkit-scrollbar': { display: 'none' }
         }}
       >
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} onViewStaff={openStaffByName} onSnooze={(it) => setSnoozeTarget(it)} onContext={(it) => setContextTarget({ id: it.id, when: it.receivedAgo || it.when, title: it.title })} onPatternsTile={() => setCoordPatternsOpen(true)} onRisksTile={() => setRisksOpen(true)} snoozedIds={extraWorkOrders.map((w) => w.id)} />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} onViewStaff={openStaffByName} onSnooze={(it) => setSnoozeTarget(it)} onContext={(it) => setContextTarget({ id: it.id, when: it.receivedAgo || it.when, title: it.title })} onPatternsTile={() => setCoordPatternsOpen(true)} onRisksTile={() => setRisksOpen(true)} onDismiss={markDispatched} onQueueForAgent={(wo) => setQueueForAgentItem(wo)} snoozedIds={extraWorkOrders.map((w) => w.id)} dispatchedIds={dispatchedIds} />}
       {tab === 1 && <ScheduleTab />}
       {tab === 2 && <WorkTab seg={workSeg} onSegChange={setWorkSeg} />}
       {tab === 3 && <KPIsTab onPatternsTile={() => setCoordPatternsOpen(true)} />}
@@ -7269,22 +9964,84 @@ export default function App() {
           onChange={(_, v) => setTab(v)}
           sx={{ height: 60 }}
         >
-          <BottomNavigationAction
-            label="Dispatch"
-            icon={
-              <Badge
-                color="error"
-                badgeContent={reviews.length + 1}
-                overlap="circular"
-                sx={{ '.MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}
-              >
-                <Icon name="bolt" size={22} />
-              </Badge>
+          {(() => {
+            // Pending pool = items the MD hasn't resolved or dismissed yet.
+            // For Error mode that's the unscheduled WOs minus any with a
+            // recorded resolution (assigned) or that landed in dispatchedIds
+            // (X-dismissed), PLUS any review cards still awaiting approval
+            // and the incoming work order if it hasn't been snoozed.
+            const TIER_ORDER = ['T1', 'T2', 'T3', 'T4'];
+            const TIER_BG = {
+              T1: '#DC2626',  // Critical / red
+              T2: '#F59E0B',  // High / amber
+              T3: '#FACC15',  // Medium / yellow
+              T4: '#64748B'   // Low / slate
+            };
+            let pendingWOs = [];
+            let pendingReviews = 0;
+            if (mode === 'sickDay') {
+              pendingWOs = agentOutageEvent.unscheduledWorkOrders.filter((wo) =>
+                !dispatchedIds.has(wo.id) && !(itemResolutions[wo.id]?.assignee)
+              );
+              pendingReviews = reviews.filter((r) => !dispatchedIds.has(r.id)).length;
+              if (!dispatchedIds.has(incomingWorkOrder.id) && !extraWorkOrders.find((w) => w.id === incomingWorkOrder.id)) {
+                pendingReviews += 1;
+              }
             }
-          />
+            const count = mode === 'sickDay'
+              ? pendingWOs.length + pendingReviews
+              : reviews.length + 1;
+            // Highest unresolved tier drives the badge color. Reviews count
+            // as T1 (they're approval-blocking decisions), so as long as
+            // any review is open the badge stays red.
+            const topTier = mode === 'sickDay'
+              ? (pendingReviews > 0
+                  ? 'T1'
+                  : TIER_ORDER.find((t) => pendingWOs.some((wo) => wo.tier === t)))
+              : 'T1';
+            const badgeBg = topTier ? TIER_BG[topTier] : '#DC2626';
+            return (
+              <BottomNavigationAction
+                label="Dispatch"
+                icon={
+                  count > 0 ? (
+                    <Badge
+                      badgeContent={count}
+                      overlap="circular"
+                      sx={{
+                        '.MuiBadge-badge': {
+                          fontSize: 10, height: 16, minWidth: 16, p: 0,
+                          bgcolor: badgeBg, color: '#fff'
+                        }
+                      }}
+                    >
+                      <Icon name="bolt" size={22} />
+                    </Badge>
+                  ) : (
+                    <Icon name="bolt" size={22} />
+                  )
+                }
+              />
+            );
+          })()}
           <BottomNavigationAction
             label="Schedule"
-            icon={<Icon name="calendar_month" size={22} />}
+            icon={
+              mode === 'sickDay' ? (
+                <Badge
+                  color="error"
+                  // Scheduling error → warning glyph on the Schedule tab
+                  // (the agent that's down owns this surface).
+                  badgeContent={<Icon name="priority_high" size={11} color="#fff" />}
+                  overlap="circular"
+                  sx={{ '.MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16, p: 0 } }}
+                >
+                  <Icon name="calendar_month" size={22} />
+                </Badge>
+              ) : (
+                <Icon name="calendar_month" size={22} />
+              )
+            }
           />
           <BottomNavigationAction
             label="Work"
@@ -7407,9 +10164,20 @@ export default function App() {
 
       <Snackbar
         open={Boolean(snack)}
-        autoHideDuration={2600}
+        autoHideDuration={typeof snack === 'object' && snack?.actionLabel ? 5000 : 2600}
         onClose={() => setSnack(null)}
-        message={snack}
+        message={typeof snack === 'string' ? snack : snack?.message}
+        action={
+          typeof snack === 'object' && snack?.actionLabel ? (
+            <Button
+              size="small"
+              onClick={snack.onAction}
+              sx={{ color: '#A5B4FC', fontWeight: 700, textTransform: 'none', minWidth: 'auto', px: 1 }}
+            >
+              {snack.actionLabel}
+            </Button>
+          ) : undefined
+        }
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         sx={{
           mb: 10,
@@ -7430,6 +10198,7 @@ export default function App() {
       open={Boolean(staffMember)}
       member={staffMember}
       onClose={() => setStaffMember(null)}
+      onMarkOut={handleMarkOut}
     />
     <PatternDetailSheet
       open={Boolean(openedPattern)}
@@ -7457,6 +10226,68 @@ export default function App() {
       }}
       onSnack={(msg) => setSnack(msg)}
     />
+    <QueueForAgentSheet
+      open={Boolean(queueForAgentItem)}
+      item={queueForAgentItem}
+      onClose={() => setQueueForAgentItem(null)}
+      onConfirm={(reminderId, reminderLabel) => {
+        const id = queueForAgentItem?.id;
+        setQueueForAgentItem(null);
+        // Record the queued state on the resolution so the card collapses
+        // into a "Queued for agent" summary in its original slot (the MD
+        // can still X-dismiss it from there).
+        if (id) {
+          recordResolution(id, { queued: true, reminderId, reminderLabel });
+        }
+        const reminderCopy = reminderId === 'none'
+          ? 'no reminder set'
+          : `remind ${reminderLabel.toLowerCase()}`;
+        successSnack(`Queued for agent · ${reminderCopy}`);
+      }}
+    />
+    <ServiceProviderSheet
+      open={spSheet.open}
+      item={spSheet.item}
+      onClose={() => setSpSheet({ open: false, item: null })}
+      onAiDispatch={(vendor) => {
+        const id = spSheet.item?.id;
+        setSpSheet({ open: false, item: null });
+        markDispatched(id);
+        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`);
+      }}
+      onManualCreate={(vendor) => {
+        const id = spSheet.item?.id;
+        setSpSheet({ open: false, item: null });
+        markDispatched(id);
+        successSnack(`Service-request form opened · ${vendor}`);
+      }}
+      onViewMore={() => {
+        setSpListSheet({ open: true, item: spSheet.item });
+        setSpSheet({ open: false, item: null });
+      }}
+    />
+    <ServiceProviderListSheet
+      open={spListSheet.open}
+      item={spListSheet.item}
+      onClose={() => setSpListSheet({ open: false, item: null })}
+      onBack={() => {
+        const it = spListSheet.item;
+        setSpListSheet({ open: false, item: null });
+        setSpSheet({ open: true, item: it });
+      }}
+      onAiDispatch={(vendor) => {
+        const id = spListSheet.item?.id;
+        setSpListSheet({ open: false, item: null });
+        markDispatched(id);
+        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`);
+      }}
+      onManualCreate={(vendor) => {
+        const id = spListSheet.item?.id;
+        setSpListSheet({ open: false, item: null });
+        markDispatched(id);
+        successSnack(`Service-request form opened · ${vendor}`);
+      }}
+    />
     <ForecastedRisksSheet
       open={risksOpen}
       onClose={() => setRisksOpen(false)}
@@ -7468,6 +10299,8 @@ export default function App() {
     </OpenReadinessContext.Provider>
     </ExtraWorkOrdersContext.Provider>
     </OpenPatternContext.Provider>
+    </MarkOutContext.Provider>
+    </ItemResolutionsContext.Provider>
     </ItemDetailContext.Provider>
     </HighlightContext.Provider>
    </ModeContext.Provider>
