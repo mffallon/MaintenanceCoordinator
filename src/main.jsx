@@ -94,7 +94,17 @@ const theme = createTheme({
     // frame's `transform: translateZ(0)` containing block instead of the
     // browser viewport. This prevents drawers/menus from extending wider
     // than the phone bounds on desktop.
-    MuiDrawer: { defaultProps: { disableScrollLock: true, disablePortal: true } },
+    MuiDrawer: {
+      defaultProps: { disableScrollLock: true, disablePortal: true },
+      styleOverrides: {
+        // Bottom drawers cap at the device-stage height minus the AppBar
+        // (~88 px). vh-based sizing in component PaperProps resolves
+        // against the browser viewport, so on tall desktop windows the
+        // drawer would otherwise grow larger than the 874 px iPhone frame
+        // and cover the AppBar.
+        paperAnchorBottom: { maxHeight: 'calc(100% - 88px) !important' }
+      }
+    },
     MuiDialog: { defaultProps: { disableScrollLock: true, disablePortal: true } },
     MuiModal: { defaultProps: { disableScrollLock: true, disablePortal: true } },
     MuiPopover: { defaultProps: { disableScrollLock: true, disablePortal: true } },

@@ -4,7 +4,7 @@ import {
   Stack, Button, Alert, AlertTitle, LinearProgress, Divider, BottomNavigation,
   BottomNavigationAction, Drawer, Paper, Snackbar, Avatar
 } from '@mui/material';
-import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails, incomingWorkOrder, coordinationPatterns, forecastedRisksPrevented, sickDayEvent, agentOutageEvent, teamIntelligence, buildingIntelligence, observedPatterns, trustedKnowledge } from './data.js';
+import { community, readiness, aiBanner, weather, tiers, reviews, mdSchedule, team, rescheduleOptions, tasksList, aiActivity, calibration, day30TeamNotes, predictiveWorkOrders, predictiveReviews, forecasts, learnedPatterns, backlog, unitTurns, services, day1Status, learningSignals, day30Status, day90Status, predictiveInsights, operationalPriorities, day1StaffingConflict, day1PmTradeoff, day1LearningHighlight, routineRollup, day30Readiness, day90Health, strategicRisks, teamFocus, day90Coverage, day1MetricDetails, incomingWorkOrder, coordinationPatterns, forecastedRisksPrevented, sickDayEvent, agentOutageEvent, teamIntelligence, buildingIntelligence, observedPatterns, trustedKnowledge, teamForecast } from './data.js';
 import { ToggleButton, ToggleButtonGroup, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, Grow, Menu, MenuItem } from '@mui/material';
 import tierCriticalIcon from './assets/priority/critical.png';
 import tierHighIcon from './assets/priority/high.png';
@@ -1763,7 +1763,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
                   <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.5 }}>
                     <Icon name="model_training" size={14} color="#4338CA" />
                     <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-                      The AI noticed
+                      I noticed something
                     </Typography>
                   </Stack>
                   <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.25, display: 'block' }}>
@@ -4594,7 +4594,7 @@ function Day1WorkCard({ task, tier, tierNum, onReason, onApprove, onOverride }) 
           <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.375 }}>
             <Icon name="auto_awesome" size={13} color="#4338CA" />
             <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-              AI recommends
+              What I’d do
             </Typography>
             {task.needsReview && (
               <Chip
@@ -4943,7 +4943,7 @@ function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContex
             <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
               <Icon name="auto_awesome" size={13} color="#4338CA" />
               <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-                AI suggests
+                What I’d do
               </Typography>
             </Stack>
           )}
@@ -5588,7 +5588,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
               ))}
             </Stack>
 
-            <SectionHeader icon="event_repeat" title="PM tradeoff" sub="One deferrable item the AI flagged" />
+            <SectionHeader icon="event_repeat" title="PM tradeoff" sub="One deferrable item I flagged" />
             <Box sx={{ mb: 1.75 }}>
               <PmTradeoffCard
                 item={day1PmTradeoff}
@@ -6834,6 +6834,7 @@ function ItemDetailSheet({ open, item, onClose }) {
     : 'info');
   const statusBg = toneBg(tone);
   return (
+   <>
     <Drawer
       anchor="bottom"
       open={open}
@@ -7025,7 +7026,7 @@ function ItemDetailSheet({ open, item, onClose }) {
                       <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.375 }}>
                         <Icon name="model_training" size={13} color="#4338CA" />
                         <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-                          The AI noticed
+                          I noticed something
                         </Typography>
                       </Stack>
                       <Typography variant="caption" sx={{ color: '#0F172A', lineHeight: 1.25, display: 'block', mb: 0.75 }}>
@@ -7180,7 +7181,7 @@ function ItemDetailSheet({ open, item, onClose }) {
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 700, display: 'block', lineHeight: 1.2 }}>
-                      AI recommends · Outsource to Service Provider
+                      I’d outsource this to a service provider
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#3730A3', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
                       In-house team can't complete the repair before tomorrow's 10 AM move-in. Apex Mechanical has same-day availability.
@@ -7465,82 +7466,6 @@ function ItemDetailSheet({ open, item, onClose }) {
           </Box>
         </Drawer>
 
-        {/* Duration editor drawer — preset list + AI feedback note. */}
-        {(() => {
-          const baseEta = typeof eta === 'string' ? eta : formatDur(eta);
-          const currentEta = durationOverride || baseEta;
-          const DURATION_OPTIONS = ['15m', '30m', '45m', '1h', '1h 30m', '2h', '2h 30m', '3h', '4h', '6h', '8h'];
-          return (
-            <Drawer
-              anchor="bottom"
-              open={durationOpen}
-              onClose={() => setDurationOpen(false)}
-              PaperProps={{
-                sx: {
-                  borderTopLeftRadius: 20, borderTopRightRadius: 20,
-                  maxHeight: '70vh', pb: 'env(safe-area-inset-bottom)',
-                  display: 'flex', flexDirection: 'column'
-                }
-              }}
-            >
-              <Box sx={{ pt: 1 }}>
-                <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
-              </Box>
-              <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
-                      Adjust estimated duration
-                    </Typography>
-                    <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
-                      {title}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, mt: 0.25, display: 'block' }}>
-                      AI proposed · {baseEta}
-                    </Typography>
-                  </Box>
-                  <IconButton size="small" onClick={() => setDurationOpen(false)}>
-                    <Icon name="close" size={20} />
-                  </IconButton>
-                </Stack>
-              </Box>
-              <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
-                  CHOOSE A DURATION
-                </Typography>
-                <Stack direction="row" spacing={0.625} flexWrap="wrap" useFlexGap>
-                  {DURATION_OPTIONS.map((opt) => {
-                    const active = opt === currentEta;
-                    return (
-                      <Chip
-                        key={opt}
-                        clickable
-                        onClick={() => {
-                          setDurationOverride(opt);
-                          setDurationOpen(false);
-                          if (opt !== baseEta) setDurationLearn({ from: baseEta, to: opt });
-                          else setDurationLearn(null);
-                        }}
-                        label={opt}
-                        sx={{
-                          height: 34, minWidth: 64,
-                          bgcolor: active ? '#0F172A' : '#fff',
-                          color: active ? '#fff' : '#334155',
-                          border: '1px solid',
-                          borderColor: active ? '#0F172A' : '#CBD5E1',
-                          fontWeight: 700,
-                          '.MuiChip-label': { px: 1.25, fontSize: 13 },
-                          '&:hover': { bgcolor: active ? '#1E293B' : '#F8FAFC' }
-                        }}
-                      />
-                    );
-                  })}
-                </Stack>
-              </Box>
-            </Drawer>
-          );
-        })()}
-
         {note && (
           <Box sx={{ mb: 1.25 }}>
             <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.5 }}>
@@ -7644,6 +7569,89 @@ function ItemDetailSheet({ open, item, onClose }) {
         </Stack>
       </Box>
     </Drawer>
+    {/* Duration editor drawer — sibling of the outer sheet so its slide-in
+        doesn't reflow the parent paper. */}
+    {(() => {
+      const baseEta = typeof eta === 'string' ? eta : formatDur(eta);
+      const currentEta = durationOverride || baseEta;
+      const DURATION_OPTIONS = ['15m', '30m', '45m', '1h', '1h 30m', '2h', '2h 30m', '3h', '4h', '6h', '8h'];
+      return (
+        <Drawer
+          anchor="bottom"
+          open={durationOpen}
+          onClose={() => setDurationOpen(false)}
+          hideBackdrop
+          keepMounted
+          disableAutoFocus
+          disableEnforceFocus
+          disableRestoreFocus
+          PaperProps={{
+            sx: {
+              borderTopLeftRadius: 20, borderTopRightRadius: 20,
+              maxHeight: '70vh', pb: 'env(safe-area-inset-bottom)',
+              display: 'flex', flexDirection: 'column',
+              boxShadow: '0 -12px 32px rgba(2,6,23,0.18)'
+            }
+          }}
+        >
+          <Box sx={{ pt: 1 }}>
+            <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+          </Box>
+          <Box sx={{ px: 2, pt: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+                  Adjust estimated duration
+                </Typography>
+                <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+                  {title}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, mt: 0.25, display: 'block' }}>
+                  AI proposed · {baseEta}
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={() => setDurationOpen(false)}>
+                <Icon name="close" size={20} />
+              </IconButton>
+            </Stack>
+          </Box>
+          <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
+              CHOOSE A DURATION
+            </Typography>
+            <Stack direction="row" spacing={0.625} flexWrap="wrap" useFlexGap>
+              {DURATION_OPTIONS.map((opt) => {
+                const active = opt === currentEta;
+                return (
+                  <Chip
+                    key={opt}
+                    clickable
+                    onClick={() => {
+                      setDurationOverride(opt);
+                      setDurationOpen(false);
+                      if (opt !== baseEta) setDurationLearn({ from: baseEta, to: opt });
+                      else setDurationLearn(null);
+                    }}
+                    label={opt}
+                    sx={{
+                      height: 34, minWidth: 64,
+                      bgcolor: active ? '#0F172A' : '#fff',
+                      color: active ? '#fff' : '#334155',
+                      border: '1px solid',
+                      borderColor: active ? '#0F172A' : '#CBD5E1',
+                      fontWeight: 700,
+                      '.MuiChip-label': { px: 1.25, fontSize: 13 },
+                      '&:hover': { bgcolor: active ? '#1E293B' : '#F8FAFC' }
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+          </Box>
+        </Drawer>
+      );
+    })()}
+   </>
   );
 }
 
@@ -8250,12 +8258,659 @@ function ScheduleRow({ task, onClick, anchored = false }) {
 // Bottom drawer used to log a tech absence (e.g. called in sick). The
 // MD picks a scope; on Save the parent receives the absence payload and
 // can fire the rebalance flow (switch to sickDay mode, etc.).
+// Streaming "agent reasoning" view shown after Mark out → before review.
+function AbsenceRebalanceThinking({ member, traceIdx }) {
+  const steps = sickDayEvent.agentSteps;
+  return (
+    <Box>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <CircularProgress size={14} thickness={6} sx={{ color: '#4338CA' }} />
+        <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 700 }}>
+          Working through {member.name.split(/\s|\./)[0]}’s shift
+        </Typography>
+      </Stack>
+      <Stack spacing={0.625}>
+        {steps.map((s, i) => {
+          const state = i < traceIdx ? 'done' : i === traceIdx ? 'active' : 'pending';
+          return (
+            <Stack key={s.id} direction="row" spacing={0.875} alignItems="flex-start">
+              <Box
+                sx={{
+                  width: 18, height: 18, borderRadius: '50%', flexShrink: 0, mt: '1px',
+                  bgcolor: state === 'done' ? '#DCFCE7' : state === 'active' ? '#EEF2FF' : '#F1F5F9',
+                  border: '1px solid',
+                  borderColor: state === 'done' ? '#86EFAC' : state === 'active' ? '#A5B4FC' : '#E2E8F0',
+                  display: 'grid', placeItems: 'center'
+                }}
+              >
+                {state === 'done' ? (
+                  <Icon name="check" size={11} color="#15803D" />
+                ) : state === 'active' ? (
+                  <CircularProgress size={10} thickness={6} sx={{ color: '#4338CA' }} />
+                ) : null}
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 700, display: 'block', lineHeight: 1.25,
+                    color: state === 'pending' ? '#94A3B8' : '#0F172A'
+                  }}
+                >
+                  {s.label}
+                </Typography>
+                {state !== 'pending' && (
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.3 }}>
+                    {s.detail}
+                  </Typography>
+                )}
+              </Box>
+            </Stack>
+          );
+        })}
+      </Stack>
+    </Box>
+  );
+}
+
+// Per-day breakdown of what the agent decided, with issue callouts:
+// (1) too many top-tier items competing for today, and
+// (2) receiving techs now over their shift capacity.
+function AbsenceRebalanceReview({ member }) {
+  const openItem = useOpenItem();
+  // Toggle between the day-grouped list and a per-tech breakdown.
+  const [view, setView] = React.useState('day');
+  // Group reassignments by day.
+  const byDay = sickDayEvent.changes.reduce((acc, c) => {
+    (acc[c.dayKey] ||= []).push(c);
+    return acc;
+  }, {});
+  // Group by the receiving technician.
+  const byTech = sickDayEvent.changes.reduce((acc, c) => {
+    const t = c.after?.tech;
+    if (!t) return acc;
+    (acc[t] ||= []).push(c);
+    return acc;
+  }, {});
+  const DAY_ORDER = [
+    { key: 'today', label: 'Today · Sat, May 16' },
+    { key: 'sun',   label: 'Sun, May 17' },
+    { key: 'mon',   label: 'Mon, May 18' }
+  ];
+
+  // Issues:
+  //   (a) Critical/high stacking — count error+warning items today.
+  //   (b) Tech overload — receiving techs whose live shift load now
+  //       exceeds capacity (simulated by counting incoming items).
+  const todayItems = byDay.today || [];
+  const criticalToday = todayItems.filter((c) =>
+    (c.task?.tone === 'error' || c.task?.tone === 'warning' || c.task?.kind === 'Critical' || c.task?.kind === 'High')
+  ).length;
+  // Only call out receiving techs whose day would have gone over capacity
+  // — naturally-fitting techs (e.g. Diane K. at 7.3h/8h) don't need a
+  // flag. For overcap techs, compute the agent's deferral and describe
+  // the rebalance outcome inline.
+  const techIncoming = todayItems.reduce((acc, c) => {
+    const t = c.after?.tech;
+    if (!t) return acc;
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  const TONE_RANK_ISSUES = { error: 0, warning: 1, info: 2, success: 3, default: 4 };
+  const overcapReceivers = Object.entries(techIncoming)
+    .map(([techName, count]) => {
+      const tm = team.find((t) => t.name === techName);
+      if (!tm) return null;
+      const incomingHrs = todayItems
+        .filter((c) => c.after?.tech === techName)
+        .reduce((s, c) => s + parseDur(c.after?.dur || '0m'), 0);
+      const before = tm.load || 0;
+      const after = before + incomingHrs;
+      if (after <= tm.capacity) return null;
+      // Replicate the agent's defer-from-routine logic to surface count.
+      const candidates = (tm.tasks || [])
+        .filter((t) => t.kind !== 'Break' && (TONE_RANK_ISSUES[t.tone || 'default'] ?? 4) >= 3)
+        .slice()
+        .sort((a, b) => (TONE_RANK_ISSUES[b.tone || 'default'] ?? 4) - (TONE_RANK_ISSUES[a.tone || 'default'] ?? 4));
+      let overHrs = after - tm.capacity;
+      const deferred = [];
+      for (const t of candidates) {
+        if (overHrs <= 0) break;
+        deferred.push(t);
+        overHrs -= parseDur(t.dur);
+      }
+      const stillOver = overHrs > 0;
+      return { techName, count, deferred, stillOver };
+    })
+    .filter(Boolean);
+
+  const issues = [];
+  if (criticalToday >= 3) {
+    issues.push({
+      level: 'high',
+      icon: 'priority_high',
+      label: `${criticalToday} top-tier items competing for today`,
+      detail: 'High and critical work alone exceeds a clean shift. Some non-critical items must move out of Today.'
+    });
+  }
+  overcapReceivers.forEach(({ techName, count, deferred, stillOver }) => {
+    const memberFirst = member.name.split(/\s|\./)[0];
+    issues.push({
+      level: stillOver ? 'high' : 'medium',
+      icon: 'group',
+      label: stillOver
+        ? `${techName} still over capacity after rebalance`
+        : `${techName} rebalanced · ${count} from ${memberFirst}, ${deferred.length} routine item${deferred.length === 1 ? '' : 's'} deferred`,
+      detail: stillOver
+        ? 'Not enough routine items to free up the shift. Reassign or override critical work to clear the overage.'
+        : 'The agent moved their lowest-priority routine items to Sun, May 17 to keep them in shift. Tap the deferred rows to override.'
+    });
+  });
+
+  return (
+    <Box>
+      {/* Summary strip */}
+      <Box
+        sx={{
+          bgcolor: '#EEF2FF', border: '1px solid #C7D2FE',
+          borderRadius: 1.5, p: 1, mb: 1.25
+        }}
+      >
+        <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.375 }}>
+          <Icon name="auto_awesome" size={13} color="#4338CA" />
+          <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
+            What the agent did
+          </Typography>
+        </Stack>
+        <Typography variant="caption" sx={{ color: '#0F172A', display: 'block', lineHeight: 1.35 }}>
+          Critical work stayed today. The rest pushed to Sun · Mon to keep the team inside shift capacity. {sickDayEvent.summary.staysToday} today, {sickDayEvent.summary.bumpsSun} on Sun, {sickDayEvent.summary.bumpsMon} on Mon.
+        </Typography>
+      </Box>
+
+      {/* Issues */}
+      {issues.length > 0 && (
+        <Box
+          sx={{
+            bgcolor: '#FEF2F2', border: '1px solid #FCA5A5',
+            borderRadius: 1.5, p: 1, mb: 1.25
+          }}
+        >
+          <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.5 }}>
+            <Icon name="warning" size={13} color="#B91C1C" />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C' }}>
+              Issues to review
+            </Typography>
+          </Stack>
+          <Stack spacing={0.625}>
+            {issues.map((iss, i) => (
+              <Stack key={i} direction="row" spacing={0.625} alignItems="flex-start">
+                <Icon name={iss.icon} size={13} color={iss.level === 'high' ? '#B91C1C' : '#92400E'} sx={{ mt: '2px', flexShrink: 0 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#7F1D1D', display: 'block', lineHeight: 1.25 }}>
+                    {iss.label}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.3 }}>
+                    {iss.detail}
+                  </Typography>
+                </Box>
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+      )}
+
+      {/* View toggle — same data, two cuts of it. */}
+      <ToggleButtonGroup
+        size="small"
+        exclusive
+        fullWidth
+        value={view}
+        onChange={(_, v) => v && setView(v)}
+        sx={{
+          mb: 1.5,
+          bgcolor: '#E0E4E7',
+          borderRadius: '4px',
+          overflow: 'hidden',
+          '.MuiToggleButton-root': {
+            flex: 1, py: '8px', px: '12px',
+            fontSize: 13, lineHeight: '18px', letterSpacing: '-0.176px',
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontWeight: 600, textTransform: 'none',
+            color: 'rgba(0,0,0,0.87)', bgcolor: '#E0E4E7',
+            border: 'none', borderRadius: 0,
+            '&:not(:last-of-type)': { borderRight: '1px solid rgba(0,0,0,0.12)' },
+            '&:hover': { bgcolor: '#D1D6DA' }
+          },
+          '.Mui-selected': {
+            bgcolor: '#0065BD !important', color: '#FFFFFF !important',
+            '&:hover': { bgcolor: '#004A8A !important' }
+          }
+        }}
+      >
+        <ToggleButton value="day">By day</ToggleButton>
+        <ToggleButton value="tech">By tech</ToggleButton>
+      </ToggleButtonGroup>
+
+      {/* Per-day breakdown */}
+      {view === 'day' && DAY_ORDER.map(({ key, label }) => {
+        const items = byDay[key] || [];
+        if (items.length === 0) return null;
+        return (
+          <Box key={key} sx={{ mb: 1.25 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.625 }}>
+              <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 800, letterSpacing: 0.2, fontSize: 11.5 }}>
+                {label.toUpperCase()}
+              </Typography>
+              <Chip
+                size="small"
+                label={`${items.length} change${items.length === 1 ? '' : 's'}`}
+                sx={{
+                  height: 18, fontSize: 10.5, fontWeight: 700,
+                  bgcolor: '#F1F5F9', color: '#0F172A',
+                  '.MuiChip-label': { px: 0.75 }
+                }}
+              />
+            </Stack>
+            <Stack spacing={0.625}>
+              {items.map((c) => {
+                const tone = c.task?.tone || 'default';
+                const barColor = tone === 'error' ? '#DC2626'
+                  : tone === 'warning' ? '#F59E0B'
+                  : tone === 'info' ? '#2563EB'
+                  : tone === 'success' ? '#10B981'
+                  : '#CBD5E1';
+                return (
+                  <Card
+                    key={c.id}
+                    variant="outlined"
+                    sx={{
+                      borderColor: '#E2E8F0',
+                      borderLeftWidth: 4, borderLeftColor: barColor
+                    }}
+                  >
+                    <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                      <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', lineHeight: 1.25 }}>
+                        {c.task?.title}
+                      </Typography>
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }} flexWrap="wrap" useFlexGap>
+                        <Chip
+                          size="small"
+                          label={`${c.before?.tech || '—'} → ${c.after?.tech || '—'}`}
+                          sx={{
+                            height: 18, fontSize: 10, fontWeight: 700,
+                            bgcolor: '#EFF6FF', color: '#0065BD',
+                            '.MuiChip-label': { px: 0.625 }
+                          }}
+                        />
+                        {c.after?.time && (
+                          <Typography variant="caption" sx={{ color: '#64748B', fontSize: 10.5 }}>
+                            {c.after.time} · {c.after.dur}
+                          </Typography>
+                        )}
+                      </Stack>
+                      {c.reason && (
+                        <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.375, lineHeight: 1.3, fontStyle: 'italic' }}>
+                          {c.reason}
+                        </Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+          </Box>
+        );
+      })}
+
+      {/* Per-tech breakdown — group by the receiving technician. */}
+      {view === 'tech' && Object.entries(byTech).map(([techName, items]) => {
+        const teamMember = team.find((t) => t.name === techName);
+        const capacity = teamMember?.capacity || 8;
+        const existingLoad = teamMember?.load || 0;
+        // Total incoming minutes today only (the load-impact chip
+        // describes the same-day delta).
+        const todayItems = items.filter((c) => c.dayKey === 'today');
+        const incomingTodayHrs = todayItems.reduce((s, c) => s + parseDur(c.after?.dur || '0m'), 0);
+        const newTodayLoad = existingLoad + incomingTodayHrs;
+        const overToday = newTodayLoad > capacity;
+        const sunCount = items.filter((c) => c.dayKey === 'sun').length;
+        const monCount = items.filter((c) => c.dayKey === 'mon').length;
+        // When the tech ends up overcap, defer their lowest-priority
+        // routine items (default/success tone) until they're back inside
+        // the shift. Computed at the tech level so the LOAD IMPACT chip
+        // can reflect the post-defer numbers.
+        const todayExisting = (teamMember?.tasks || []).filter((t) => t.kind !== 'Break');
+        const techDeferred = (() => {
+          if (!overToday || todayExisting.length === 0) return [];
+          const TONE_RANK = { error: 0, warning: 1, info: 2, success: 3, default: 4 };
+          const candidates = todayExisting
+            .filter((t) => (TONE_RANK[t.tone || 'default'] ?? 4) >= 3)
+            .slice()
+            .sort((a, b) => (TONE_RANK[b.tone || 'default'] ?? 4) - (TONE_RANK[a.tone || 'default'] ?? 4));
+          const picked = [];
+          let overHrs = newTodayLoad - capacity;
+          for (const t of candidates) {
+            if (overHrs <= 0) break;
+            picked.push(t);
+            overHrs -= parseDur(t.dur);
+          }
+          return picked;
+        })();
+        const techDeferredHrs = techDeferred.reduce((s, t) => s + parseDur(t.dur), 0);
+        const finalTodayLoad = newTodayLoad - techDeferredHrs;
+        const finalOver = finalTodayLoad > capacity;
+        const rebalanced = overToday && !finalOver && techDeferred.length > 0;
+        // Group this tech's incoming items by day for display.
+        const techByDay = items.reduce((acc, c) => {
+          (acc[c.dayKey] ||= []).push(c);
+          return acc;
+        }, {});
+        return (
+          <Box key={techName} sx={{ mb: 1.5 }}>
+            <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
+              <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                {/* Tech header */}
+                <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1 }}>
+                  <Avatar sx={{ bgcolor: '#E2E8F0', color: '#0F172A', width: 32, height: 32, fontSize: 12 }}>
+                    {getInitials(techName)}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+                      {techName}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748B' }}>
+                      {teamMember?.role || 'Team member'} · receiving {items.length} item{items.length === 1 ? '' : 's'}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                {/* Same-day load impact (only when receiving items today).
+                    Uses post-defer numbers when the agent had to push
+                    routine items to Sun to keep the tech inside capacity. */}
+                {todayItems.length > 0 && (
+                  <Box
+                    sx={{
+                      bgcolor: finalOver ? '#FEF2F2' : '#F8FAFC',
+                      border: '1px solid',
+                      borderColor: finalOver ? '#FCA5A5' : '#E2E8F0',
+                      borderRadius: 1.5, p: 0.875, mb: 1
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.375 }} flexWrap="wrap" useFlexGap>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, letterSpacing: 0.2, fontSize: 10 }}>
+                          TODAY · LOAD IMPACT
+                        </Typography>
+                        {rebalanced && (
+                          <Chip
+                            size="small"
+                            icon={<Icon name="autorenew" size={10} color="#0065BD" sx={{ ml: 0.5 }} />}
+                            label="rebalanced"
+                            sx={{
+                              height: 16, fontSize: 9.5, fontWeight: 700,
+                              bgcolor: '#EFF6FF', color: '#0065BD',
+                              '.MuiChip-label': { px: 0.5 }
+                            }}
+                          />
+                        )}
+                      </Stack>
+                      <Chip
+                        size="small"
+                        label={finalOver
+                          ? `Over by ${fmtHours(finalTodayLoad - capacity)}h`
+                          : `${fmtHours(capacity - finalTodayLoad)}h open after`}
+                        sx={{
+                          height: 17, fontSize: 10, fontWeight: 700,
+                          bgcolor: finalOver ? '#FEE2E2' : '#DCFCE7',
+                          color: finalOver ? '#B91C1C' : '#15803D',
+                          '.MuiChip-label': { px: 0.625 }
+                        }}
+                      />
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.3 }}>
+                      Before {fmtHours(existingLoad)}h / {capacity}h shift
+                      {' · '}+{fmtHours(incomingTodayHrs)}h from {member.name.split(/\s|\./)[0]}
+                      {techDeferred.length > 0 && ` · −${fmtHours(techDeferredHrs)}h deferred to Sun`}
+                      {' → '}{fmtHours(finalTodayLoad)}h
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Sun / Mon adds (no load math — fresh days) */}
+                {(sunCount > 0 || monCount > 0) && (
+                  <Stack direction="row" spacing={0.5} sx={{ mb: 1 }}>
+                    {sunCount > 0 && (
+                      <Chip
+                        size="small"
+                        label={`Sun · +${sunCount}`}
+                        sx={{ height: 18, fontSize: 10.5, bgcolor: '#EFF6FF', color: '#0065BD', fontWeight: 700, '.MuiChip-label': { px: 0.625 } }}
+                      />
+                    )}
+                    {monCount > 0 && (
+                      <Chip
+                        size="small"
+                        label={`Mon · +${monCount}`}
+                        sx={{ height: 18, fontSize: 10.5, bgcolor: '#EFF6FF', color: '#0065BD', fontWeight: 700, '.MuiChip-label': { px: 0.625 } }}
+                      />
+                    )}
+                  </Stack>
+                )}
+
+                {/* Per-day breakdown: existing shift items, items being
+                    added in from {member.name}, and (for overcap techs)
+                    a deferred item to bring them back to capacity. */}
+                <Stack spacing={1}>
+                  {DAY_ORDER.map(({ key, label }) => {
+                    const dayItems = techByDay[key] || [];
+                    if (dayItems.length === 0) return null;
+                    // Existing schedule per day. Today comes from the
+                    // tech's `team.tasks` data; Sun/Mon come from
+                    // `teamForecast` so the MD can see the rest of the
+                    // receiving tech's day on those future dates too.
+                    const existing = (() => {
+                      if (!teamMember) return [];
+                      if (key === 'today') {
+                        return teamMember.tasks.filter((t) => t.kind !== 'Break');
+                      }
+                      const fc = teamForecast?.[key]?.[teamMember.id] || [];
+                      return fc.filter((t) => t.kind !== 'Break');
+                    })();
+                    // Reuse the tech-level deferred list (computed above)
+                    // for today; Sun/Mon never trigger deferral.
+                    const deferred = key === 'today' ? techDeferred : [];
+                    const deferredIds = new Set(deferred.map((d) => d.title));
+                    const stillOnShift = existing.filter((t) => !deferredIds.has(t.title));
+                    return (
+                      <Box key={key}>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, letterSpacing: 0.2, fontSize: 10, display: 'block', mb: 0.5 }}>
+                          {label.replace('Today · ', '').toUpperCase()}
+                        </Typography>
+
+                        {/* Combined shift list: existing items + items
+                            being added from {member.name}, all sorted by
+                            priority (Critical → High → Medium → routine).
+                            Added items keep the green '+' icon so they're
+                            still identifiable in the mix. */}
+                        {(stillOnShift.length + dayItems.length) > 0 && (() => {
+                          const TONE_RANK = { error: 0, warning: 1, info: 2, success: 3, default: 4 };
+                          const tagged = [
+                            ...stillOnShift.map((t, i) => ({
+                              kind: 'shift',
+                              tone: t.tone || 'default',
+                              title: t.title,
+                              dur: t.dur,
+                              time: t.time,
+                              raw: t,
+                              idx: i
+                            })),
+                            ...dayItems.map((c) => ({
+                              kind: 'added',
+                              tone: c.task?.tone || 'default',
+                              title: c.task?.title,
+                              dur: c.after?.dur,
+                              time: c.after?.time,
+                              raw: c
+                            }))
+                          ].sort((a, b) => (TONE_RANK[a.tone] ?? 4) - (TONE_RANK[b.tone] ?? 4));
+                          return (
+                            <Box sx={{ mb: deferred.length > 0 ? 0.75 : 0 }}>
+                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, fontSize: 10, display: 'block', mb: 0.25 }}>
+                                ON SHIFT · ORDERED BY PRIORITY
+                              </Typography>
+                              <Stack spacing={0.25} sx={{ pl: 0.5 }}>
+                                {tagged.map((item, i) => {
+                                  const isAdded = item.kind === 'added';
+                                  const onTap = (e) => {
+                                    e.stopPropagation();
+                                    if (!openItem) return;
+                                    if (isAdded) {
+                                      const c = item.raw;
+                                      openItem({
+                                        id: c.id,
+                                        kind: c.task?.kind || 'Reassigned task',
+                                        title: c.task?.title,
+                                        icon: c.task?.icon,
+                                        tone: c.task?.tone,
+                                        status: 'Reassigned',
+                                        location: c.task?.location,
+                                        assignee: teamMember?.name,
+                                        time: c.after?.time,
+                                        eta: c.after?.dur,
+                                        note: c.reason,
+                                        priority: c.task?.kind === 'Critical' ? 'Critical'
+                                          : c.task?.kind === 'High' ? 'High'
+                                          : c.task?.kind === 'Medium' ? 'Medium' : undefined
+                                      });
+                                    } else {
+                                      const t = item.raw;
+                                      openItem({
+                                        id: `${teamMember.id}__shift-${item.idx}`,
+                                        kind: t.kind || 'Scheduled task',
+                                        title: t.title,
+                                        icon: t.icon,
+                                        tone: t.tone,
+                                        status: t.kind === 'Critical' ? 'Critical' : 'Queued',
+                                        location: t.location,
+                                        assignee: teamMember.name,
+                                        time: t.time,
+                                        eta: t.dur,
+                                        note: t.note,
+                                        priority: t.kind === 'Critical' ? 'Critical'
+                                          : t.kind === 'High' ? 'High'
+                                          : t.kind === 'Medium' ? 'Medium' : undefined
+                                      });
+                                    }
+                                  };
+                                  return (
+                                    <Stack
+                                      key={i}
+                                      direction="row"
+                                      alignItems="flex-start"
+                                      spacing={0.5}
+                                      onClick={onTap}
+                                      sx={{
+                                        cursor: 'pointer',
+                                        borderRadius: 0.5,
+                                        py: 0.125,
+                                        transition: 'background-color 80ms',
+                                        '&:hover': { bgcolor: '#F8FAFC' }
+                                      }}
+                                    >
+                                      {isAdded ? (
+                                        <Icon name="add_circle" size={13} color="#16A34A" sx={{ mt: '2px', flexShrink: 0 }} />
+                                      ) : (
+                                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#94A3B8', mt: '8px', flexShrink: 0 }} />
+                                      )}
+                                      <Typography variant="caption" sx={{ color: isAdded ? '#0F172A' : '#475569', display: 'block', lineHeight: 1.3, fontSize: 11.5 }}>
+                                        <Box component="span" sx={{ fontWeight: isAdded ? 700 : 400 }}>{item.title}</Box>
+                                        <Box component="span" sx={{ color: '#94A3B8' }}>
+                                          {i === 0 ? ` · ${item.time} · ${item.dur}` : ` · ~${item.dur}`}
+                                        </Box>
+                                      </Typography>
+                                    </Stack>
+                                  );
+                                })}
+                              </Stack>
+                            </Box>
+                          );
+                        })()}
+
+                        {/* Deferred — synthesized when the tech goes overcap.
+                            Rows stay tappable so the MD can open the work
+                            order and override (keep on today, reassign,
+                            etc.) instead of accepting the defer. */}
+                        {deferred.length > 0 && (
+                          <Box>
+                            <Typography variant="caption" sx={{ color: '#B91C1C', fontWeight: 700, fontSize: 10, display: 'block', mb: 0.25 }}>
+                              DEFERRED TO LATER
+                            </Typography>
+                            <Stack spacing={0.25} sx={{ pl: 0.5 }}>
+                              {deferred.map((t, i) => (
+                                <Stack
+                                  key={i}
+                                  direction="row"
+                                  alignItems="flex-start"
+                                  spacing={0.5}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openItem && openItem({
+                                      id: `${teamMember.id}__deferred-${i}`,
+                                      kind: t.kind || 'Deferred task',
+                                      title: t.title,
+                                      icon: t.icon,
+                                      tone: t.tone,
+                                      status: 'Deferred',
+                                      location: t.location,
+                                      assignee: teamMember.name,
+                                      time: t.time,
+                                      eta: t.dur,
+                                      note: t.note,
+                                      priority: t.kind === 'Critical' ? 'Critical'
+                                        : t.kind === 'High' ? 'High'
+                                        : t.kind === 'Medium' ? 'Medium' : undefined
+                                    });
+                                  }}
+                                  sx={{
+                                    cursor: 'pointer',
+                                    borderRadius: 0.5,
+                                    py: 0.125,
+                                    transition: 'background-color 80ms',
+                                    '&:hover': { bgcolor: '#FEF2F2' }
+                                  }}
+                                >
+                                  <Icon name="remove_circle" size={13} color="#DC2626" sx={{ mt: '2px', flexShrink: 0 }} />
+                                  <Typography variant="caption" sx={{ color: '#0F172A', display: 'block', lineHeight: 1.3, fontSize: 11.5 }}>
+                                    <Box component="span" sx={{ fontWeight: 700 }}>{t.title}</Box>
+                                    <Box component="span" sx={{ color: '#7F1D1D' }}>{' · '}{t.dur} · deferred to Sun, May 17</Box>
+                                  </Typography>
+                                </Stack>
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
 function AbsenceSheet({ open, member, onClose, onConfirm }) {
   const [scope, setScope] = React.useState('today');
   const [partWindow, setPartWindow] = React.useState('morning');
   const [throughDay, setThroughDay] = React.useState('sun');
   const [customFrom, setCustomFrom] = React.useState('09:00');
   const [customTo, setCustomTo] = React.useState('13:00');
+  // 3-phase flow inside the drawer: pick scope → watch the agent
+  // rebalance → review the resulting plan before it commits.
+  const [phase, setPhase] = React.useState('pick');
+  const [traceIdx, setTraceIdx] = React.useState(0);
   React.useEffect(() => {
     if (open) {
       setScope('today');
@@ -8263,8 +8918,22 @@ function AbsenceSheet({ open, member, onClose, onConfirm }) {
       setThroughDay('sun');
       setCustomFrom('09:00');
       setCustomTo('13:00');
+      setPhase('pick');
+      setTraceIdx(0);
     }
   }, [open, member?.id]);
+  // Stream agent reasoning steps during the 'thinking' phase. When the
+  // last step lands, transition to 'review' after a short beat.
+  React.useEffect(() => {
+    if (phase !== 'thinking') return undefined;
+    const steps = sickDayEvent.agentSteps.length;
+    if (traceIdx >= steps) {
+      const t = setTimeout(() => setPhase('review'), 500);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setTraceIdx((i) => i + 1), 600);
+    return () => clearTimeout(t);
+  }, [phase, traceIdx]);
   if (!member) return null;
   const SCOPE_OPTIONS = [
     { id: 'today',    icon: 'today',       label: 'Rest of today',  sub: 'Out for the remainder of Sat, May 16' },
@@ -8307,7 +8976,12 @@ function AbsenceSheet({ open, member, onClose, onConfirm }) {
       PaperProps={{
         sx: {
           borderTopLeftRadius: 20, borderTopRightRadius: 20,
-          maxHeight: '85vh', pb: 'env(safe-area-inset-bottom)',
+          // 100% here is the device-stage height (because the parent has
+          // transform:translateZ which becomes the containing block for
+          // the drawer's position:fixed). Leaving 88 px for the AppBar
+          // means the drawer never covers the TELS header on tall screens.
+          maxHeight: 'calc(100% - 88px)',
+          pb: 'env(safe-area-inset-bottom)',
           display: 'flex', flexDirection: 'column'
         }
       }}
@@ -8319,10 +8993,14 @@ function AbsenceSheet({ open, member, onClose, onConfirm }) {
         <Stack direction="row" spacing={1.25} alignItems="center">
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
-              Mark out · {member.name}
+              {phase === 'pick' ? `Mark out · ${member.name}`
+                : phase === 'thinking' ? `Rebalancing ${member.name}'s work`
+                : `Review the rebalance · ${member.name}`}
             </Typography>
             <Typography sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
-              When will {member.name.split(/\s|\./)[0]} be out?
+              {phase === 'pick' ? `When will ${member.name.split(/\s|\./)[0]} be out?`
+                : phase === 'thinking' ? 'Working on the rebalance now'
+                : `${sickDayEvent.summary.totalChanges} changes across Sat – Mon`}
             </Typography>
           </Box>
           <IconButton size="small" onClick={onClose}>
@@ -8332,6 +9010,7 @@ function AbsenceSheet({ open, member, onClose, onConfirm }) {
       </Box>
 
       <Box sx={{ p: 1.5, flex: 1, overflowY: 'auto' }}>
+        {phase === 'pick' && (<>
         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
           SCOPE
         </Typography>
@@ -8521,28 +9200,77 @@ function AbsenceSheet({ open, member, onClose, onConfirm }) {
             The scheduling agent will rebalance {member.name.split(/\s|\./)[0]}’s work across the team and across days. You’ll review the changes before anything commits.
           </Typography>
         </Box>
+        </>)}
+
+        {phase === 'thinking' && (
+          <AbsenceRebalanceThinking member={member} traceIdx={traceIdx} />
+        )}
+
+        {phase === 'review' && (
+          <AbsenceRebalanceReview member={member} />
+        )}
       </Box>
 
       <Box sx={{ p: 1.5, borderTop: '1px solid #E2E8F0', bgcolor: '#fff' }}>
-        <Stack direction="row" spacing={0.75}>
-          <Button
-            fullWidth
-            variant="outlined"
-            color="inherit"
-            onClick={onClose}
-            sx={{ textTransform: 'none', fontWeight: 600 }}
-          >
-            Cancel
-          </Button>
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={() => onConfirm(buildPayload())}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Mark out
-          </Button>
-        </Stack>
+        {phase === 'pick' && (
+          <Stack direction="row" spacing={0.75}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={onClose}
+              sx={{ textTransform: 'none', fontWeight: 600, flex: '0 0 auto', px: 1.75 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => { setPhase('thinking'); setTraceIdx(0); }}
+              sx={{ textTransform: 'none', fontWeight: 700, flex: '1 1 auto', whiteSpace: 'nowrap' }}
+            >
+              Mark out · run rebalance
+            </Button>
+          </Stack>
+        )}
+        {phase === 'thinking' && (
+          <Stack direction="row" spacing={0.75}>
+            <Button
+              fullWidth
+              variant="outlined"
+              color="inherit"
+              onClick={() => setPhase('pick')}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Back
+            </Button>
+            <Button
+              fullWidth
+              variant="contained"
+              disabled
+              sx={{ textTransform: 'none', fontWeight: 700 }}
+            >
+              Rebalancing…
+            </Button>
+          </Stack>
+        )}
+        {phase === 'review' && (
+          <Stack direction="row" spacing={0.75}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => setPhase('pick')}
+              sx={{ textTransform: 'none', fontWeight: 600, flex: '0 0 auto', px: 1.75 }}
+            >
+              Back
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => onConfirm(buildPayload())}
+              sx={{ textTransform: 'none', fontWeight: 700, flex: '1 1 auto', whiteSpace: 'nowrap' }}
+            >
+              Approve rebalance
+            </Button>
+          </Stack>
+        )}
       </Box>
     </Drawer>
   );
@@ -8825,8 +9553,8 @@ function ScheduleTab() {
   const longLabel = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const shortLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   return (
-    <Box sx={{ px: 1, pt: 1.5 }}>
-      <Box sx={{ mb: 1.25, px: 0.5 }}>
+    <Box sx={{ px: 1.5, pt: 1.5 }}>
+      <Box sx={{ mb: 1.25 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
           Schedule
         </Typography>
@@ -9410,7 +10138,7 @@ function OperationalKnowledgeScreen({ onBack, maturity }) {
       <SectionHeader
         icon="groups"
         title="Team Intelligence"
-        sub="What Connected Community has observed about each team member"
+        sub="What I’ve noticed about each team member"
         color="#0065BD"
       />
       <Stack spacing={1} sx={{ mb: 2 }}>
@@ -9748,7 +10476,7 @@ function TeamIntelligenceSheet({ open, member, intel, onClose }) {
       <Box sx={{ px: 1.5, py: 1.5, flex: 1, overflowY: 'auto' }}>
         {/* Observations */}
         <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, display: 'block', mb: 0.75 }}>
-          Connected Community has observed
+          What I’ve noticed
         </Typography>
         <Card variant="outlined" sx={{ borderColor: '#E2E8F0', mb: 1.5 }}>
           <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -10343,11 +11071,23 @@ export default function App() {
       return next;
     });
   }, []);
-  // Build a success snack with a deep-link back to AI activity (tab 5).
-  const successSnack = (message) => setSnack({
+  // Reverse a markDispatched so an Undo action can restore an item.
+  const unmarkDispatched = React.useCallback((id) => {
+    if (!id) return;
+    setDispatchedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+  // Build a success snack with a deep-link into AI activity (tab 5) and
+  // an optional Undo for the most recent action.
+  const successSnack = (message, opts = {}) => setSnack({
     message,
-    actionLabel: 'View in AI activity',
-    onAction: () => { setTab(5); setSnack(null); }
+    actionLabel: opts.actionLabel || 'View details',
+    onAction: opts.onAction || (() => { setTab(5); setSnack(null); }),
+    onUndo: opts.onUndo
   });
 
   // Memoized so its identity stays stable across renders for the context.
@@ -10360,6 +11100,15 @@ export default function App() {
   const recordResolution = React.useCallback((id, payload) => {
     if (!id) return;
     setItemResolutions((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...payload } }));
+  }, []);
+  const clearResolution = React.useCallback((id) => {
+    if (!id) return;
+    setItemResolutions((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
   const resolutionsValue = React.useMemo(
     () => ({ resolutions: itemResolutions, recordResolution }),
@@ -10435,8 +11184,11 @@ export default function App() {
     const what =
       item?.recommendations ? item.recommendations[0]?.body
       : item?.recommended || item?.title || 'recommendation';
-    markDispatched(item?.id);
-    successSnack(`Approved · ${what}`);
+    const approvedId = item?.id;
+    markDispatched(approvedId);
+    successSnack(`Approved · ${what}`, {
+      onUndo: () => unmarkDispatched(approvedId)
+    });
   };
 
   const handleFeedback = (kind) => {
@@ -10455,7 +11207,8 @@ export default function App() {
     successSnack(
       kind === 'remember' ? 'New rule saved · AI will remember'
       : kind === 'once' ? 'Treated as one-time override'
-      : 'Context added to this decision'
+      : 'Context added to this decision',
+      { onUndo: () => unmarkDispatched(id) }
     );
   };
 
@@ -10801,28 +11554,47 @@ export default function App() {
 
       <Snackbar
         open={Boolean(snack)}
-        autoHideDuration={typeof snack === 'object' && snack?.actionLabel ? 5000 : 2600}
+        autoHideDuration={typeof snack === 'object' && (snack?.actionLabel || snack?.onUndo) ? 6000 : 2600}
         onClose={() => setSnack(null)}
         message={typeof snack === 'string' ? snack : snack?.message}
         action={
-          typeof snack === 'object' && snack?.actionLabel ? (
-            <Button
-              size="small"
-              onClick={snack.onAction}
-              sx={{ color: '#A5B4FC', fontWeight: 700, textTransform: 'none', minWidth: 'auto', px: 1 }}
-            >
-              {snack.actionLabel}
-            </Button>
+          typeof snack === 'object' && (snack?.actionLabel || snack?.onUndo) ? (
+            <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+              {snack.onUndo ? (
+                <Button
+                  size="small"
+                  onClick={() => { snack.onUndo(); setSnack(null); }}
+                  sx={{ color: '#FCA5A5', fontWeight: 700, textTransform: 'none', minWidth: 'auto', px: 1 }}
+                >
+                  Undo
+                </Button>
+              ) : null}
+              {snack.actionLabel ? (
+                <Button
+                  size="small"
+                  onClick={snack.onAction}
+                  sx={{ color: '#A5B4FC', fontWeight: 700, textTransform: 'none', minWidth: 'auto', px: 1 }}
+                >
+                  {snack.actionLabel}
+                </Button>
+              ) : null}
+            </Stack>
           ) : undefined
         }
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         sx={{
-          mb: 10,
+          left: '0 !important',
+          right: '0 !important',
+          bottom: '60px !important',
+          width: '100%',
           zIndex: 1400,
           '& .MuiSnackbarContent-root': {
             bgcolor: '#0F172A', color: '#fff', fontWeight: 600,
-            borderRadius: 2, minWidth: 'auto'
-          }
+            borderRadius: 0, width: '100%', maxWidth: '100%',
+            flexWrap: 'nowrap', px: 1.5, py: 1
+          },
+          '& .MuiSnackbarContent-message': { flex: 1, minWidth: 0 },
+          '& .MuiSnackbarContent-action': { ml: 1, pl: 0, mr: 0 }
         }}
       />
     </Box>
@@ -10879,7 +11651,9 @@ export default function App() {
         const reminderCopy = reminderId === 'none'
           ? 'no reminder set'
           : `remind ${reminderLabel.toLowerCase()}`;
-        successSnack(`Queued for agent · ${reminderCopy}`);
+        successSnack(`Queued for agent · ${reminderCopy}`, {
+          onUndo: () => clearResolution(id)
+        });
       }}
     />
     <ServiceProviderSheet
@@ -10890,13 +11664,17 @@ export default function App() {
         const id = spSheet.item?.id;
         setSpSheet({ open: false, item: null });
         markDispatched(id);
-        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`);
+        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`, {
+          onUndo: () => unmarkDispatched(id)
+        });
       }}
       onManualCreate={(vendor) => {
         const id = spSheet.item?.id;
         setSpSheet({ open: false, item: null });
         markDispatched(id);
-        successSnack(`Service-request form opened · ${vendor}`);
+        successSnack(`Service-request form opened · ${vendor}`, {
+          onUndo: () => unmarkDispatched(id)
+        });
       }}
       onViewMore={() => {
         setSpListSheet({ open: true, item: spSheet.item });
@@ -10916,13 +11694,17 @@ export default function App() {
         const id = spListSheet.item?.id;
         setSpListSheet({ open: false, item: null });
         markDispatched(id);
-        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`);
+        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`, {
+          onUndo: () => unmarkDispatched(id)
+        });
       }}
       onManualCreate={(vendor) => {
         const id = spListSheet.item?.id;
         setSpListSheet({ open: false, item: null });
         markDispatched(id);
-        successSnack(`Service-request form opened · ${vendor}`);
+        successSnack(`Service-request form opened · ${vendor}`, {
+          onUndo: () => unmarkDispatched(id)
+        });
       }}
     />
     <ForecastedRisksSheet
