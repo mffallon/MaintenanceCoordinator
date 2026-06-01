@@ -44,7 +44,7 @@ export const aiBanner = {
 
 export const weather = {
   headline: 'Cold snap expected tonight · 22°F low',
-  body: 'AI raised boiler and freeze-risk inspections to Critical. A freeze burst means resident heat loss and a major emergency repair bill.'
+  body: 'I raised boiler and freeze-risk inspections to Critical for tonight. A freeze burst means resident heat loss and a serious repair bill.'
 };
 
 export const tiers = [
@@ -63,7 +63,7 @@ export const tiers = [
         status: 'In progress',
         kpi: 'Life Safety',
         reason: 'Flagged 11 min ago. Open trouble signal = citable life-safety deficiency; state survey window opens Monday.',
-        recommend: 'AI recommends immediate scheduling — an open fire-panel trouble signal is a citable life-safety deficiency ahead of Monday’s survey window.',
+        recommend: 'I’d handle this today — an open fire-panel signal counts as a citable deficiency, and the survey window opens Monday.',
         confidence: 'High · life-safety rule',
         reasoning: true
       },
@@ -76,7 +76,7 @@ export const tiers = [
         status: 'Queued',
         kpi: 'Operational Continuity',
         reason: 'Elevated by weather signal — 22°F overnight low. A freeze burst risks resident heat loss + a major repair bill.',
-        recommend: 'AI recommends immediate scheduling due to tonight’s freeze risk and prior seasonal boiler issues.',
+        recommend: 'I’d schedule this now — tonight’s freeze risk plus prior seasonal boiler trouble.',
         confidence: 'High · weather risk detected',
         elevated: true,
         reasoning: true
@@ -98,7 +98,7 @@ export const tiers = [
         status: 'At risk',
         kpi: 'Move-In Readiness',
         reason: 'Move-in tomorrow 10 AM. Filter stock low; vendor backup recommended.',
-        recommend: 'AI recommends prioritizing this above routine PM — tomorrow’s move-in may be impacted and ready-room inventory is low.',
+        recommend: 'I’d put this above routine PM — tomorrow’s move-in is exposed and ready-room stock is low.',
         confidence: 'Medium · learning unit-turn patterns',
         reasoning: true,
         needsReview: true
@@ -112,7 +112,7 @@ export const tiers = [
         status: 'Overdue',
         kpi: 'Regulatory Comp.',
         reason: 'Overdue weekly regulatory check — bumped to High and slotted today; survey exposure grows daily.',
-        recommend: 'AI recommends slotting this today — it’s an overdue weekly regulatory check and survey exposure grows daily.',
+        recommend: 'I’d slot this in today — it’s an overdue weekly regulatory check, and exposure grows each day.',
         confidence: 'Medium · learning your compliance cadence',
         elevated: true,
         reasoning: true
@@ -126,7 +126,7 @@ export const tiers = [
         status: 'Overdue',
         kpi: 'Regulatory Comp.',
         reason: 'Overdue weekly exercise; logbook gap. AI assigned Sasha (capacity today).',
-        recommend: 'AI recommends assigning Sasha — she has capacity today and this overdue weekly exercise has a logbook gap.',
+        recommend: 'I’d put this on Sasha — she has capacity today, and the weekly logbook has a gap.',
         confidence: 'Medium · learning technician availability',
         elevated: true,
         reasoning: true
@@ -140,7 +140,7 @@ export const tiers = [
         status: 'Overdue',
         kpi: 'Regulatory Comp.',
         reason: 'Overdue weekly Legionella-risk log. AI assigned Diane (capacity today).',
-        recommend: 'AI recommends Diane for this overdue Legionella-risk log — she has open capacity this afternoon.',
+        recommend: 'I’d give this to Diane — she has open capacity this afternoon, and the Legionella-risk log is overdue.',
         confidence: 'Medium · learning technician availability',
         elevated: true,
         reasoning: true
@@ -154,7 +154,7 @@ export const tiers = [
         status: 'Overdue',
         kpi: 'Regulatory Comp.',
         reason: 'Overdue daily food-safety log. Bundled onto Diane’s afternoon route.',
-        recommend: 'AI recommends bundling this onto Diane’s afternoon route — it’s an overdue daily food-safety log.',
+        recommend: 'I’d bundle this onto Diane’s afternoon route — it’s an overdue daily food-safety log and there’s no detour cost.',
         confidence: 'Medium · learning route efficiency',
         elevated: true,
         reasoning: true
@@ -168,7 +168,7 @@ export const tiers = [
         status: 'On track',
         kpi: 'Move-In Readiness',
         reason: 'Sequenced after HVAC clears; resident orientation 4 PM.',
-        recommend: 'AI recommends sequencing this after HVAC clears the corridor; resident orientation is at 4 PM.',
+        recommend: 'I’d run this after HVAC clears the corridor — resident orientation is at 4 PM.',
         confidence: 'Medium · learning unit-turn timing',
         reasoning: true
       }
@@ -189,7 +189,7 @@ export const tiers = [
         status: 'Open',
         kpi: 'Regulatory Comp.',
         reason: 'Monthly regulatory inspection due May 22 — batched with Marco’s rounds.',
-        recommend: 'AI recommends bundling this with Marco’s rounds — the monthly inspection is due May 22.',
+        recommend: 'I’d bundle this with Marco’s rounds — the monthly inspection is due May 22.',
         confidence: 'Medium · learning your monthly cadence',
         reasoning: true
       }
@@ -210,7 +210,7 @@ export const tiers = [
         status: 'Deferrable',
         kpi: 'PM Comp.',
         reason: 'Monthly PM due May 23 — deferrable; capacity reallocated to Unit 214.',
-        recommend: 'AI recommends deferring this monthly PM — capacity is better spent on the at-risk Unit 214 turn.',
+        recommend: 'I’d defer this monthly PM — the capacity is better spent on the at-risk Unit 214 turn.',
         confidence: 'Low · awaiting MD preference on PM tradeoffs',
         reasoning: true
       }
@@ -231,7 +231,7 @@ export const tiers = [
         status: 'Bundled',
         kpi: 'Resident Sat.',
         reason: 'Co-located along Diane’s 2 PM route. Zero detour cost.',
-        recommend: 'AI recommends bundling this in the AM only if no higher-priority items remain.',
+        recommend: 'I’d only bundle this in the AM if no higher-priority items remain.',
         confidence: 'Low · awaiting MD preference',
         reasoning: true
       }
@@ -297,7 +297,7 @@ export const mdSchedule = [
     id: 'md-2', time: '9:15 AM', dur: '20m', kind: 'Approval',
     title: 'Approve vendor dispatch · Apex Mechanical',
     location: 'Unit 214 turn', icon: 'support_agent', tone: 'warning',
-    note: 'AI recommended; awaiting your call. Move-in 10 AM tomorrow.'
+    note: 'I flagged this — waiting on your call. Move-in 10 AM tomorrow.'
   },
   {
     id: 'md-3', time: '10:30 AM', dur: '45m', kind: 'Walkthrough',
@@ -320,7 +320,7 @@ export const mdSchedule = [
     id: 'md-5', time: '3:30 PM', dur: '20m', kind: 'Override review',
     title: 'Confirm learned rule · Move-in HVAC priority',
     location: 'Office', icon: 'model_training', tone: 'default',
-    note: 'AI proposed: when move-in <24h, HVAC supersedes PM filter swap.'
+    note: 'I’m proposing a rule: when move-in is <24h, HVAC takes priority over PM filter swap.'
   },
   {
     id: 'md-6', time: '4:30 PM', dur: '15m', kind: 'Sign-off',
@@ -332,12 +332,17 @@ export const mdSchedule = [
 
 export const team = [
   {
+    id: 'tm-md', name: 'Mike F.', role: 'Maintenance Director', shift: '8a–5p',
+    capacity: 8, load: 2.2, status: 'Has capacity',
+    tasks: mdSchedule
+  },
+  {
     id: 'tm-1', name: 'Marco D.', role: 'Lead Tech', shift: '8a–5p',
     capacity: 8, load: 7.5, status: 'On-site',
     tasks: [
       { time: '8:00 AM', dur: '90m', kind: 'Critical', title: 'Fire panel trouble signal — West Wing',
         location: 'Bldg A · Panel 3', icon: 'local_fire_department', tone: 'error',
-        note: 'Survey window opens Monday — AI elevated to Critical.' },
+        note: 'Survey window opens Monday — I bumped this to Critical.' },
       { time: '9:30 AM', dur: '45m', kind: 'PM', title: 'Mechanical room gauge & belt round',
         location: 'Mech Room A', icon: 'speed', tone: 'default', note: '' },
       { time: '10:30 AM', dur: '45m', kind: 'Walkthrough', title: 'Walk you through fire panel resolution',
@@ -411,7 +416,7 @@ export const team = [
         location: 'Unit 117', icon: 'task_alt', tone: 'info', note: '' },
       { time: '2:00 PM', dur: '1h', kind: 'High', title: 'Generator visual inspection + logbook',
         location: 'Emergency Power Generators', icon: 'electrical_services', tone: 'warning',
-        note: 'AI slotted — overdue weekly regulatory; you had capacity today.' },
+        note: 'I slotted this in — overdue weekly regulatory, and you had capacity today.' },
       { time: '3:00 PM', dur: '45m', kind: 'Turn', title: 'Unit 121 paint + caulk',
         location: 'Unit 121', icon: 'format_paint', tone: 'default', note: '' },
       { time: '4:00 PM', dur: '30m', kind: 'Resident', title: 'Move-in walkthrough · Unit 117',
@@ -429,20 +434,20 @@ export const team = [
         location: 'Floors 1–3', icon: 'directions_walk', tone: 'default', note: '' },
       { time: '9:00 AM', dur: '60m', kind: 'Resident', title: 'Resident requests · morning batch (3)',
         location: 'Floor 1', icon: 'home_repair_service', tone: 'success',
-        note: 'AI grouped along east-corridor route.' },
+        note: 'I bundled these on the east-corridor route to save the trip.' },
       { time: '10:00 AM', dur: '1h', kind: 'Resident', title: 'Resident requests · Floor 2 batch (4)',
         location: 'Floor 2', icon: 'home_repair_service', tone: 'default',
-        note: 'AI grouped to minimize travel.' },
+        note: 'I grouped these to keep Diane on one floor.' },
       { time: '11:00 AM', dur: '30m', kind: 'High', title: 'Test & log hot water temperatures',
         location: 'Water Temperature Checks', icon: 'thermostat', tone: 'warning',
-        note: 'AI slotted — overdue weekly regulatory log.' },
+        note: 'I slotted this in — overdue weekly regulatory log.' },
       { time: '11:30 AM', dur: '30m', kind: 'Prep', title: 'Restock janitorial / PM cart',
         location: 'Supply room', icon: 'inventory_2', tone: 'default', note: '' },
       { time: '12:00 PM', dur: '30m', kind: 'Break', title: 'Lunch',
         location: 'Break room', icon: 'restaurant', tone: 'default', note: '' },
       { time: '1:00 PM', dur: '20m', kind: 'High', title: 'Check freezer / refrigerator temps',
         location: 'Refrigerator/Freezer Combos', icon: 'kitchen', tone: 'warning',
-        note: 'AI batched — overdue daily food-safety log.' },
+        note: 'I batched these — overdue daily food-safety log.' },
       { time: '1:20 PM', dur: '40m', kind: 'PM', title: 'Inspect bed rails — Wing B',
         location: 'Wing B', icon: 'bed', tone: 'default', note: '' },
       { time: '2:00 PM', dur: '55m', kind: 'Quick wins', title: 'Bundled: 4 fixtures · 2 cabinet hinges',
@@ -1127,7 +1132,7 @@ export const predictiveWorkOrders = [
     title: 'Freeze-risk boiler circulation checks',
     category: 'Seasonal Preparedness', location: 'Mechanical Rooms A–C',
     priority: 'High', status: 'Queued', assignee: 'Jacob B.', eta: '90m', kpi: 'Operational Readiness',
-    reason: 'AI elevated seasonal readiness work — overnight temperatures forecast below 20°F.'
+    reason: 'I elevated seasonal readiness work — overnight temperatures are forecast below 20°F.'
   },
   {
     id: 'wo-1093', source: 'Learned Pattern', kind: 'Learned pattern',
@@ -1144,7 +1149,7 @@ export const predictiveTasks = [
     id: 'tk-26', category: 'Boiler Systems',
     title: 'Verify freeze-protection valves and circulation pumps.',
     status: 'at-risk', due: 'Due tonight', cadence: 'Seasonal', eta: '1h', assignee: 'Jacob B.',
-    note: 'AI elevated — overnight freeze warning and prior winter failures.',
+    note: 'I elevated this — overnight freeze warning and prior winter failures.',
     tags: ['Weather', 'Seasonal', 'Predictive']
   },
   {
@@ -1264,7 +1269,7 @@ export const services = [
     location: 'Bldg B · Elevator 2', status: 'Awaiting quote',
     window: 'Quote requested May 13', cost: 'Est. $1,200–1,800', sla: 'Next-day',
     contact: 'service@summitelevator.com',
-    note: 'AI flagged a repeat fault pattern (3 service calls in 60 days) — vendor review suggested.'
+    note: 'I flagged a repeat fault pattern (3 service calls in 60 days) — worth a vendor review.'
   },
   {
     id: 'sv-3', vendor: 'SafeGuard Fire Systems', trade: 'Fire / Life Safety',
@@ -1375,14 +1380,14 @@ export const day1StaffingConflict = {
   who: 'Jacob B.',
   title: 'Jacob is sequenced 1.5 hrs over capacity today',
   body: 'Unplanned overtime cost and burnout risk if left as-is. Diane has 2.2 hrs open on the same floor.',
-  hint: 'AI suggests reassigning the Floor 3 filter PM to Diane.'
+  hint: 'I’d reassign the Floor 3 filter PM to Diane.'
 };
 
 export const day1PmTradeoff = {
   id: 'pm-1', icon: 'event_repeat',
   title: 'Floor 3 filter replacement · deferrable PM',
   body: 'No compliance deadline before May 31. Lowest-risk item to move when today is at capacity.',
-  hint: 'AI suggests moving to Saturday AM.'
+  hint: 'I’d move this to Saturday AM.'
 };
 
 // Day 1 — pick the single most relevant learning signal (the rest collapse).
@@ -1997,3 +2002,33 @@ export const trustedKnowledge = [
     weight: 'Strong influence'
   }
 ];
+
+// Existing Sun/Mon shifts for techs receiving Sasha's reassigned work.
+// Used by the Mark-out review's per-tech card so the MD can see the rest
+// of the receiving tech's day, not just the items being added in.
+export const teamForecast = {
+  sun: {
+    // Jacob B. — weekend on-call coverage; HVAC + boiler routine.
+    'tm-2': [
+      { time: '8:00 AM', dur: '1h', kind: 'PM', title: 'Boiler #2 weekly walkdown', location: 'Mech Room B', icon: 'thermostat', tone: 'default' },
+      { time: '9:30 AM', dur: '1h 30m', kind: 'High', title: 'RTU-4 vibration follow-up', location: 'Roof · RTU-4', icon: 'hvac', tone: 'warning', note: 'Resident comfort complaints continued overnight.' },
+      { time: '12:00 PM', dur: '30m', kind: 'Break', title: 'Lunch', location: 'Break room', icon: 'restaurant', tone: 'default' },
+      { time: '1:00 PM', dur: '1h', kind: 'PM', title: 'Cooling tower water-treatment log', location: 'Roof · Cooling tower', icon: 'water_drop', tone: 'default' },
+      { time: '2:30 PM', dur: '1h', kind: 'Walkthrough', title: 'Boiler room round', location: 'Mech Room B', icon: 'fact_check', tone: 'default' },
+      { time: '4:00 PM', dur: '45m', kind: 'Prep', title: 'Weekend on-call handoff log', location: 'Office', icon: 'task_alt', tone: 'default' }
+    ]
+  },
+  mon: {
+    // Sasha P. — returning Monday after the Saturday absence. Full turn day.
+    'tm-3': [
+      { time: '8:30 AM', dur: '1h', kind: 'Turn', title: 'Unit 124 turn · punch list', location: 'Unit 124', icon: 'meeting_room', tone: 'default' },
+      { time: '9:30 AM', dur: '1h 30m', kind: 'High', title: 'Unit 125 paint touch-up', location: 'Unit 125', icon: 'format_paint', tone: 'warning' },
+      { time: '11:00 AM', dur: '30m', kind: 'Resident', title: 'Floor 1 work-order check-ins', location: 'Floor 1', icon: 'home_repair_service', tone: 'default' },
+      { time: '12:00 PM', dur: '30m', kind: 'Break', title: 'Lunch', location: 'Break room', icon: 'restaurant', tone: 'default' },
+      { time: '12:30 PM', dur: '45m', kind: 'QA', title: 'Unit 125 final QA pass', location: 'Unit 125', icon: 'task_alt', tone: 'info' },
+      { time: '1:15 PM', dur: '45m', kind: 'Resident', title: 'Apt 312 fixture replace', location: 'Apt 312', icon: 'home_repair_service', tone: 'default' },
+      { time: '2:00 PM', dur: '45m', kind: 'Prep', title: 'Stage materials · next move-in batch', location: 'Shop floor', icon: 'inventory_2', tone: 'default' },
+      { time: '2:45 PM', dur: '1h 15m', kind: 'Turn', title: 'Unit 127 punch list', location: 'Unit 127', icon: 'meeting_room', tone: 'default' }
+    ]
+  }
+};
