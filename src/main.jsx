@@ -74,14 +74,29 @@ const theme = createTheme({
   shape: { borderRadius: 4 },
   spacing: 8,
   components: {
-    MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
-    MuiCard: { styleOverrides: { root: { borderRadius: 4 } } },
+    MuiPaper: {
+      styleOverrides: {
+        root: { backgroundImage: 'none' },
+        // No border on outlined surfaces by default. Reach for an explicit
+        // `border` in sx when you specifically want one.
+        outlined: { border: 'none' }
+      }
+    },
+    MuiCard: { styleOverrides: { root: { borderRadius: 16 } } },
     MuiChip: { styleOverrides: { root: { fontWeight: 600, borderRadius: 4 } } },
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: { root: { borderRadius: 4 } }
     },
     MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 4 } } },
+    // Enforce a 36×36 minimum tap target on every IconButton — even the
+    // size="small" variants. Anything tappable should hit at least the
+    // 36px Material guidance for finger-friendly touch.
+    MuiIconButton: {
+      styleOverrides: {
+        root: { minWidth: 36, minHeight: 36 }
+      }
+    },
     // AppBar / BottomNavigation are left at their black brand color so the
     // nav surfaces don't pick up the DSX blue — only body content does.
     MuiAppBar: { styleOverrides: { root: { backgroundImage: 'none' } } },
@@ -95,7 +110,19 @@ const theme = createTheme({
     // browser viewport. This prevents drawers/menus from extending wider
     // than the phone bounds on desktop.
     MuiDrawer: {
-      defaultProps: { disableScrollLock: true, disablePortal: true },
+      // disableAutoFocus / disableEnforceFocus / disableRestoreFocus stop
+      // MUI's focus trap from focusing the drawer paper on open. That focus
+      // call triggers a browser scrollIntoView against the iPhone-frame
+      // scroll container, which visibly shifts the underlying view while the
+      // drawer slides up. With these off, the originating screen stays static
+      // and only the drawer animates — the behavior we want for every drawer.
+      defaultProps: {
+        disableScrollLock: true,
+        disablePortal: true,
+        disableAutoFocus: true,
+        disableEnforceFocus: true,
+        disableRestoreFocus: true
+      },
       styleOverrides: {
         // Bottom drawers cap at the device-stage height minus the AppBar
         // (~88 px). vh-based sizing in component PaperProps resolves

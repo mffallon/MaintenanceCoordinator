@@ -1,0 +1,31 @@
+#,Where,Before,After
+1,Day 30 banner headline,Connected Community is operationally calibrated to Cedar Ridge,Coordination calibrated · 30 days at Cedar Ridge
+2,Day 30 banner sub,Coordination is steady and the AI is learning fast — ready to widen what it handles next?,"Routine PM, quick-win batching, and staffing balancing handled. Ready to widen what it covers?"
+3,Day 90 banner headline,Connected Community is beginning to anticipate operational readiness risks.,Forecasting active · 90 days of pattern data
+4,Day 90 banner sub,"Connected Community has developed enough operational context to begin surfacing predictive readiness insights across staffing, maintenance, and compliance operations.","PM, staffing, occupancy, and compliance trends are tracked. Forecasts surface when something needs your read."
+5,Day 90 banner context line,"These insights are based on 90 days of staffing, maintenance, occupancy, and PM coordination patterns.","Based on 90 days of staffing, PM, occupancy, and work-order data."
+6,Routine rollup card title (Day 1),Routine work coordinated quietly in the background,Routine work coordinated
+7,Routine rollup card title (Day 30),Routine operations coordinated automatically,Routine work coordinated
+8,Routine rollup card title (Day 90),Routine operations protected automatically,Routine work coordinated
+9,Rollup item (Day 1),routine work orders coordinated,work orders sequenced
+10,Rollup item (Day 1),PM tasks scheduled automatically,PMs scheduled
+11,Rollup item (Day 30),PM tasks scheduled and routed,PMs scheduled and routed
+12,Rollup item (Day 30),staffing reassignments resolved from learned rules,staffing reassignments resolved by learned rules
+13,"Rollup item (Day 90)","work orders, PM, and quick-wins coordinated","work orders, PMs, and quick-wins coordinated"
+14,Rollup item (Day 90),staffing reassignments resolved automatically,staffing reassignments resolved by rules
+15,Rollup item (Day 90),vendor escalations sequenced ahead of risk,vendor escalations queued ahead of failure
+16,Schedule · Team AI banner (Day 1),AI is recommending team assignments — still learning each tech's pace,AI recommending assignments · still learning each tech's pace
+17,Schedule · Team AI banner (Day 30),AI pre-balanced the team from 30 days of completion patterns,Team pre-balanced from 30 days of completion data
+18,Schedule · Team AI banner (Day 90),"Operational coverage is balanced — the AI is monitoring drift, not assignments","Coverage balanced. AI is watching drift, not assigning work"
+19,Schedule · My Day caption (Day 1),AI ordered your day by priority — top items first,Your day · ordered by priority · top items first
+20,Schedule · My Day caption (Day 30),Your day is reduced to approvals and exceptions,Your day · approvals and exceptions only
+21,Schedule · My Day caption (Day 90),Your day is reduced to operational oversight only,Your day · oversight only · routine handled
+22,KPIs · AI Coordination KPIs sub (Day 1),Early calibration signals — the AI is still learning your building.,Early calibration signals · still learning the building.
+23,KPIs · AI Coordination KPIs sub (Day 30),How Connected Community is performing — calibration depth and operational lift.,Calibration depth and operational lift · last 30 days.
+24,KPIs · AI Coordination KPIs sub (Day 90),Predictive readiness and operational lift across 90 days.,Predictive readiness · last 90 days.
+25,Today screen · Outcomes section sub (all modes),What Connected Community handled for you in the background,What the AI handled in the background
+26,Today screen · "Today's operational state" section header,Today's operational state,Today's state
+27,Today screen · Today's state section sub,Grouped readiness summaries — routine work runs in the background,Routine work runs in the background — tap any group for detail
+28,Pattern detail drawer sub,How Connected Community arrived at this assignment.,How the AI arrived at this assignment.
+29,Coordination Settings · Recommended next step,Allow Connected Community to coordinate routine technician reassignment automatically.,Let the AI handle routine technician reassignment without sign-off.
+30,Incoming WO card body,Wasting water continuously and disturbing the resident — satisfaction risk if it goes overnight.,Wasting water and waking the resident. Fix today.

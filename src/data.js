@@ -44,7 +44,9 @@ export const aiBanner = {
 
 export const weather = {
   headline: 'Cold snap expected tonight · 22°F low',
-  body: 'I raised boiler and freeze-risk inspections to Critical for tonight. A freeze burst means resident heat loss and a serious repair bill.'
+  body: 'I raised boiler and freeze-risk inspections to Critical for tonight.',
+  undoHeadline: "Here's what changes if I undo it",
+  undoImpact: "Boiler and freeze-risk inspections drop back to routine — they'd wait for the normal rotation instead of going out tonight. If the 22°F low lands, frozen-pipe risk won't be covered."
 };
 
 export const tiers = [
@@ -317,7 +319,7 @@ export const mdSchedule = [
     note: 'Doc uploads at 88% — 3 items outstanding.'
   },
   {
-    id: 'md-5', time: '3:30 PM', dur: '20m', kind: 'Override review',
+    id: 'md-5', time: '3:30 PM', dur: '20m', kind: 'Modify review',
     title: 'Confirm learned rule · Move-in HVAC priority',
     location: 'Office', icon: 'model_training', tone: 'default',
     note: 'I’m proposing a rule: when move-in is <24h, HVAC takes priority over PM filter swap.'
@@ -473,22 +475,25 @@ export const reviews = [
     id: 'rv-1',
     kind: 'Competing critical priorities',
     icon: 'priority_high',
-    summary:
-      '9:15 AM · Three Tier 1 priorities competing for limited resources this shift. All three cannot be completed today.',
+    summary: '3 Tier 1 priorities — can’t do all today.',
     priorities: [
-      { id: 'p-214', tier: 'T1', icon: 'hvac', label: 'Unit 214 HVAC failure', detail: 'Move-in tomorrow 10 AM', relatedId: 'ut-214' },
-      { id: 'p-boiler', tier: 'T1', icon: 'thermostat', label: 'Boiler #2 resident-comfort issue', detail: 'Active in occupied wing', relatedId: 'wo-1038' },
-      { id: 'p-pm', tier: 'T1', icon: 'event_repeat', label: 'Overdue PM compliance work', detail: 'Inside survey window, slack remaining', relatedId: 'tk-2' }
+      { id: 'p-214', tier: 'T1', icon: 'hvac', label: 'Unit 214 HVAC failure · move-in 10 AM tomorrow', plan: 'Send to Apex Mechanical (service provider)', relatedId: 'ut-214' },
+      { id: 'p-boiler', tier: 'T1', icon: 'thermostat', label: 'Boiler #2 down in an occupied wing · resident comfort now', plan: 'Hand to a general tech · ~2 hr resolution', relatedId: 'wo-1038' },
+      { id: 'p-pm', tier: 'T1', icon: 'event_repeat', label: 'Overdue PM compliance · due inside the survey window', plan: 'Defer to second shift', relatedId: 'tk-2' }
     ],
+    // Operational domains touched by these conflicts. Rendered as
+    // outlined tag chips so the MD can see the breadth of impact at a
+    // glance (inspired by the "Domains" row pattern).
+    domains: ['Life safety', 'Resident comfort', 'Move-in readiness', 'Survey readiness'],
     recommended: 'Awaiting your sign-off before dispatching the service provider and reassigning the in-house tech.',
     assignments: [
       { icon: 'support_agent', primary: 'Service Provider → Unit 214 HVAC', secondary: 'Move-in 10 AM tomorrow · the in-house team cannot complete the repair in time' },
       { icon: 'thermostat', primary: 'General tech → Boiler #2', secondary: 'Resident-comfort issue · ~2 hr resolution' },
       { icon: 'event_repeat', primary: 'Overdue PM compliance → second shift', secondary: 'Stays inside the survey window' }
     ],
-    why: 'Unit 214 has a 10 AM move-in tomorrow. HVAC repair is the only path that protects the turn, and the in-house team cannot complete it in time, so the work has to go to the outsourced service provider. Boiler is resident-comfort impact, not life-safety, but cannot wait through the shift. Overdue PM compliance still sits inside the survey window and has the most schedule flexibility. Reassigning the general tech to PM work would leave the boiler unattended through the morning.',
-    tradeoff: 'Move-in protected. Boiler resident-comfort restored in ~2 hrs. PM compliance slips into second shift but stays inside the survey window. No projected PM completion KPI miss. No projected survey readiness impact.',
-    confidence: 'High · move-in readiness and capacity rules applied · 4 similar three-way conflicts escalated and resolved this quarter'
+    why: 'Move-in is tomorrow — Unit 214 HVAC has to go to a vendor or it slips. Boiler is resident comfort, not life-safety, but can’t wait. PM compliance has the most slack today.',
+    tradeoff: 'Move-in protected. Boiler restored in ~2 hrs. PM slips to second shift — still inside the survey window.',
+    confidence: 'High'
   },
   {
     id: 'rv-2',
@@ -803,16 +808,16 @@ export const calibration = {
       days: [1,2,0,1,2,1,2,0,2,3,1,2,2,1,3,2,3,2,1,3,2,3,3,2,3,3,2,3,3,3]
     },
     {
-      icon: 'model_training', label: 'Override rules learned', value: '6', trend: 'this month', tone: 'info',
+      icon: 'model_training', label: 'Modify rules learned', value: '6', trend: 'this month', tone: 'info',
       unit: '', start: 0, current: 6,
       detail: 'Override patterns the AI generalized into reusable rules.',
       series: [0, 0, 1, 2, 2, 3, 4, 5, 6],
       days: [0,0,0,0,3,0,0,0,0,0,3,0,0,0,0,0,3,0,0,0,3,0,0,0,0,3,0,0,0,3]
     },
     {
-      icon: 'history_toggle_off', label: 'WO aging reduced', value: '14%', trend: 'vs. Day 1', tone: 'success',
+      icon: 'history_toggle_off', label: 'WO aging reduced', value: '14%', trend: 'vs. Day 3', tone: 'success',
       unit: '%', start: 0, current: 14,
-      detail: 'Reduction in average work-order age vs. the Day 1 baseline.',
+      detail: 'Reduction in average work-order age vs. the Day 3 baseline.',
       series: [0, 2, 3, 5, 7, 9, 11, 13, 14],
       days: [0,1,0,1,1,2,1,1,2,1,2,2,1,2,2,2,2,3,2,2,3,2,3,2,3,3,2,3,3,3]
     },
@@ -858,11 +863,11 @@ export const day30TeamNotes = {
 // Day 1 — "Learning your building." AI assists with recommendations;
 // the MD stays in control. Banner + early calibration signals.
 export const day1Status = {
-  headline: 'Learning Cedar Ridge operations',
-  sub: 'Recommending today, learning as it goes.',
+  headline: 'We’re off to a good start!',
+  sub: 'Three days in — here’s what we’re building. I’ll keep learning your community as we go.',
   metrics: [
     { key: 'accepted', label: 'Recommendations accepted', value: '9', sub: 'this week' },
-    { key: 'overrides', label: 'Overrides learned', value: '2', sub: 'so far' },
+    { key: 'overrides', label: 'Modifications learned', value: '2', sub: 'so far' },
     { key: 'patterns', label: 'Patterns detected', value: '4', sub: 'early signals' }
   ]
 };
@@ -871,8 +876,8 @@ export const day1Status = {
 // when the MD taps a tile. Each item is independently respondable.
 export const day1MetricDetails = {
   accepted: {
-    title: 'Review Accepted Recommendations',
-    sub: '9 AI recommendations you approved this week.',
+    title: 'Accepted History',
+    sub: '9 recommendations you and I shipped this week.',
     icon: 'thumb_up_alt',
     color: '#16A34A',
     items: [
@@ -1045,11 +1050,11 @@ export const learningSignals = [
 // Day 30 — "Operationally Calibrated." The AI has learned the building's
 // rhythms; the MD now manages exceptions, not every task.
 export const day30Status = {
-  headline: 'Coordination calibrated · 30 days at Cedar Ridge',
+  headline: 'We’ve found our rhythm',
   sub: 'Routine PM, quick-win batching, and staffing balancing handled. Ready to widen what it covers?',
   metrics: [
     { key: 'acceptance', value: '82%', label: 'Recommendation acceptance', sub: 'last 30 days' },
-    { key: 'patterns', value: '11', label: 'Learned coordination patterns', sub: 'active rules' },
+    { key: 'patterns', value: '11', label: 'Learned patterns', sub: 'active rules' },
     { value: '94%', label: 'PM tasks performed on time', sub: 'last 30 days' }
   ],
   capabilities: [
@@ -1069,7 +1074,7 @@ export const day30Status = {
 // Day 90 — "Predictive Operations Mode." The AI quietly protects readiness;
 // the MD oversees flow and is alerted only to meaningful anomalies.
 export const day90Status = {
-  headline: 'Forecasting active · 90 days of pattern data',
+  headline: 'We’re staying ahead',
   sub: 'PM, staffing, occupancy, and compliance trends are tracked. Forecasts surface when something needs your read.',
   context: 'Based on 90 days of staffing, PM, occupancy, and work-order data.',
   metrics: [
@@ -1165,7 +1170,7 @@ export const predictiveTasks = [
 export const predictiveReviews = [
   {
     id: 'rv-4', kind: 'Technician pattern · needs your read', icon: 'psychology_alt',
-    summary: 'Bruce W.\'s completion times have slowed ~22% over the last 30 days — but the pattern is ambiguous and one of the likely causes is HR-sensitive.',
+    summary: 'Bruce W.\'s completion times have slowed ~22% over the last 30 days — but the pattern is ambiguous.',
     recommended: 'Hold autonomous rebalancing for Bruce. Three remediation paths are staged behind your judgment.',
     why: 'AI ran three causal hypotheses against the data and can\'t separate them with confidence: (1) physical fatigue (slower starts, faster on familiar assets), (2) route saturation (Bruce is the most-used tech for life-safety this quarter), (3) unfamiliar asset mix (3 new chiller variants added in April). Each has a different remediation path, and one is a conversation only you can have.',
     tradeoff: 'Holding rebalancing means Bruce stays at current load this week. No compliance impact — life-safety tasks are still completing on time, just slower.',
@@ -1385,7 +1390,8 @@ export const day1StaffingConflict = {
 
 export const day1PmTradeoff = {
   id: 'pm-1', icon: 'event_repeat',
-  title: 'Floor 3 filter replacement · deferrable PM',
+  badge: 'Deferrable PM',
+  title: 'Floor 3 filter replacement',
   body: 'No compliance deadline before May 31. Lowest-risk item to move when today is at capacity.',
   hint: 'I’d move this to Saturday AM.'
 };

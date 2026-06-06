@@ -1,0 +1,7 @@
+id,time,duration,kind,title,location,note
+"md-2","9:15 AM","20m","Approval","Approve vendor dispatch · Apex Mechanical","Unit 214 turn","AI recommended; awaiting your call. Move-in 10 AM tomorrow."
+"md-3","10:30 AM","45m","Walkthrough","Fire panel inspection · West Wing","Bldg A · Panel 3","Marco D. on-site; confirm trouble-signal resolution."
+"md-lunch","12:00 PM","30m","Break","Lunch","Break room",""
+"md-4","1:00 PM","30m","Review","Survey readiness check-in · Regulatory","Office","Doc uploads at 88% — 3 items outstanding."
+"md-5","3:30 PM","20m","Override review","Confirm learned rule · Move-in HVAC priority","Office","AI proposed: when move-in <24h, HVAC supersedes PM filter swap."
+"md-6","4:30 PM","15m","Sign-off","Day-end KPI sign-off","Office","PM Comp. projected 84% by EOD (+2 pts)."

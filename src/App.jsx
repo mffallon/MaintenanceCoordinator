@@ -357,7 +357,7 @@ const toneBg = (tone) => {
 };
 
 const TRUST_MODES = [
-  { id: 'day1', n: '1', disabled: false },
+  { id: 'day1', n: '3', disabled: false },
   { id: 'day30', n: '30', disabled: false },
   { id: 'day90', n: '90', disabled: false },
   // "Error" mode mirrors Day 1 content but is the entry point for live
@@ -613,22 +613,50 @@ function AIBanner({ onReview, onAccept }) {
   );
 }
 
-function WeatherCard({ bare }) {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
+function WeatherCard({ bare, onAccept, onContext, hasContext = false }) {
+  // The card exits by sliding off-screen then collapsing its height so the
+  // next card moves up. Direction signals the decision: accept (OK) slides
+  // right, undo/revert slides left.
+  const [exiting, setExiting] = useState(false);
+  const [exitDir, setExitDir] = useState('right');
+  const [gone, setGone] = useState(false);
+  // "Undo elevation" first previews the consequence (what reverting does to
+  // the inspections) before the MD commits.
+  const [reverting, setReverting] = useState(false);
+  // Lets the snackbar's Undo bring the card back after it's been swept away.
+  const restore = () => { setExiting(false); setGone(false); setReverting(false); setExitDir('right'); };
+  const dismiss = (dir = 'right') => {
+    setExitDir(dir);
+    setExiting(true);
+    // Once the slide/fade finishes, collapse the height to pull the next
+    // card up into the freed space.
+    setTimeout(() => setGone(true), 360);
+  };
   const card = (
-      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#fff' }}>
-        <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-          <Stack direction="row" spacing={1} alignItems="flex-start">
-            <Box
-              sx={{
-                width: 32, height: 32, borderRadius: '10px',
-                bgcolor: '#E0F2FE', display: 'grid', placeItems: 'center', flexShrink: 0
-              }}
-            >
-              <Icon name="ac_unit" size={20} color="#0369A1" />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box
+        sx={{
+          transition: 'transform 360ms cubic-bezier(0.4, 0, 0.2, 1), opacity 360ms cubic-bezier(0.4, 0, 0.2, 1)',
+          transform: exiting
+            ? (exitDir === 'left' ? 'translateX(-115%)' : 'translateX(115%)')
+            : 'translateX(0)',
+          opacity: exiting ? 0 : 1,
+          pointerEvents: exiting ? 'none' : 'auto'
+        }}
+      >
+        <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#fff' }}>
+          <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Chip
+                size="small"
+                icon={<Icon name="ac_unit" size={13} color="#0369A1" />}
+                label="Weather signal · raised by agent"
+                sx={{
+                  height: 20, fontSize: 10.5, fontWeight: 700, mb: 0.5,
+                  bgcolor: '#E0F2FE', color: '#0369A1',
+                  '.MuiChip-label': { px: 0.75 },
+                  '.MuiChip-icon': { ml: 0.5, mr: -0.25 }
+                }}
+              />
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#075985', lineHeight: 1.25 }}>
                 {weather.headline}
               </Typography>
@@ -636,48 +664,114 @@ function WeatherCard({ bare }) {
                 {weather.body}
               </Typography>
             </Box>
-            <IconButton size="small" onClick={() => setDismissed(true)} sx={{ color: '#0369A1', m: -0.5 }}>
-              <Icon name="close" size={18} />
-            </IconButton>
-          </Stack>
-          <Divider sx={{ my: 1, borderColor: '#E2E8F0' }} />
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Icon name="undo" size={16} color="#0369A1" />}
-              sx={{
-                color: '#0369A1', borderColor: '#7DD3FC',
-                '&:hover': { borderColor: '#0369A1', bgcolor: 'transparent' }
-              }}
-            >
-              Undo elevation
-            </Button>
-            <Button
-              size="small"
-              startIcon={<Icon name="add_comment" size={16} color="#0369A1" />}
-              sx={{ color: '#0369A1' }}
-            >
-              Add context
-            </Button>
-            <Box sx={{ flex: 1 }} />
-            <Button
-              size="small"
-              variant="contained"
-              onClick={() => setDismissed(true)}
-              sx={{
-                bgcolor: '#0369A1', color: '#fff',
-                '&:hover': { bgcolor: '#075985' }
-              }}
-            >
-              OK
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+            {reverting ? (
+              <Box sx={{ mt: 1 }}>
+                {/* Consequence preview — what reverting the elevation means
+                    before the MD commits. Amber framing flags the dropped
+                    protection. */}
+                <Box
+                  sx={{
+                    bgcolor: '#FFFBEB', border: '1px solid #FDE68A',
+                    borderRadius: 1.5, p: 1
+                  }}
+                >
+                  <Stack direction="row" spacing={0.625} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Icon name="warning" size={14} color="#B45309" />
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#B45309' }}>
+                      {weather.undoHeadline}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="caption" sx={{ display: 'block', color: '#92400E', lineHeight: 1.35 }}>
+                    {weather.undoImpact}
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setReverting(false)}
+                    sx={{
+                      minHeight: 36, color: '#0369A1', borderColor: '#7DD3FC',
+                      '&:hover': { borderColor: '#0369A1', bgcolor: '#F0F9FF' }
+                    }}
+                  >
+                    Keep at Critical
+                  </Button>
+                  <Box sx={{ flex: 1 }} />
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => dismiss('left')}
+                    startIcon={<Icon name="undo" size={16} color="#fff" />}
+                    sx={{
+                      minHeight: 36, bgcolor: '#B91C1C', color: '#fff',
+                      '&:hover': { bgcolor: '#991B1B' }
+                    }}
+                  >
+                    Confirm undo
+                  </Button>
+                </Stack>
+              </Box>
+            ) : (
+              <>
+              {hasContext && (
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1 }}>
+                  <Icon name="check_circle" size={13} color="#15803D" />
+                  <Typography variant="caption" sx={{ color: '#15803D', fontWeight: 600 }}>
+                    Context added
+                  </Typography>
+                </Stack>
+              )}
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: hasContext ? 0.75 : 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon name="undo" size={16} color="#B91C1C" />}
+                  onClick={() => setReverting(true)}
+                  sx={{
+                    minHeight: 36,
+                    color: '#B91C1C', borderColor: '#FCA5A5',
+                    '&:hover': { borderColor: '#B91C1C', bgcolor: '#FEF2F2' }
+                  }}
+                >
+                  Undo elevation
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<Icon name={hasContext ? 'edit' : 'add_comment'} size={16} color={hasContext ? '#0065BD' : '#0369A1'} />}
+                  onClick={() => onContext && onContext()}
+                  sx={{ minHeight: 36, color: hasContext ? '#0065BD' : '#0369A1', fontWeight: hasContext ? 700 : 600 }}
+                >
+                  {hasContext ? 'Edit context' : 'Add context'}
+                </Button>
+                <Box sx={{ flex: 1 }} />
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => { dismiss('right'); onAccept && onAccept({ undo: restore }); }}
+                  sx={{
+                    minHeight: 36,
+                    bgcolor: '#0369A1', color: '#fff',
+                    '&:hover': { bgcolor: '#075985' }
+                  }}
+                >
+                  OK
+                </Button>
+              </Stack>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
   );
-  if (bare) return card;
-  return <Box sx={{ px: 1.5, pt: 1.25 }}>{card}</Box>;
+  // Collapse animates the height to 0 after the slide so siblings glide up.
+  const wrapped = (
+    <Collapse in={!gone} timeout={320} unmountOnExit>
+      {card}
+    </Collapse>
+  );
+  if (bare) return wrapped;
+  return <Box sx={{ px: 1.5, pt: 1.25 }}>{wrapped}</Box>;
 }
 
 function TaskCard({ task, onReason, onReview }) {
@@ -826,81 +920,99 @@ function TierSection({ tier, onReason, onReview }) {
   );
 }
 
-function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
+function ReviewCard({ item, onApprove, onOverride, onViewStaff, onIgnore, onAddContext, sweeping = false }) {
   // For staffing overloads, the secondary action navigates the MD to the
   // affected tech's schedule instead of opening the generic Override sheet.
   const staffing = item?.kind === 'Staffing overload';
+  // Services recommendations are a binary "approve the vendor dispatch or
+  // ignore it" decision — there's nothing to modify, so the secondary action
+  // reads as "Ignore" rather than "Modify".
+  const servicesRec = item?.kind === 'Services Recommendation';
   // Pull the tech name out of the summary, e.g. "Jacob B. is sequenced…"
   const techName = staffing ? (item.summary || '').split(' is ')[0] : null;
   const mode = useMode();
-  const day30 = mode === 'day30' || mode === 'day90'; // calibrated (Day 30+)
-  const day90 = mode === 'day90'; // predictive operations
-  const [noteOpen, setNoteOpen] = useState(false);
-  const [note, setNote] = useState('');
   // Day 1: keep reasoning visible by default — the MD is actively supervising.
   // Day 30/90: collapsed behind a "More info" toggle to keep the page calm.
   // Error (sickDay) mode mirrors Day 1 — same active-supervision UX.
   const day1 = mode === 'day1' || mode === 'sickDay';
   const [moreOpen, setMoreOpen] = useState(day1);
-  const submit = (kind) => {
-    setNoteOpen(false);
-    setNote('');
-    if (kind === 'approve') onApprove(item);
-    else onOverride(item);
-  };
+  // Per-recommendation reasoning expanders. In Day 1/3 the primary (i=0)
+  // recommendation stays expanded, but alternatives collapse behind a
+  // "More info" toggle so the card stays scannable. Day 30/90 collapses all.
+  const [openRecs, setOpenRecs] = useState(() => (day1 ? new Set([0]) : new Set()));
+  const toggleRec = (i) => setOpenRecs((prev) => {
+    const next = new Set(prev);
+    if (next.has(i)) next.delete(i); else next.add(i);
+    return next;
+  });
+  const openContext = () => onAddContext && onAddContext(item);
   const lineSx = {
     display: 'block', fontSize: 12.5, color: '#475569',
     fontWeight: 400, lineHeight: 1.35, mb: 0.5
   };
   const confidenceRow = item.confidence ? (
-    <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5, mb: 0.5 }}>
-      <Icon name="verified" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
-      <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
-        Confidence: {item.confidence}
-      </Typography>
-    </Stack>
+    <Typography variant="caption" sx={{ ...lineSx, mt: 0.5, mb: 0.5 }}>
+      <Box component="span" sx={{ fontWeight: 600, color: '#0F172A' }}>Confidence:</Box> {item.confidence}
+    </Typography>
   ) : null;
   return (
+    <Box
+      sx={{
+        transition: 'transform 380ms cubic-bezier(0.4, 0, 0.2, 1), opacity 380ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: sweeping ? 'translateX(115%)' : 'translateX(0)',
+        opacity: sweeping ? 0 : 1,
+        pointerEvents: sweeping ? 'none' : 'auto'
+      }}
+    >
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
         <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
-              <Chip
-                size="small"
-                label={item.kind}
-                sx={{
-                  height: 20, bgcolor: '#0F172A', color: '#fff',
-                  fontWeight: 700,
-                  '.MuiChip-label': { px: 0.875, fontSize: 11 }
-                }}
-              />
-              {day30 && (
-                <Chip
-                  size="small"
-                  icon={item.predictive
-                    ? <Icon name="online_prediction" size={10} color="#B45309" sx={{ ml: 0.5 }} />
-                    : undefined}
-                  label={item.predictive ? 'Predictive · readiness risk' : 'Exception · MD review needed'}
-                  sx={{
-                    height: 17, fontSize: 9.5, fontWeight: 700,
-                    bgcolor: item.predictive ? '#FEF3C7' : '#FEE2E2',
-                    color: item.predictive ? '#B45309' : '#B91C1C',
-                    '.MuiChip-label': { px: 0.625 }
-                  }}
-                />
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
+              <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                {item.priorities ? (
+                  // Critical-priorities card: red pill with warning icon.
+                  <Chip
+                    size="small"
+                    icon={<Icon name="priority_high" size={13} color="#fff" sx={{ ml: 0.5 }} />}
+                    label={item.kind}
+                    sx={{
+                      height: 20, bgcolor: '#DC2626', color: '#fff',
+                      fontWeight: 700,
+                      '.MuiChip-label': { px: 0.875, fontSize: 11 }
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    size="small"
+                    label={item.kind}
+                    sx={{
+                      height: 20, bgcolor: '#0F172A', color: '#fff',
+                      fontWeight: 700,
+                      '.MuiChip-label': { px: 0.875, fontSize: 11 }
+                    }}
+                  />
+                )}
+              </Stack>
+              {item.flaggedAt && (
+                <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0, fontSize: 11 }}>
+                  {item.flaggedAt}
+                </Typography>
               )}
             </Stack>
             <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
               {item.summary}
             </Typography>
             {item.priorities && (
-              <Stack spacing={0.625} sx={{ mt: 0.875 }}>
-                {item.priorities.map((p, i) => (
+              <>
+              <Stack spacing={0.75} sx={{ mt: 1.25 }}>
+                {item.priorities.map((p, i) => {
+                  const plan = p.plan;
+                  return (
                   <Stack key={i} direction="row" spacing={0.75} alignItems="flex-start">
-                    <Box sx={{ width: 24, height: 24, flexShrink: 0, display: 'grid', placeItems: 'center', mt: '1px' }}>
+                    <Box sx={{ width: 20, height: 20, flexShrink: 0, display: 'grid', placeItems: 'center', mt: '2px' }}>
                       {p.tier === 'T1' || p.tier === 'T2' || p.tier === 'T3' || p.tier === 'T4' ? (
-                        <TierIcon tier={p.tier} size={20} />
+                        <TierIcon tier={p.tier} size={16} />
                       ) : (
                         <Icon name={p.icon} size={14} color="#B91C1C" />
                       )}
@@ -920,10 +1032,23 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
                           {p.detail}
                         </Typography>
                       )}
+                      {plan && (
+                        <Stack direction="row" spacing={0.375} alignItems="center" sx={{ mt: 0.25 }}>
+                          <Icon name="arrow_forward" size={11} color="#4338CA" sx={{ flexShrink: 0 }} />
+                          <Typography
+                            variant="caption"
+                            sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}
+                          >
+                            {plan}
+                          </Typography>
+                        </Stack>
+                      )}
                     </Box>
                   </Stack>
-                ))}
+                  );
+                })}
               </Stack>
+              </>
             )}
           </Box>
         </Stack>
@@ -931,37 +1056,49 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
           sx={{
             bgcolor: '#F8FAFC',
             borderRadius: 1.5,
-            border: '1px solid #E2E8F0',
             overflow: 'hidden'
           }}
         >
           {mode === 'sickDay' && (
-            // Error mode — slim red top strip flags the recommendation as
-            // stale. Card body stays neutral so the reasoning still reads
-            // as the standard AI rec, just out-of-date.
+            // Error mode — DSX filled-error strip (error/main #C60C30) flags
+            // the recommendation as stale. Card body stays neutral so the
+            // reasoning still reads as the standard AI rec, just out-of-date.
             <Box
               sx={{
-                bgcolor: '#FEE2E2', borderBottom: '1px solid #FCA5A5',
-                px: 1, py: 0.375,
+                bgcolor: '#C60C30',
+                px: 1, py: 0.5,
                 display: 'flex', alignItems: 'center', gap: 0.5
               }}
             >
-              <Icon name="cloud_off" size={12} color="#B91C1C" />
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C', fontSize: 10.5, lineHeight: 1.2 }}>
+              <Icon name="cloud_off" size={12} color="#FFFFFF" />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#FFFFFF', fontSize: 10.5, lineHeight: 1.2 }}>
                 Stale · last computed {agentOutageEvent.startedAt} (pre-outage)
               </Typography>
             </Box>
           )}
           <Box sx={{ p: 1 }}>
-          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
-            <Icon name="auto_awesome" size={14} color="#4338CA" />
-            <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-              {item.recommendations ? 'AI Recommendations' : 'AI Recommendation'}
-            </Typography>
-          </Stack>
           {item.recommendations ? (
             <Stack spacing={1} sx={{ mt: 0.5 }}>
-              {item.recommendations.map((rec, i) => (
+              {/* For staffing overloads, the schedule shortcut sits above the
+                  recommended actions so the MD can check the tech's day before
+                  deciding. */}
+              {staffing && techName && onViewStaff && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon name="calendar_month" size={15} />}
+                  onClick={() => onViewStaff(techName)}
+                  fullWidth
+                >
+                  View {techName}'s schedule
+                </Button>
+              )}
+              {item.recommendations.map((rec, i) => {
+                const recOpen = openRecs.has(i);
+                // Primary stays open in Day 1/3; alternatives always get the
+                // collapsible toggle.
+                const showToggle = !day1 || i > 0;
+                return (
                 <Box
                   key={i}
                   sx={{
@@ -982,34 +1119,34 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
                       '.MuiChip-label': { px: 0.75 }
                     }}
                   />
-                  <Typography variant="caption" sx={lineSx}>
-                    {rec.body}
-                  </Typography>
-                  {!day1 && (
+                  <Stack direction="row" spacing={0.375} alignItems="flex-start">
+                    <Icon name="arrow_forward" size={12} color="#4338CA" sx={{ mt: '2px', flexShrink: 0 }} />
+                    <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
+                      {rec.body}
+                    </Typography>
+                  </Stack>
+                  {showToggle && (
                     <Button
                       size="small"
-                      onClick={() => setMoreOpen((v) => !v)}
-                      startIcon={<Icon name={moreOpen ? 'expand_less' : 'expand_more'} size={15} />}
+                      onClick={() => toggleRec(i)}
+                      startIcon={<Icon name={recOpen ? 'expand_less' : 'expand_more'} size={15} />}
                       sx={{
                         alignSelf: 'flex-start', textTransform: 'none',
                         color: '#475569', fontWeight: 600, fontSize: 12,
-                        px: 0.5, mb: 0.25, mt: -0.25
+                        px: 0.5, mb: 0.25, mt: 0.25
                       }}
                     >
-                      {moreOpen ? 'Less info' : 'More info'}
+                      {recOpen ? 'Less info' : 'More info'}
                     </Button>
                   )}
-                  <Collapse in={moreOpen} unmountOnExit>
+                  <Collapse in={recOpen} unmountOnExit>
                     {rec.why && (
-                      <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
-                        <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
-                        <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
-                          Why: {rec.why}
-                        </Typography>
-                      </Stack>
+                      <Typography variant="caption" sx={{ ...lineSx, mb: 0.5 }}>
+                        <Box component="span" sx={{ fontWeight: 600, color: '#0F172A' }}>Why:</Box> {rec.why}
+                      </Typography>
                     )}
                     <Typography variant="caption" sx={{ ...lineSx, mb: 0.75 }}>
-                      Tradeoff: {rec.tradeoff}
+                      <Box component="span" sx={{ fontWeight: 600, color: '#0F172A' }}>Tradeoff:</Box> {rec.tradeoff}
                     </Typography>
                     {i === item.recommendations.length - 1 && confidenceRow}
                   </Collapse>
@@ -1023,81 +1160,59 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
                     {i === 0 ? 'Approve recommended' : 'Approve this instead'}
                   </Button>
                 </Box>
-              ))}
+                );
+              })}
               <Stack direction="row" spacing={1} sx={{ pt: 0.25 }}>
-                {staffing && techName && onViewStaff ? (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<Icon name="calendar_month" size={15} />}
-                    onClick={() => onViewStaff(techName)}
-                    fullWidth
-                  >
-                    View {techName}'s schedule
-                  </Button>
-                ) : (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    onClick={() => onOverride(item)}
-                    fullWidth
-                  >
-                    Override
-                  </Button>
-                )}
                 <IconButton
                   size="small"
-                  onClick={() => setNoteOpen((v) => !v)}
+                  onClick={openContext}
                   sx={{
-                    border: '1px solid',
-                    borderColor: noteOpen ? '#4338CA' : '#CBD5E1',
+                    border: '1px solid #CBD5E1',
                     borderRadius: 1.5,
-                    bgcolor: noteOpen ? '#EEF2FF' : '#fff',
-                    color: noteOpen ? '#4338CA' : 'inherit'
+                    bgcolor: '#fff'
                   }}
                 >
                   <Icon name="add_comment" size={18} />
                 </IconButton>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  onClick={() => (onIgnore ? onIgnore(item) : onOverride(item))}
+                  fullWidth
+                  sx={{
+                    color: '#475569', borderColor: '#CBD5E1', bgcolor: '#fff',
+                    '&:hover': { borderColor: '#94A3B8', bgcolor: '#F8FAFC' }
+                  }}
+                >
+                  Ignore
+                </Button>
               </Stack>
             </Stack>
           ) : (
             <>
-              {item.assignments && (
+              {item.assignments && !item.priorities && (
                 <Stack spacing={0.625} sx={{ mb: 0.75 }}>
                   {item.assignments.map((a, i) => (
-                    <Stack key={i} direction="row" spacing={0.75} alignItems="flex-start">
-                      <Box
-                        sx={{
-                          width: 24, height: 24, borderRadius: '6px', flexShrink: 0,
-                          bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', mt: '1px'
-                        }}
+                    <Box key={i} sx={{ minWidth: 0 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.3 }}
                       >
-                        <Icon name={a.icon} size={14} color="#4338CA" />
-                      </Box>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        {a.primary}
+                      </Typography>
+                      {a.secondary && (
                         <Typography
                           variant="caption"
-                          sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.3 }}
+                          sx={{ display: 'block', color: '#64748B', lineHeight: 1.3, mt: 0.125 }}
                         >
-                          {a.primary}
+                          {a.secondary}
                         </Typography>
-                        {a.secondary && (
-                          <Typography
-                            variant="caption"
-                            sx={{ display: 'block', color: '#64748B', lineHeight: 1.3, mt: 0.125 }}
-                          >
-                            {a.secondary}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
+                      )}
+                    </Box>
                   ))}
                 </Stack>
               )}
-              <Typography variant="caption" sx={lineSx}>
-                {item.recommended}
-              </Typography>
               {!day1 && (
                 <Button
                   size="small"
@@ -1114,96 +1229,63 @@ function ReviewCard({ item, onApprove, onOverride, onViewStaff }) {
               )}
               <Collapse in={moreOpen} unmountOnExit>
                 {item.why && (
-                  <Stack direction="row" spacing={0.5} sx={{ mb: 0.5 }}>
-                    <Icon name="psychology" size={13} color="#475569" sx={{ mt: '2px', flexShrink: 0 }} />
-                    <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
-                      Why: {item.why}
-                    </Typography>
-                  </Stack>
+                  <Typography variant="caption" sx={{ ...lineSx, mb: 0.5 }}>
+                    <Box component="span" sx={{ fontWeight: 600, color: '#0F172A' }}>Why:</Box> {item.why}
+                  </Typography>
                 )}
                 <Typography variant="caption" sx={{ ...lineSx, mb: 0 }}>
-                  Tradeoff: {item.tradeoff}
+                  <Box component="span" sx={{ fontWeight: 600, color: '#0F172A' }}>Tradeoff:</Box> {item.tradeoff}
                 </Typography>
                 {confidenceRow}
               </Collapse>
-              <Divider sx={{ my: 1 }} />
-              <Stack direction="row" spacing={1}>
-                <Button size="small" variant="contained" onClick={() => onApprove(item)} fullWidth>
-                  Approve
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color={mode === 'sickDay' ? 'inherit' : 'error'}
-                  onClick={() => onOverride(item)}
-                  fullWidth
-                >
-                  {mode === 'sickDay' ? 'Decide manually' : 'Override'}
-                </Button>
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 <IconButton
                   size="small"
-                  onClick={() => setNoteOpen((v) => !v)}
+                  onClick={openContext}
                   sx={{
-                    border: '1px solid',
-                    borderColor: noteOpen ? '#4338CA' : '#CBD5E1',
+                    border: '1px solid #CBD5E1',
                     borderRadius: 1.5,
-                    bgcolor: noteOpen ? '#EEF2FF' : '#fff',
-                    color: noteOpen ? '#4338CA' : 'inherit'
+                    bgcolor: '#fff'
                   }}
                 >
                   <Icon name="add_comment" size={18} />
                 </IconButton>
+                {servicesRec ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    onClick={() => (onIgnore ? onIgnore(item) : onOverride(item))}
+                    fullWidth
+                    sx={{
+                      color: '#475569', borderColor: '#CBD5E1', bgcolor: '#fff',
+                      '&:hover': { borderColor: '#94A3B8', bgcolor: '#F8FAFC' }
+                    }}
+                  >
+                    Ignore
+                  </Button>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color={mode === 'sickDay' ? 'inherit' : 'primary'}
+                    onClick={() => onOverride(item)}
+                    fullWidth
+                  >
+                    {mode === 'sickDay' ? 'Decide manually' : 'Modify'}
+                  </Button>
+                )}
+                <Button size="small" variant="contained" onClick={() => onApprove(item)} fullWidth>
+                  Approve
+                </Button>
               </Stack>
             </>
           )}
-          <Collapse in={noteOpen} unmountOnExit>
-            <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed #CBD5E1' }}>
-              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.75 }}>
-                <Icon name="add_comment" size={14} color="#4338CA" />
-                <Typography variant="caption" sx={{ fontWeight: 700, color: '#4338CA' }}>
-                  Add context for this decision
-                </Typography>
-              </Stack>
-              <TextField
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="e.g. Apex is booked today — try in-house first, escalate if not cleared by noon."
-                multiline
-                minRows={2}
-                fullWidth
-                size="small"
-                sx={{ mb: 1, '.MuiInputBase-root': { fontSize: 13, bgcolor: '#fff' } }}
-              />
-              <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.75 }}>
-                Apply this note, then decide:
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                <Button
-                  size="small"
-                  variant="contained"
-                  fullWidth
-                  disabled={!note.trim()}
-                  onClick={() => submit('approve')}
-                >
-                  Approve with note
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  fullWidth
-                  disabled={!note.trim()}
-                  onClick={() => submit('override')}
-                >
-                  Override / decline
-                </Button>
-              </Stack>
-            </Box>
-          </Collapse>
           </Box>
         </Box>
       </CardContent>
     </Card>
+    </Box>
   );
 }
 
@@ -1306,7 +1388,7 @@ function ContextSheet({ open, task, onClose, onResolve }) {
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-              Your call — this overrides the original plan.
+              Your call — this modifies the original plan.
             </Typography>
           </Stack>
         )}
@@ -1435,7 +1517,7 @@ function ReasoningSheet({ open, task, onClose, onFeedback }) {
           />
         </Stack>
 
-        <Divider sx={{ my: 1.75 }} />
+        <Box sx={{ mt: 1.75 }} />
 
         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
           Was this the right call?
@@ -1604,7 +1686,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" sx={{ lineHeight: 1.2 }}>
-              {hasPriorities ? 'Handle each priority' : 'Override recorded'}
+              {hasPriorities ? 'Handle each priority' : 'Modification recorded'}
             </Typography>
             <Typography variant="caption">{subject}</Typography>
           </Box>
@@ -1623,7 +1705,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
             <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
               AI had recommended
             </Typography>
-            <Typography variant="body2" sx={{ fontSize: 12.5, textDecoration: 'line-through', color: '#94A3B8' }}>
+            <Typography variant="body2" sx={{ fontSize: 12.5, color: '#475569' }}>
               {rec}
             </Typography>
           </Box>
@@ -1632,7 +1714,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
         {hasPriorities ? (
           <>
             <Typography variant="caption" sx={{ display: 'block', color: '#475569', mb: 0.75, lineHeight: 1.4 }}>
-              Tap each priority to open the work order and decide how to handle it. Once all three are resolved you can lock in or shape the rule.
+              Resolve each priority, then lock in or shape the rule.
             </Typography>
 
             {/* Scheduling-conflict banner — surfaces double-bookings before
@@ -1790,14 +1872,7 @@ function OverrideSheet({ open, item, onClose, onChoose }) {
                   </Button>
                 </Stack>
               </>
-            ) : (
-              <Typography
-                variant="caption"
-                sx={{ display: 'block', color: '#94A3B8', textAlign: 'center', lineHeight: 1.4 }}
-              >
-                {`${item.priorities.filter((p) => resolutionFor(p)).length} of ${item.priorities.length} resolved · tap a priority above to continue`}
-              </Typography>
-            )}
+            ) : null}
           </>
         ) : (
           <>
@@ -1866,46 +1941,22 @@ function CalibrationButton({ onClick }) {
 // Day 30 — "Operationally Calibrated" state banner.
 function Day30Banner({ onReview, onMetric }) {
   return (
-    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
+    <Card variant="outlined" sx={{ bgcolor: '#E5F1FA', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box
-            sx={{
-              width: 34, height: 34, borderRadius: '10px', bgcolor: '#EEF2FF',
-              display: 'grid', placeItems: 'center', flexShrink: 0
-            }}
-          >
-            <Icon name="verified_user" size={19} color="#4338CA" />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                {day30Status.headline}
-              </Typography>
-              <Chip
-                size="small"
-                label="Day 30 · Calibrated"
-                sx={{
-                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
-                  '.MuiChip-label': { px: 0.625 }
-                }}
-              />
-            </Stack>
-            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
-              {day30Status.sub}{' '}
-              <Box
-                component="span"
-                onClick={(e) => { e.stopPropagation(); onReview && onReview(); }}
-                sx={{
-                  color: '#0369A1', textDecoration: 'underline',
-                  fontWeight: 600, cursor: 'pointer'
-                }}
-              >
-                Review coordination settings
-              </Box>.
-            </Typography>
-          </Box>
-        </Stack>
+        <Typography
+          component="h4"
+          sx={{
+            color: '#293036',
+            fontFeatureSettings: "'liga' off, 'clig' off",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontSize: 18,
+            fontWeight: 700,
+            lineHeight: '133.3%',
+            letterSpacing: '-0.252px'
+          }}
+        >
+          {day30Status.headline}
+        </Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0.75, mt: 1.25 }}>
           {day30Status.metrics.map((m) => {
@@ -1915,7 +1966,7 @@ function Day30Banner({ onReview, onMetric }) {
                 key={m.label}
                 onClick={() => clickable && onMetric(m.key)}
                 sx={{
-                  border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
+                  border: '1px solid #E2E8F0', borderRadius: '8px', p: 0.875, bgcolor: '#fff',
                   cursor: clickable ? 'pointer' : 'default',
                   transition: 'transform 80ms, border-color 80ms, box-shadow 80ms',
                   position: 'relative',
@@ -1937,11 +1988,6 @@ function Day30Banner({ onReview, onMetric }) {
                 <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
                   {m.label}
                 </Typography>
-                {m.sub && (
-                  <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10 }}>
-                    {m.sub}
-                  </Typography>
-                )}
               </Box>
             );
           })}
@@ -1955,42 +2001,22 @@ function Day30Banner({ onReview, onMetric }) {
 // Day 90 — "Predictive Operations Mode" banner.
 function Day90Banner({ onReview, onMetric }) {
   return (
-    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
+    <Card variant="outlined" sx={{ bgcolor: '#E5F1FA', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box
-            sx={{
-              width: 34, height: 34, borderRadius: '10px', bgcolor: '#EEF2FF',
-              display: 'grid', placeItems: 'center', flexShrink: 0
-            }}
-          >
-            <Icon name="online_prediction" size={19} color="#4338CA" />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
-              <Chip
-                size="small"
-                label="Day 90 · Insights available"
-                sx={{
-                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
-                  '.MuiChip-label': { px: 0.625 }
-                }}
-              />
-            </Stack>
-            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
-              {day90Status.headline}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
-              {day90Status.sub}
-            </Typography>
-            <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
-              <Icon name="info" size={12} color="#94A3B8" sx={{ mt: '2px', flexShrink: 0 }} />
-              <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', lineHeight: 1.3 }}>
-                {day90Status.context}
-              </Typography>
-            </Stack>
-          </Box>
-        </Stack>
+        <Typography
+          component="h4"
+          sx={{
+            color: '#293036',
+            fontFeatureSettings: "'liga' off, 'clig' off",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontSize: 18,
+            fontWeight: 700,
+            lineHeight: '133.3%',
+            letterSpacing: '-0.252px'
+          }}
+        >
+          {day90Status.headline}
+        </Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 0.75, mt: 1.25 }}>
           {day90Status.metrics.map((m) => {
@@ -2000,7 +2026,7 @@ function Day90Banner({ onReview, onMetric }) {
                 key={m.label}
                 onClick={() => clickable && onMetric(m.key)}
                 sx={{
-                  border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
+                  border: '1px solid #E2E8F0', borderRadius: '8px', p: 0.875, bgcolor: '#fff',
                   gridColumn: m.wide ? 'span 3' : 'span 2',
                   cursor: clickable ? 'pointer' : 'default',
                   transition: 'transform 80ms, border-color 80ms, box-shadow 80ms',
@@ -2600,77 +2626,46 @@ function OperationalForecast() {
 // to convey the system is continuously retrying.
 function AgentOutageBanner() {
   const e = agentOutageEvent;
+  // DSX-MUI filled error Alert (node 6595:48260): error/main #C60C30 fill,
+  // white contrast text, 4px radius, ErrorOutline icon. Title 16px / Medium,
+  // description 14px / Medium, both Inter.
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        borderColor: '#FCA5A5', bgcolor: '#FEF2F2', mb: 1.5,
-        borderLeftWidth: 4, borderLeftColor: '#DC2626'
-      }}
-    >
+    <Card sx={{ bgcolor: '#C60C30', borderRadius: '4px', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 1 }}>
-          <Box
-            sx={{
-              width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
-              bgcolor: '#FEE2E2', display: 'grid', placeItems: 'center'
-            }}
-          >
-            <Icon name="cloud_off" size={20} color="#B91C1C" />
-          </Box>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Icon name="error" size={20} color="#FFFFFF" sx={{ mt: '1px', flexShrink: 0 }} />
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mb: 0.125 }}>
-              <Typography sx={{ fontSize: 15, fontWeight: 700, color: '#7F1D1D', lineHeight: 1.2 }}>
-                {e.title}
-              </Typography>
-              <Chip
-                size="small"
-                label="System error"
-                sx={{
-                  height: 17, fontSize: 10, fontWeight: 700,
-                  bgcolor: '#FEE2E2', color: '#B91C1C',
-                  border: '1px solid #FCA5A5',
-                  '.MuiChip-label': { px: 0.625 }
-                }}
-              />
-            </Stack>
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
-              <Icon name="schedule" size={13} color="#7F1D1D" />
-              <Typography variant="caption" sx={{ color: '#7F1D1D', fontWeight: 600 }}>
-                Down since {e.startedAt} · {e.ago}
-              </Typography>
-            </Stack>
-            <Typography variant="caption" sx={{ color: '#7F1D1D', display: 'block', lineHeight: 1.35 }}>
-              {e.detail}
+            <Typography
+              sx={{
+                color: '#FFFFFF',
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                fontSize: 16, fontWeight: 500, lineHeight: 1.5, letterSpacing: '-0.176px'
+              }}
+            >
+              {e.title}
+            </Typography>
+            <Typography
+              sx={{
+                color: '#FFFFFF',
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                fontSize: 14, fontWeight: 500, lineHeight: 1.43, letterSpacing: '-0.1px',
+                mt: 0.25
+              }}
+            >
+              Down since {e.startedAt} · {e.ago}
+            </Typography>
+            <Typography
+              sx={{
+                color: 'rgba(255,255,255,0.88)',
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                fontSize: 14, fontWeight: 500, lineHeight: 1.43, letterSpacing: '-0.1px',
+                mt: 0.5
+              }}
+            >
+              TELS is on it · back by ~{e.etaRestore}.
             </Typography>
           </Box>
         </Stack>
-
-        {/* Status pill — vendor-acknowledged outage with the ETA folded
-            into a secondary line so the whole thing reads as one card. */}
-        <Box
-          sx={{
-            display: 'flex', alignItems: 'flex-start', gap: 0.75,
-            bgcolor: '#fff', border: '1px solid #FCA5A5', borderRadius: 1.5,
-            px: 1, py: 0.625, mb: 1
-          }}
-        >
-          <Box sx={{ bgcolor: '#FEE2E2', borderRadius: '4px', px: 0.625, py: 0.125, mt: 0.125 }}>
-            <Typography sx={{ fontSize: 9, fontWeight: 800, color: '#B91C1C', letterSpacing: 0.4 }}>
-              STATUS
-            </Typography>
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="caption" sx={{ color: '#7F1D1D', fontWeight: 700, display: 'block', lineHeight: 1.25 }}>
-              TELS is aware and working on it
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.25, mt: 0.125 }}>
-              Back by ~{e.etaRestore} · {e.etaIn} · {e.etaRange.toLowerCase()}
-            </Typography>
-          </Box>
-        </Box>
-
-
       </CardContent>
     </Card>
   );
@@ -2679,44 +2674,26 @@ function AgentOutageBanner() {
 // Day 1 — "Learning your building" status banner.
 function Day1Banner({ onMetric, onSettings }) {
   return (
-    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF', mb: 1.5 }}>
+    <Card variant="outlined" sx={{ bgcolor: '#E5F1FA', mb: 1.5 }}>
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box
-            sx={{
-              width: 34, height: 34, borderRadius: '10px', bgcolor: '#EEF2FF',
-              display: 'grid', placeItems: 'center', flexShrink: 0
-            }}
-          >
-            <Icon name="school" size={19} color="#4338CA" />
-          </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                {day1Status.headline}
-              </Typography>
-              <Chip
-                size="small"
-                label="Day 1 · Learning"
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap>
+              <Typography
+                component="h4"
                 sx={{
-                  height: 17, fontSize: 9.5, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA',
-                  '.MuiChip-label': { px: 0.625 }
-                }}
-              />
-            </Stack>
-            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25, lineHeight: 1.35 }}>
-              {day1Status.sub}{' '}
-              <Box
-                component="span"
-                onClick={(e) => { e.stopPropagation(); onSettings && onSettings(); }}
-                sx={{
-                  color: '#0369A1', textDecoration: 'underline',
-                  fontWeight: 600, cursor: 'pointer'
+                  color: '#293036',
+                  fontFeatureSettings: "'liga' off, 'clig' off",
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  lineHeight: '133.3%',
+                  letterSpacing: '-0.252px'
                 }}
               >
-                Adjust coordination settings
-              </Box>.
-            </Typography>
+                {day1Status.headline}
+              </Typography>
+            </Stack>
           </Box>
         </Stack>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0.75, mt: 1.25 }}>
@@ -2725,7 +2702,7 @@ function Day1Banner({ onMetric, onSettings }) {
               key={m.label}
               onClick={() => onMetric && onMetric(m.key)}
               sx={{
-                border: '1px solid #E2E8F0', borderRadius: 1.5, p: 0.875, bgcolor: '#fff',
+                border: '1px solid #E2E8F0', borderRadius: '8px', p: 0.875, bgcolor: '#fff',
                 cursor: onMetric ? 'pointer' : 'default',
                 transition: 'transform 80ms, border-color 80ms, box-shadow 80ms',
                 position: 'relative',
@@ -2746,9 +2723,6 @@ function Day1Banner({ onMetric, onSettings }) {
               </Stack>
               <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.2, mt: 0.25 }}>
                 {m.label}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10 }}>
-                {m.sub}
               </Typography>
             </Box>
           ))}
@@ -3685,14 +3659,6 @@ function ServiceProviderSheet({ open, item, onClose, onAiDispatch, onManualCreat
       </Box>
 
       <Box sx={{ p: 1.5, overflowY: 'auto' }}>
-        {targetSub && (
-          <Box sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1, mb: 1.5 }}>
-            <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.4 }}>
-              {targetSub}
-            </Typography>
-          </Box>
-        )}
-
         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.75 }}>
           HOW DO YOU WANT TO DISPATCH?
         </Typography>
@@ -4069,7 +4035,7 @@ function CoordinationPatternsSheet({ open, onClose, onContext, onSnack }) {
 
 // Drawer for typing or dictating context against a Day 1 metric item.
 // Opens on top of the metric/undo drawers; saving closes only this sheet.
-function AddContextSheet({ open, item, onClose, onSave }) {
+function AddContextSheet({ open, item, onClose, onSave, onSaveModify, onSaveApprove }) {
   const [value, setValue] = React.useState('');
   const [recording, setRecording] = React.useState(false);
   const recordTimer = React.useRef(null);
@@ -4143,7 +4109,7 @@ function AddContextSheet({ open, item, onClose, onSave }) {
               Add context
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.25 }}>
-              Tell the AI what to weight on the next pass — type or dictate.
+              Tell the AI what to weight on the next pass.
             </Typography>
           </Box>
           <IconButton size="small" onClick={onClose}>
@@ -4160,10 +4126,10 @@ function AddContextSheet({ open, item, onClose, onSave }) {
             }}
           >
             <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block' }}>
-              {item.when || 'Day 1 calibration'}
+              {item.when || item.flaggedAt || 'Day 3 calibration'}
             </Typography>
             <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: '#0F172A', lineHeight: 1.25, mt: 0.125 }}>
-              {item.title}
+              {item.title || item.summary}
             </Typography>
           </Box>
         )}
@@ -4220,27 +4186,59 @@ function AddContextSheet({ open, item, onClose, onSave }) {
           </Stack>
         )}
 
-        <Stack direction="row" spacing={0.875} sx={{ mt: 1.5 }}>
-          <Button
-            fullWidth
-            variant="outlined"
-            color="inherit"
-            onClick={onClose}
-            sx={{ textTransform: 'none', fontWeight: 600 }}
-          >
-            Cancel
-          </Button>
-          <Button
-            fullWidth
-            variant="contained"
-            disabled={!canSave}
-            onClick={() => onSave && onSave(value.trim())}
-            startIcon={<Icon name="check" size={16} />}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Save context
-          </Button>
-        </Stack>
+        {/* No Cancel — the header's close (X) already dismisses the sheet.
+            Review-context variant puts all three actions on one row (Save
+            context far-left); the generic sheet shows Save context alone. */}
+        {(onSaveModify || onSaveApprove) ? (
+          <Stack direction="row" spacing={0.75} sx={{ mt: 1.5 }}>
+            <Button
+              fullWidth
+              size="small"
+              variant="contained"
+              disabled={!canSave}
+              onClick={() => onSave && onSave(value.trim())}
+              sx={{ minHeight: 44, textTransform: 'none', fontWeight: 700, fontSize: 12, px: 0.75, whiteSpace: 'nowrap' }}
+            >
+              Save context
+            </Button>
+            {onSaveModify && (
+              <Button
+                fullWidth
+                size="small"
+                variant="outlined"
+                color="primary"
+                onClick={() => onSaveModify(value.trim())}
+                sx={{ minHeight: 44, textTransform: 'none', fontWeight: 700, fontSize: 12, px: 0.75, whiteSpace: 'nowrap' }}
+              >
+                Save and modify
+              </Button>
+            )}
+            {onSaveApprove && (
+              <Button
+                fullWidth
+                size="small"
+                variant="contained"
+                onClick={() => onSaveApprove(value.trim())}
+                sx={{ minHeight: 44, textTransform: 'none', fontWeight: 700, fontSize: 12, px: 0.75, whiteSpace: 'nowrap', bgcolor: '#16A34A', '&:hover': { bgcolor: '#15803D' } }}
+              >
+                Save and approve
+              </Button>
+            )}
+          </Stack>
+        ) : (
+          <Stack direction="row" spacing={0.875} sx={{ mt: 1.5 }}>
+            <Button
+              fullWidth
+              variant="contained"
+              disabled={!canSave}
+              onClick={() => onSave && onSave(value.trim())}
+              startIcon={<Icon name="check" size={16} />}
+              sx={{ minHeight: 44, textTransform: 'none', fontWeight: 700 }}
+            >
+              Save context
+            </Button>
+          </Stack>
+        )}
       </Box>
     </Drawer>
   );
@@ -4536,7 +4534,7 @@ function Day1WorkCard({ task, tier, tierNum, onReason, onApprove, onOverride }) 
   const isCritical = tierNum === 1;
   const isRoutine = tier.id === 't5';
   const primaryLabel = isCritical ? 'Assign now' : isRoutine ? 'Approve batch' : 'Approve';
-  const secondaryLabel = isRoutine ? 'Defer' : 'Override';
+  const secondaryLabel = isRoutine ? 'Defer' : 'Modify';
   return (
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -4628,12 +4626,6 @@ function Day1WorkCard({ task, tier, tierNum, onReason, onApprove, onOverride }) 
         </Box>
 
         <Stack direction="row" spacing={0.75} sx={{ mt: 0.875 }}>
-          <Button size="small" variant="contained" fullWidth onClick={() => onApprove(task)}>
-            {primaryLabel}
-          </Button>
-          <Button size="small" variant="outlined" color="error" fullWidth onClick={() => onOverride(task)}>
-            {secondaryLabel}
-          </Button>
           <IconButton
             size="small"
             onClick={() => onReason(task)}
@@ -4641,6 +4633,12 @@ function Day1WorkCard({ task, tier, tierNum, onReason, onApprove, onOverride }) 
           >
             <Icon name="add_comment" size={18} />
           </IconButton>
+          <Button size="small" variant="outlined" color="primary" fullWidth onClick={() => onOverride(task)}>
+            {secondaryLabel}
+          </Button>
+          <Button size="small" variant="contained" fullWidth onClick={() => onApprove(task)}>
+            {primaryLabel}
+          </Button>
         </Stack>
       </CardContent>
     </Card>
@@ -4741,19 +4739,101 @@ function LearningSignals() {
 // Calm-mode sections — operational readiness framing (replaces task lists)
 // ─────────────────────────────────────────────────────────────────────
 
-function SectionHeader({ icon, title, sub, color = '#4338CA' }) {
+// Bare title — no leading icon, no caption. Typography matches the DSX
+// h4 spec: Inter 18px / 700 / line-height 133.3% / letter-spacing -0.252px
+// / Gray 800 (#293036), with ligatures off. Optional right-aligned count
+// (e.g. "5 items") mirrors the Figma "11 Insights" pattern. Icon and sub
+// props are accepted but ignored so existing call sites stay valid.
+function SectionHeader({ title, count, countLabel = 'items' }) {
   return (
-    <Stack direction="row" spacing={0.625} alignItems="flex-start" sx={{ mb: 1 }}>
-      <Icon name={icon} size={16} color={color} sx={{ mt: '2px' }} />
-      <Box sx={{ flex: 1 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{title}</Typography>
-        {sub && (
-          <Typography variant="caption" sx={{ display: 'block', lineHeight: 1.3 }}>
-            {sub}
-          </Typography>
-        )}
-      </Box>
+    <Stack
+      direction="row"
+      alignItems="baseline"
+      justifyContent="space-between"
+      sx={{ mb: 1 }}
+    >
+      <Typography
+        component="h4"
+        sx={{
+          color: '#293036',
+          fontFeatureSettings: "'liga' off, 'clig' off",
+          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+          fontSize: 18,
+          fontStyle: 'normal',
+          fontWeight: 700,
+          lineHeight: '133.3%',
+          letterSpacing: '-0.252px'
+        }}
+      >
+        {title}
+      </Typography>
+      {typeof count === 'number' && (
+        <Typography
+          component="span"
+          sx={{
+            color: '#293036',
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontSize: 14,
+            lineHeight: 1.25
+          }}
+        >
+          <Box component="span" sx={{ fontWeight: 700 }}>{count}</Box>
+          <Box component="span" sx={{ color: '#64748B', ml: 0.5 }}>{countLabel}</Box>
+        </Typography>
+      )}
     </Stack>
+  );
+}
+
+// Empty state for the exceptions queue once the MD has cleared everything.
+// A small spot illustration (gradient disc + check + accent dots) plus a
+// warm first-person reassurance, in the calm "all handled" green.
+function ExceptionsEmptyState({
+  title = "You're all caught up",
+  body = "Nothing needs your review right now. I'll flag anything the moment it comes up.",
+  onViewActivity
+}) {
+  return (
+    <Box sx={{ textAlign: 'center', py: 3.5, px: 2 }}>
+      <Box sx={{ position: 'relative', width: 96, height: 96, mx: 'auto', mb: 1.75 }}>
+        {/* soft outer halo */}
+        <Box sx={{ position: 'absolute', inset: 0, borderRadius: '50%', bgcolor: '#DCFCE7', opacity: 0.6 }} />
+        {/* inner gradient disc */}
+        <Box
+          sx={{
+            position: 'absolute', inset: 12, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #BBF7D0 0%, #86EFAC 100%)',
+            display: 'grid', placeItems: 'center',
+            boxShadow: '0 8px 20px rgba(22,163,74,0.18)'
+          }}
+        >
+          <Icon name="task_alt" size={36} color="#15803D" />
+        </Box>
+        {/* accent dots */}
+        <Box sx={{ position: 'absolute', top: 8, right: 10, width: 9, height: 9, borderRadius: '50%', bgcolor: '#4ADE80' }} />
+        <Box sx={{ position: 'absolute', bottom: 14, left: 6, width: 6, height: 6, borderRadius: '50%', bgcolor: '#86EFAC' }} />
+        <Box sx={{ position: 'absolute', top: 24, left: 0, width: 5, height: 5, borderRadius: '50%', bgcolor: '#BBF7D0' }} />
+      </Box>
+      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>
+        {title}
+      </Typography>
+      <Typography variant="caption" sx={{ display: 'block', color: '#64748B', mt: 0.5, maxWidth: 268, mx: 'auto', lineHeight: 1.45 }}>
+        {body}
+      </Typography>
+      {onViewActivity && (
+        <Button
+          variant="text"
+          onClick={onViewActivity}
+          endIcon={<Icon name="arrow_forward" size={15} color="#0065BD" />}
+          sx={{
+            mt: 1, textTransform: 'none', fontWeight: 700, fontSize: 13,
+            color: '#0065BD', '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' }
+          }}
+        >
+          See what I'm handling in the background
+        </Button>
+      )}
+    </Box>
   );
 }
 
@@ -4807,8 +4887,8 @@ function OperationalPriorityCard({ item, onApprove, onOverride, onReason }) {
           <Button size="small" variant="contained" fullWidth onClick={() => onApprove && onApprove(item)}>
             {item.approveLabel || 'Approve'}
           </Button>
-          <Button size="small" variant="outlined" color="inherit" fullWidth onClick={() => onOverride && onOverride(item)}>
-            Override
+          <Button size="small" variant="outlined" color="primary" fullWidth onClick={() => onOverride && onOverride(item)}>
+            Modify
           </Button>
           {onReason && (
             <IconButton
@@ -4868,42 +4948,61 @@ function StaffingConflictCard({ item, onApprove, onOverride }) {
 
 // Card for a brand-new incoming work order with an AI-suggested assignment.
 // Rendered at the top of Day 1 approvals — fresh, time-sensitive decision.
-function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContext, onViewStaff }) {
+function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContext, onViewStaff, sweeping = false }) {
   const mode = useMode();
+  const openItem = useOpenItem();
+  // Tapping Modify drops the MD straight into the work-order detail card so
+  // they can schedule it however they want (reassign, reschedule, duration).
+  const openWorkOrder = () => openItem && openItem({
+    id: item.id,
+    kind: item.kind || 'New work order',
+    title: item.title,
+    icon: item.icon,
+    tone: item.tone,
+    status: item.status || 'Needs scheduling',
+    location: item.location,
+    assignee: item.suggestion?.tech || 'Unassigned',
+    time: item.receivedAt || item.receivedAgo,
+    note: item.body,
+    priority: item.priority
+  });
+  // Priority → TELS tier mapping. Medium → T3, High → T2, Critical → T1, Low → T4.
+  const PRIORITY_TIER = { Critical: 'T1', High: 'T2', Medium: 'T3', Low: 'T4' };
+  const tier = PRIORITY_TIER[item.priority] || 'T3';
+  // Tier-driven badge palette — light fill / dark text matching the priority.
+  const TIER_PALETTE = {
+    T1: { bg: '#FEE2E2', fg: '#B91C1C' },
+    T2: { bg: '#FFEDD5', fg: '#9A3412' },
+    T3: { bg: '#FEF3C7', fg: '#92400E' },
+    T4: { bg: '#F1F5F9', fg: '#475569' }
+  };
+  const tierPalette = TIER_PALETTE[tier];
   return (
-    <Card variant="outlined" sx={{ borderColor: '#A5B4FC', bgcolor: '#FCFCFF' }}>
+    <Box
+      sx={{
+        transition: 'transform 380ms cubic-bezier(0.4, 0, 0.2, 1), opacity 380ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: sweeping ? 'translateX(115%)' : 'translateX(0)',
+        opacity: sweeping ? 0 : 1,
+        pointerEvents: sweeping ? 'none' : 'auto'
+      }}
+    >
+    <Card variant="outlined" sx={{ bgcolor: '#FCFCFF' }}>
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-        <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box
-            sx={{
-              width: 34, height: 34, borderRadius: '10px', flexShrink: 0,
-              bgcolor: '#E0F2FE', display: 'grid', placeItems: 'center'
-            }}
-          >
-            <Icon name={item.icon} size={19} color="#0369A1" />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
               <Chip
                 size="small"
-                label="New"
+                icon={<TierIcon tier={tier} size={14} />}
+                label="New work order"
                 sx={{
-                  height: 17, fontSize: 9.5, fontWeight: 700,
-                  bgcolor: '#0F172A', color: '#fff',
-                  '.MuiChip-label': { px: 0.625 }
+                  height: 20, fontSize: 10.5, fontWeight: 700,
+                  bgcolor: tierPalette.bg, color: tierPalette.fg,
+                  '.MuiChip-label': { px: 0.75 },
+                  '.MuiChip-icon': { ml: 0.5, mr: -0.25 }
                 }}
               />
-              <Chip
-                size="small"
-                label={item.priority}
-                sx={{
-                  height: 17, fontSize: 9.5, fontWeight: 700,
-                  bgcolor: '#FEF3C7', color: '#92400E',
-                  '.MuiChip-label': { px: 0.625 }
-                }}
-              />
-              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
-                {item.id.toUpperCase()} · {item.receivedAgo}
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+                {item.receivedAgo}
               </Typography>
             </Stack>
             <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
@@ -4911,34 +5010,36 @@ function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContex
             </Typography>
             <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: '#64748B' }}>
               <Icon name="place" size={13} color="#94A3B8" />
-              <Typography variant="caption">{item.location}</Typography>
+              <Typography variant="caption">{item.location} · {item.id.toUpperCase()}</Typography>
             </Stack>
             <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.5 }}>
               {item.body}
             </Typography>
-          </Box>
-        </Stack>
+        </Box>
 
         <Box
           sx={{
-            bgcolor: mode === 'sickDay' ? '#FEF2F2' : '#F8FAFC',
-            border: '1px solid',
-            borderColor: mode === 'sickDay' ? '#FCA5A5' : '#E2E8F0',
+            bgcolor: '#F8FAFC',
             borderRadius: 1.5, p: 1, mt: 0.875
           }}
         >
           {mode === 'sickDay' ? (
-            <Box sx={{ mb: 0.75 }}>
-              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
-                <Icon name="cloud_off" size={13} color="#B91C1C" />
-                <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C' }}>
-                  Stale suggestion · last computed {agentOutageEvent.startedAt}
-                </Typography>
-              </Stack>
-              <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.3 }}>
-                Capacity and ETA below were calculated before the agent went down. Staff schedules may have shifted since.
+            // DSX filled-error treatment (error/main #C60C30) so the stale
+            // warning reads with the same urgency as the outage banner.
+            <Stack
+              direction="row"
+              spacing={0.625}
+              alignItems="center"
+              sx={{
+                bgcolor: '#C60C30', borderRadius: '4px',
+                px: 0.875, py: 0.5, mb: 0.75
+              }}
+            >
+              <Icon name="cloud_off" size={13} color="#FFFFFF" sx={{ flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                Stale suggestion · last computed {agentOutageEvent.startedAt}
               </Typography>
-            </Box>
+            </Stack>
           ) : (
             <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
               <Icon name="auto_awesome" size={13} color="#4338CA" />
@@ -4973,52 +5074,46 @@ function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContex
               sx={{ height: 18, fontSize: 10, '.MuiChip-label': { px: 0.5 } }}
             />
           </Stack>
-          <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mb: 0.375 }}>
-            <Icon name="psychology" size={13} color="#475569" sx={{ mt: '1px', flexShrink: 0 }} />
-            <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3 }}>
-              {item.suggestion.rationale}
-            </Typography>
-          </Stack>
-          <Typography variant="caption" sx={{ color: '#16A34A', fontWeight: 600 }}>
-            ✓ {item.suggestion.travel}
+          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.3, display: 'block', mb: 0.375 }}>
+            <Box component="span" sx={{ fontWeight: 600, color: '#0F172A' }}>Why:</Box> {item.suggestion.rationale}{' '}
+            <Box component="span" sx={{ color: '#16A34A', fontWeight: 600 }}>✓ {item.suggestion.travel}</Box>
           </Typography>
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.625 }}>
-            <Icon name="verified" size={12} color="#475569" />
-            <Typography variant="caption" sx={{ color: '#64748B' }}>
-              Confidence: {item.confidence}
-            </Typography>
-          </Stack>
-          <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
-            <Button
-              size="small"
-              variant="contained"
-              fullWidth
-              onClick={() => onApprove && onApprove(item)}
-            >
-              Approve
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color={mode === 'sickDay' ? 'inherit' : 'error'}
-              fullWidth
-              onClick={() => onReassign && onReassign(item)}
-              sx={{ bgcolor: '#fff' }}
-            >
-              {mode === 'sickDay' ? 'Decide manually' : 'Override'}
-            </Button>
-            <IconButton
-              size="small"
-              onClick={() => onContext && onContext(item)}
-              sx={{
-                border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff'
-              }}
-            >
-              <Icon name="add_comment" size={18} />
-            </IconButton>
-          </Stack>
+          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.625 }}>
+            <Box component="span" sx={{ fontWeight: 600, color: '#0F172A' }}>Confidence:</Box> {item.confidence}
+          </Typography>
         </Box>
 
+        {/* Action row sits at the full card width — outside the gray
+            "What I'd do" inset — so it lines up with other cards' footers. */}
+        <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+          <IconButton
+            size="small"
+            onClick={() => onContext && onContext(item)}
+            sx={{
+              border: '1px solid #CBD5E1', borderRadius: 1.5, bgcolor: '#fff'
+            }}
+          >
+            <Icon name="add_comment" size={18} />
+          </IconButton>
+          <Button
+            size="small"
+            variant="outlined"
+            color={mode === 'sickDay' ? 'inherit' : 'primary'}
+            fullWidth
+            onClick={() => (mode === 'sickDay' && onReassign ? onReassign(item) : openWorkOrder())}
+            sx={{ bgcolor: '#fff' }}
+          >
+            {mode === 'sickDay' ? 'Decide manually' : 'Modify'}
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            fullWidth
+            onClick={() => onApprove && onApprove(item)}
+          >
+            Approve
+          </Button>
+        </Stack>
         <Button
           fullWidth
           size="small"
@@ -5032,68 +5127,79 @@ function IncomingWorkOrderCard({ item, onApprove, onSnooze, onReassign, onContex
         </Button>
       </CardContent>
     </Card>
+    </Box>
   );
 }
 
-function PmTradeoffCard({ item, onApprove, onOverride }) {
+function PmTradeoffCard({ item, onApprove, onOverride, sweeping = false }) {
   const mode = useMode();
   const stale = mode === 'sickDay';
   return (
+    <Box
+      sx={{
+        transition: 'transform 380ms cubic-bezier(0.4, 0, 0.2, 1), opacity 380ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: sweeping ? 'translateX(115%)' : 'translateX(0)',
+        opacity: sweeping ? 0 : 1,
+        pointerEvents: sweeping ? 'none' : 'auto'
+      }}
+    >
     <Card variant="outlined" sx={{ borderColor: '#E2E8F0' }}>
       <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-        <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box
-            sx={{
-              width: 30, height: 30, borderRadius: '10px', flexShrink: 0,
-              bgcolor: '#F1F5F9', display: 'grid', placeItems: 'center'
-            }}
-          >
-            <Icon name={item.icon} size={17} color="#475569" />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
-              {item.title}
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
-              {item.body}
-            </Typography>
-            {stale ? (
-              <Box
-                sx={{
-                  mt: 0.625, bgcolor: '#FEF2F2', border: '1px solid #FCA5A5',
-                  borderRadius: 1.5, p: 0.75
-                }}
-              >
-                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
-                  <Icon name="cloud_off" size={13} color="#B91C1C" sx={{ flexShrink: 0 }} />
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C', lineHeight: 1.2 }}>
-                    Stale suggestion · last computed {agentOutageEvent.startedAt}
-                  </Typography>
-                </Stack>
-                <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.3 }}>
-                  {item.hint} The agent isn’t available to confirm the new slot is still open.
-                </Typography>
-              </Box>
-            ) : (
-              <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
-                <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
-                <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
-                  {item.hint}
+        <Box sx={{ minWidth: 0 }}>
+          {item.badge && (
+            <Chip
+              size="small"
+              label={item.badge}
+              sx={{
+                height: 20, fontSize: 10.5, fontWeight: 700, mb: 0.5,
+                bgcolor: '#F1F5F9', color: '#475569',
+                '.MuiChip-label': { px: 0.75 }
+              }}
+            />
+          )}
+          <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+            {item.title}
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#475569', lineHeight: 1.35, mt: 0.25 }}>
+            {item.body}
+          </Typography>
+          {stale ? (
+            <Box
+              sx={{
+                mt: 0.625, bgcolor: '#FEF2F2', border: '1px solid #FCA5A5',
+                borderRadius: 1.5, p: 0.75
+              }}
+            >
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
+                <Icon name="cloud_off" size={13} color="#B91C1C" sx={{ flexShrink: 0 }} />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#B91C1C', lineHeight: 1.2 }}>
+                  Stale suggestion · last computed {agentOutageEvent.startedAt}
                 </Typography>
               </Stack>
-            )}
-          </Box>
-        </Stack>
+              <Typography variant="caption" sx={{ color: '#991B1B', display: 'block', lineHeight: 1.3 }}>
+                {item.hint} The agent isn’t available to confirm the new slot is still open.
+              </Typography>
+            </Box>
+          ) : (
+            <Stack direction="row" spacing={0.375} alignItems="flex-start" sx={{ mt: 0.5 }}>
+              <Icon name="auto_awesome" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: '#4338CA', fontWeight: 600, lineHeight: 1.3 }}>
+                {item.hint}
+              </Typography>
+            </Stack>
+          )}
+        </Box>
         <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
-          <Button size="small" variant="contained" fullWidth onClick={() => onApprove && onApprove(item)}>
-            {stale ? 'Approve as proposed' : 'Approve defer'}
-          </Button>
           <Button size="small" variant="outlined" color="inherit" fullWidth onClick={() => onOverride && onOverride(item)}>
             {stale ? 'Decide manually' : 'Keep today'}
+          </Button>
+          <Button size="small" variant="contained" fullWidth onClick={() => onApprove && onApprove(item)}>
+            {stale ? 'Approve as proposed' : 'Approve defer'}
           </Button>
         </Stack>
       </CardContent>
     </Card>
+    </Box>
   );
 }
 
@@ -5273,7 +5379,7 @@ function StrategicRiskCard({ item }) {
   );
 }
 
-function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibration, onDay1Metric, onViewStaff, onSnooze, onContext, onPatternsTile, onRisksTile, onDismiss, onQueueForAgent, snoozedIds = [], dispatchedIds = new Set() }) {
+function TodayTab({ openReason, openOverride, onApprove, onIgnore, onReviewContext, sweepingId, onWeatherAccept, onViewActivity, onPriorities, onCalibration, onDay1Metric, onViewStaff, onSnooze, onContext, onPatternsTile, onRisksTile, onDismiss, onQueueForAgent, snoozedIds = [], dispatchedIds = new Set(), contextedIds = new Set() }) {
   const isDispatched = (id) => dispatchedIds && dispatchedIds.has && dispatchedIds.has(id);
   const openItem = useOpenItem();
   const { resolutions } = useItemResolutions();
@@ -5304,48 +5410,49 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
 
   return (
     <>
-      <Box sx={{ px: 1.5, pt: 2 }}>
+      <Box sx={{ px: 1.5, pt: 1.5 }}>
         {/* Error mode — agent-outage banner sits above everything else so
             the MD sees it first. The Day-1 banner is suppressed in this
             mode (the outage IS the status). */}
         {sickDay && (
           <Box
             sx={{
-              mx: -1.5, mt: -2, px: 1.5, pt: 2, pb: 0.5,
-              bgcolor: '#FEF2F2', mb: 1.5
+              mx: -1.5, mt: -1.5, px: 1.5, pt: 1.5, pb: 0.5,
+              bgcolor: '#E5F1FA', mb: 1.5
             }}
           >
             <AgentOutageBanner />
           </Box>
         )}
-        {/* Maturity banner — Day 1 sits on a light-purple section backdrop. */}
+        {/* Maturity banner — full-width on the day surface, no surrounding tint.
+            Combined with parent pt:1.5 and CardContent p:1.5, the banner
+            headline sits ~24px below the TopBar baseline. */}
         {day1 && !sickDay && (
-          <Box
-            sx={{
-              mx: -1.5, mt: -2, px: 1.5, pt: 2, pb: 0.5,
-              bgcolor: '#F5F3FF', mb: 1.5
-            }}
-          >
+          <Box sx={{ mx: -1.5, mt: -1.5, pt: 1.5, mb: 1.5 }}>
             <Day1Banner onMetric={onDay1Metric} onSettings={onCalibration} />
           </Box>
         )}
         {day30 && (
-          <Day30Banner
-            onReview={onCalibration}
-            onMetric={(k) => {
-              if (k === 'patterns') onPatternsTile && onPatternsTile();
-              else if (k === 'acceptance') onDay1Metric && onDay1Metric('accepted');
-            }}
-          />
+          <Box sx={{ mx: -1.5, mt: -1.5, pt: 1.5, mb: 1.5 }}>
+            <Day30Banner
+              onReview={onCalibration}
+              onMetric={(k) => {
+                if (k === 'patterns') onPatternsTile && onPatternsTile();
+                else if (k === 'acceptance') onDay1Metric && onDay1Metric('accepted');
+              }}
+            />
+          </Box>
         )}
         {day90 && (
-          <Day90Banner
-            onReview={onCalibration}
-            onMetric={(k) => {
-              if (k === 'patterns') onPatternsTile && onPatternsTile();
-              else if (k === 'risks') onRisksTile && onRisksTile();
-            }}
-          />
+          <Box sx={{ mx: -1.5, mt: -1.5, pt: 1.5, mb: 1.5 }}>
+            <Day90Banner
+              onReview={onCalibration}
+              onMetric={(k) => {
+                if (k === 'patterns') onPatternsTile && onPatternsTile();
+                else if (k === 'risks') onRisksTile && onRisksTile();
+              }}
+            />
+          </Box>
         )}
 
         {/* ── ERROR MODE — unscheduled work that came in during outage ── */}
@@ -5357,7 +5464,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
               sub={`${agentOutageEvent.unscheduledWorkOrders.length} new work orders need to be routed manually until the agent reconnects`}
               color="#B91C1C"
             />
-            <Stack spacing={1} sx={{ mb: 1.75 }}>
+            <Stack spacing={2} sx={{ mb: 1.75 }}>
               {agentOutageEvent.unscheduledWorkOrders.map((wo) => {
                 // Hide cards the MD has explicitly dismissed (via the X on
                 // the collapsed view).
@@ -5468,30 +5575,36 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                   }}
                 >
                   <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-                    {/* Top row — icon + meta on a single line. */}
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75, minWidth: 0 }}>
-                      <Box sx={{ flexShrink: 0, display: 'grid', placeItems: 'center', width: 24, height: 24 }}>
-                        {wo.tier === 'T1' || wo.tier === 'T2' || wo.tier === 'T3' || wo.tier === 'T4' ? (
-                          <TierIcon tier={wo.tier} size={22} />
-                        ) : (
-                          <Icon name={wo.icon} size={16} color="#64748B" />
-                        )}
-                      </Box>
-                      <Typography
-                        variant="caption"
+                    {/* Top row — category pill (tier-tinted) + meta on a single line. */}
+                    {(() => {
+                      const TIER_PILL = {
+                        T1: { bg: '#FEE2E2', fg: '#B91C1C' },
+                        T2: { bg: '#FFEDD5', fg: '#9A3412' },
+                        T3: { bg: '#FEF3C7', fg: '#92400E' },
+                        T4: { bg: '#F1F5F9', fg: '#475569' }
+                      };
+                      const palette = TIER_PILL[wo.tier] || TIER_PILL.T4;
+                      return (
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.75, minWidth: 0 }}>
+                      <Chip
+                        size="small"
+                        icon={wo.tier === 'T1' || wo.tier === 'T2' || wo.tier === 'T3' || wo.tier === 'T4'
+                          ? <TierIcon tier={wo.tier} size={14} />
+                          : undefined}
+                        label={wo.category}
                         sx={{
-                          color: '#64748B', fontWeight: 600, flex: 1, minWidth: 0,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                          height: 20, fontSize: 10.5, fontWeight: 700,
+                          bgcolor: palette.bg, color: palette.fg,
+                          '.MuiChip-label': { px: 0.75 },
+                          '.MuiChip-icon': { ml: 0.5, mr: -0.25 }
                         }}
-                      >
-                        <Box component="span" sx={{ color: '#64748B', fontWeight: 700 }}>
-                          {wo.category}
-                        </Box>
-                        <Box component="span" sx={{ color: '#94A3B8' }}>
-                          {' · received '}{wo.receivedAt}
-                        </Box>
+                      />
+                      <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+                        received {wo.receivedAt}
                       </Typography>
                     </Stack>
+                      );
+                    })()}
 
                     {/* Title and below flow at the full card width — no
                         longer indented under the meta column. */}
@@ -5511,19 +5624,6 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                       <Button
                         fullWidth
                         size="small"
-                        variant="contained"
-                        startIcon={<Icon name="person_add" size={13} color="#fff" />}
-                        onClick={(e) => { e.stopPropagation(); openWo({ autoOpen: true }); }}
-                        sx={{
-                          textTransform: 'none', fontWeight: 700, fontSize: 12,
-                          bgcolor: '#0065BD', '&:hover': { bgcolor: '#004A8A' }
-                        }}
-                      >
-                        Assign manually
-                      </Button>
-                      <Button
-                        fullWidth
-                        size="small"
                         variant="outlined"
                         startIcon={<Icon name="snooze" size={13} color="#0065BD" />}
                         onClick={(e) => { e.stopPropagation(); onQueueForAgent && onQueueForAgent(wo); }}
@@ -5535,6 +5635,19 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                       >
                         Queue for agent
                       </Button>
+                      <Button
+                        fullWidth
+                        size="small"
+                        variant="contained"
+                        startIcon={<Icon name="person_add" size={13} color="#fff" />}
+                        onClick={(e) => { e.stopPropagation(); openWo({ autoOpen: true }); }}
+                        sx={{
+                          textTransform: 'none', fontWeight: 700, fontSize: 12,
+                          bgcolor: '#0065BD', '&:hover': { bgcolor: '#004A8A' }
+                        }}
+                      >
+                        Assign manually
+                      </Button>
                     </Stack>
                   </CardContent>
                 </Card>
@@ -5545,15 +5658,23 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
         )}
 
         {/* ── DAY 1 ───────────────────────────────────────────────── */}
-        {day1 && (
+        {day1 && (() => {
+          // Live count of items in the approval queue: ReviewCards still
+          // open + incoming WO (unless snoozed/dispatched) + PM tradeoff +1
+          // for the always-present weather signal card, so the count matches
+          // the cards on screen (and the Dispatch nav badge).
+          const openReviews = reviews.filter((r) => !isDispatched(r.id)).length;
+          const incomingShown = !snoozedIds.includes(incomingWorkOrder.id) && !isDispatched(incomingWorkOrder.id) ? 1 : 0;
+          const pmTradeoffShown = isDispatched(day1PmTradeoff.id) ? 0 : 1;
+          const approvalCount = openReviews + incomingShown + pmTradeoffShown + 1;
+          return (
           <>
             <SectionHeader
-              icon="how_to_reg"
               title="Needs your approval"
-              sub="Decisions the AI surfaced for your sign-off. You're supervising."
-              color="#B91C1C"
+              count={approvalCount}
+              countLabel="items"
             />
-            <Stack spacing={1.25} sx={{ mb: 1.75 }}>
+            <Stack spacing={2} sx={{ mb: 1.75 }}>
               {/* Competing critical priorities leads the section — it's the
                   Module 3 behavioral-boundary moment and demands the MD's
                   attention first. */}
@@ -5564,9 +5685,12 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                   onApprove={onApprove}
                   onOverride={openOverride}
                   onViewStaff={onViewStaff}
+                  onIgnore={onIgnore}
+                  onAddContext={onReviewContext}
+                  sweeping={sweepingId === r.id}
                 />
               ))}
-              <WeatherCard bare />
+              <WeatherCard bare onAccept={onWeatherAccept} onContext={() => onContext({ id: 'weather-signal', when: 'Weather signal', title: weather.headline })} hasContext={contextedIds.has('weather-signal')} />
               {!snoozedIds.includes(incomingWorkOrder.id) && !isDispatched(incomingWorkOrder.id) && (
                 <IncomingWorkOrderCard
                   item={incomingWorkOrder}
@@ -5575,6 +5699,7 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                   onReassign={openOverride}
                   onContext={onContext}
                   onViewStaff={onViewStaff}
+                  sweeping={sweepingId === incomingWorkOrder.id}
                 />
               )}
               {reviews.filter((r) => r.id !== 'rv-1' && !isDispatched(r.id)).map((r) => (
@@ -5584,18 +5709,20 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                   onApprove={onApprove}
                   onOverride={openOverride}
                   onViewStaff={onViewStaff}
+                  onIgnore={onIgnore}
+                  onAddContext={onReviewContext}
+                  sweeping={sweepingId === r.id}
                 />
               ))}
+              {!isDispatched(day1PmTradeoff.id) && (
+                <PmTradeoffCard
+                  item={day1PmTradeoff}
+                  onApprove={onApprove}
+                  onOverride={openOverride}
+                  sweeping={sweepingId === day1PmTradeoff.id}
+                />
+              )}
             </Stack>
-
-            <SectionHeader icon="event_repeat" title="PM tradeoff" sub="One deferrable item I flagged" />
-            <Box sx={{ mb: 1.75 }}>
-              <PmTradeoffCard
-                item={day1PmTradeoff}
-                onApprove={onApprove}
-                onOverride={openOverride}
-              />
-            </Box>
 
             <SectionHeader
               icon="check_circle"
@@ -5607,27 +5734,36 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
               <RoutineRollupCard data={routineRollup.day1} />
             </Box>
           </>
-        )}
+          );
+        })()}
 
         {/* ── DAY 30 ──────────────────────────────────────────────── */}
         {day30 && (
           <>
+            {/* +1 for the always-present weather signal card so the count
+                matches the cards on screen (and the Dispatch nav badge). */}
             <SectionHeader
-              icon="report_problem"
               title="Exceptions requiring review"
-              sub={`${exceptions.length} item${exceptions.length === 1 ? '' : 's'} the AI escalated · everything else is handled`}
-              color="#B91C1C"
+              count={exceptions.length + 1}
+              countLabel="items"
             />
-            <Stack spacing={1.25} sx={{ mb: 1.75 }}>
-              <WeatherCard bare />
+            <Stack spacing={2} sx={{ mb: 1.75 }}>
               {exceptions.map((r) => (
                 <ReviewCard
                   key={r.id}
                   item={r}
                   onApprove={onApprove}
                   onOverride={openOverride}
+                  onViewStaff={onViewStaff}
+                  onIgnore={onIgnore}
+                  onAddContext={onReviewContext}
+                  sweeping={sweepingId === r.id}
                 />
               ))}
+              {exceptions.length === 0 && <ExceptionsEmptyState onViewActivity={onViewActivity} />}
+              {/* Weather signal sits last — informational, after the
+                  decision-requiring exception cards. */}
+              <WeatherCard bare onAccept={onWeatherAccept} onContext={() => onContext({ id: 'weather-signal', when: 'Weather signal', title: weather.headline })} hasContext={contextedIds.has('weather-signal')} />
             </Stack>
 
             <SectionHeader
@@ -5667,13 +5803,17 @@ function TodayTab({ openReason, openOverride, onApprove, onPriorities, onCalibra
                   sub="One signal the AI couldn't decide on alone · everything else is handled"
                   color="#4338CA"
                 />
-                <Stack spacing={1.25} sx={{ mb: 1.75 }}>
+                <Stack spacing={2} sx={{ mb: 1.75 }}>
                   {exceptions.map((r) => (
                     <ReviewCard
                       key={r.id}
                       item={r}
                       onApprove={onApprove}
                       onOverride={openOverride}
+                      onViewStaff={onViewStaff}
+                      onIgnore={onIgnore}
+                      onAddContext={onReviewContext}
+                      sweeping={sweepingId === r.id}
                     />
                   ))}
                 </Stack>
@@ -8402,8 +8542,8 @@ function AbsenceRebalanceReview({ member }) {
         ? `${techName} still over capacity after rebalance`
         : `${techName} rebalanced · ${count} from ${memberFirst}, ${deferred.length} routine item${deferred.length === 1 ? '' : 's'} deferred`,
       detail: stillOver
-        ? 'Not enough routine items to free up the shift. Reassign or override critical work to clear the overage.'
-        : 'The agent moved their lowest-priority routine items to Sun, May 17 to keep them in shift. Tap the deferred rows to override.'
+        ? 'Not enough routine items to free up the shift. Reassign or modify critical work to clear the overage.'
+        : 'The agent moved their lowest-priority routine items to Sun, May 17 to keep them in shift. Tap the deferred rows to modify.'
     });
   });
 
@@ -9723,7 +9863,7 @@ function ScheduleTab() {
             // Day 30: show only Approval / Override review / Sign-off / Walkthrough on warning+
             // Day 90: show only top 2 most strategic items
             const isStrategic = (it) =>
-              ['Approval', 'Override review', 'Sign-off'].includes(it.kind) ||
+              ['Approval', 'Modify review', 'Sign-off'].includes(it.kind) ||
               it.tone === 'error' || it.tone === 'warning';
             const visible = day90
               ? ordered.filter(isStrategic).slice(0, 2)
@@ -9957,7 +10097,7 @@ function SettingsTab() {
     ? { tag: 'Predictive operations', tag2: 'Day 90+', tone: '#16A34A', bg: '#DCFCE7' }
     : day30
       ? { tag: 'Calibrated', tag2: 'Day 30+', tone: '#0065BD', bg: '#DBEAFE' }
-      : { tag: 'Learning', tag2: 'Day 1', tone: '#9333EA', bg: '#F3E8FF' };
+      : { tag: 'Learning', tag2: 'Day 3', tone: '#9333EA', bg: '#F3E8FF' };
   const [subView, setSubView] = React.useState('main');
 
   if (subView === 'knowledge') {
@@ -10592,8 +10732,33 @@ function TeamIntelligenceSheet({ open, member, intel, onClose }) {
   );
 }
 
-// Placeholder Operational Coordination screen — full build in next pass.
+// How autonomously the agent handles each coordination area. Three levels,
+// in increasing order of agent autonomy.
+const COORD_LEVELS = [
+  { key: 'manual', label: 'Manual', icon: 'pan_tool', color: '#475569', bg: '#F1F5F9', desc: "I'll surface it and leave every call to you." },
+  { key: 'assist', label: 'Assist', icon: 'handshake', color: '#0065BD', bg: '#E5F1FA', desc: "I prepare the move and ask before acting." },
+  { key: 'auto', label: 'Auto', icon: 'bolt', color: '#15803D', bg: '#DCFCE7', desc: "I handle it and log it for your review." }
+];
+const coordLevel = (key) => COORD_LEVELS.find((l) => l.key === key) || COORD_LEVELS[1];
+
+// The coordination areas the agent manages, each with a default autonomy.
+const COORD_AREAS = [
+  { key: 'triage', icon: 'assignment', name: 'Work Order Triage', desc: 'Routing and prioritizing incoming work', level: 'auto' },
+  { key: 'pm', icon: 'fact_check', name: 'PM & Compliance', desc: 'Scheduling preventive and survey work', level: 'assist' },
+  { key: 'staffing', icon: 'groups', name: 'Staffing', desc: 'Balancing the day across the team', level: 'assist' },
+  { key: 'turns', icon: 'meeting_room', name: 'Unit Turns', desc: 'Sequencing make-ready work for move-ins', level: 'auto' },
+  { key: 'asset', icon: 'monitor_heart', name: 'Asset Health', desc: 'Watching for repeat failures and risk', level: 'assist' },
+  { key: 'weather', icon: 'ac_unit', name: 'Weather', desc: 'Raising work ahead of weather events', level: 'auto' },
+  { key: 'vendor', icon: 'engineering', name: 'Vendor Escalation', desc: 'Dispatching outside service providers', level: 'manual' },
+  { key: 'forecast', icon: 'online_prediction', name: 'Forecasting', desc: 'Projecting readiness and upcoming load', level: 'assist' }
+];
+
 function OperationalCoordinationScreen({ onBack }) {
+  const [levels, setLevels] = React.useState(() =>
+    Object.fromEntries(COORD_AREAS.map((a) => [a.key, a.level]))
+  );
+  const [editing, setEditing] = React.useState(null); // area being adjusted
+
   return (
     <Box sx={{ px: 1.5, pt: 1.25, pb: 2 }}>
       <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1.25 }}>
@@ -10605,18 +10770,102 @@ function OperationalCoordinationScreen({ onBack }) {
         </Typography>
       </Stack>
       <Typography variant="caption" sx={{ color: '#475569', display: 'block', lineHeight: 1.4, mb: 1.5 }}>
-        Manage how Connected Community coordinates routine operations, escalates exceptions, and supports readiness planning.
+        Set how much I handle in each area — from surfacing it for you to running it on my own.
       </Typography>
-      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', bgcolor: '#F8FAFC' }}>
-        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Icon name="construction" size={18} color="#64748B" />
-            <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.4 }}>
-              Coming next: per-area coordination levels (Work Order Triage, PM & Compliance, Staffing, Unit Turns, Asset Health, Weather, Vendor Escalation, Forecasting).
-            </Typography>
-          </Stack>
-        </CardContent>
+
+      {/* iOS-style grouped list — one tappable row per coordination area. */}
+      <Card variant="outlined" sx={{ borderColor: '#E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
+        {COORD_AREAS.map((area, i) => {
+          const lvl = coordLevel(levels[area.key]);
+          return (
+            <Box
+              key={area.key}
+              role="button"
+              onClick={() => setEditing(area)}
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 1.25,
+                px: 1.5, py: 1.125, cursor: 'pointer',
+                borderTop: i === 0 ? 'none' : '1px solid #F1F5F9',
+                '&:hover': { bgcolor: '#F8FAFC' }
+              }}
+            >
+              <Box sx={{ width: 32, height: 32, borderRadius: '9px', flexShrink: 0, bgcolor: '#F1F5F9', display: 'grid', placeItems: 'center' }}>
+                <Icon name={area.icon} size={18} color="#475569" />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0F172A', lineHeight: 1.2 }}>
+                  {area.name}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', lineHeight: 1.3, mt: 0.125 }}>
+                  {area.desc}
+                </Typography>
+              </Box>
+              <Chip
+                size="small"
+                icon={<Icon name={lvl.icon} size={12} color={lvl.color} sx={{ ml: 0.5 }} />}
+                label={lvl.label}
+                sx={{ height: 22, bgcolor: lvl.bg, color: lvl.color, fontWeight: 700, flexShrink: 0, '.MuiChip-label': { px: 0.75, fontSize: 11.5 } }}
+              />
+              <Icon name="chevron_right" size={18} color="#CBD5E1" sx={{ flexShrink: 0 }} />
+            </Box>
+          );
+        })}
       </Card>
+
+      {/* Per-area level picker. */}
+      <Drawer
+        anchor="bottom"
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        PaperProps={{ sx: { borderTopLeftRadius: 20, borderTopRightRadius: 20, pb: 'env(safe-area-inset-bottom)' } }}
+      >
+        <Box sx={{ pt: 1 }}>
+          <Box sx={{ width: 36, height: 4, bgcolor: '#CBD5E1', mx: 'auto', borderRadius: 2 }} />
+        </Box>
+        {editing && (
+          <Box sx={{ px: 2, pt: 1.5, pb: 1.5 }}>
+            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 1.5 }}>
+              <Box sx={{ width: 36, height: 36, borderRadius: '10px', flexShrink: 0, bgcolor: '#F1F5F9', display: 'grid', placeItems: 'center' }}>
+                <Icon name={editing.icon} size={20} color="#475569" />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{editing.name}</Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35 }}>{editing.desc}</Typography>
+              </Box>
+              <IconButton size="small" onClick={() => setEditing(null)}>
+                <Icon name="close" size={20} color="#64748B" />
+              </IconButton>
+            </Stack>
+            <Stack spacing={1}>
+              {COORD_LEVELS.map((l) => {
+                const selected = levels[editing.key] === l.key;
+                return (
+                  <Box
+                    key={l.key}
+                    role="button"
+                    onClick={() => { setLevels((prev) => ({ ...prev, [editing.key]: l.key })); setEditing(null); }}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: 1.25, p: 1.25,
+                      border: '1px solid', borderColor: selected ? l.color : '#E2E8F0',
+                      bgcolor: selected ? l.bg : '#fff', borderRadius: 2, cursor: 'pointer',
+                      '&:hover': { bgcolor: selected ? l.bg : '#F8FAFC' }
+                    }}
+                  >
+                    <Box sx={{ width: 32, height: 32, borderRadius: '9px', flexShrink: 0, bgcolor: l.bg, display: 'grid', placeItems: 'center' }}>
+                      <Icon name={l.icon} size={18} color={l.color} />
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>{l.label}</Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1.35, mt: 0.125 }}>{l.desc}</Typography>
+                    </Box>
+                    {selected && <Icon name="check_circle" size={20} color={l.color} sx={{ flexShrink: 0 }} />}
+                  </Box>
+                );
+              })}
+            </Stack>
+          </Box>
+        )}
+      </Drawer>
     </Box>
   );
 }
@@ -10637,7 +10886,7 @@ const AI_ACTION_ICON = {
 // Map a Day-30 AI activity item into the same visual shape as the
 // Day-1 metric drawer cards (timestamp + state pill, title, body, purple
 // "why" line, "What the AI did" panel with Add context, Undo footer).
-function AiActivityCard({ item, onContext, onUndo }) {
+function AiActivityCard({ item, onContext, onUndo, hasContext = false }) {
   const done = item.status === 'completed';
   const monitoring = item.status === 'monitoring';
   const stateLabel = monitoring ? 'Monitoring'
@@ -10683,55 +10932,78 @@ function AiActivityCard({ item, onContext, onUndo }) {
         </Typography>
         <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.625 }}>
           <Icon name="psychology" size={13} color="#4338CA" sx={{ mt: '1px', flexShrink: 0 }} />
-          <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600 }}>
-            {item.action} · {item.target}
-          </Typography>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600, display: 'block' }}>
+              {item.action} · {item.target}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#4338CA', lineHeight: 1.3, fontWeight: 600, display: 'block' }}>
+              Routed to {item.assignee} · {item.when}.
+            </Typography>
+          </Box>
         </Stack>
-        <Box sx={{ mt: 0.625, p: 0.875, bgcolor: '#F8FAFC', borderRadius: 1.25, border: '1px solid #E2E8F0' }}>
-          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="space-between">
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-              <Icon name="model_training" size={13} color="#64748B" sx={{ flexShrink: 0 }} />
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', lineHeight: 1.3 }}>
-                What the AI did
-              </Typography>
-            </Stack>
-            <Button
-              size="small"
-              onClick={() => onContext && onContext(item)}
-              startIcon={<Icon name="add_comment" size={13} color="#0369A1" />}
-              sx={{
-                px: 0.5, py: 0,
-                textTransform: 'none', fontSize: 11.5, fontWeight: 600,
-                color: '#0369A1', minHeight: 0, flexShrink: 0
-              }}
-            >
-              Add context
-            </Button>
+        {/* Context-added signifier — a small check confirms the MD has
+            already weighed in on this item; the button below switches to an
+            Edit affordance. */}
+        {hasContext && (
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1 }}>
+            <Icon name="check_circle" size={13} color="#15803D" />
+            <Typography variant="caption" sx={{ color: '#15803D', fontWeight: 600 }}>
+              Context added
+            </Typography>
           </Stack>
-          <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.35, display: 'block', mt: 0.5 }}>
-            Routed to {item.assignee} · {item.when}.
-          </Typography>
-        </Box>
-        <Button
-          fullWidth
-          size="small"
-          variant="contained"
-          disabled={!undoable}
-          startIcon={<Icon name="undo" size={14} />}
-          onClick={() => onUndo && onUndo(item)}
-          sx={{
-            mt: 1, textTransform: 'none', fontSize: 12,
-            '&.Mui-disabled': { bgcolor: '#F1F5F9', color: '#94A3B8' }
-          }}
-        >
-          {undoable ? 'Undo' : `${stateLabel} — can't undo`}
-        </Button>
+        )}
+        {/* Footer — Add context sits beside Undo. The Undo reads as a
+            subtle, low-emphasis action (it reverses what just happened),
+            not a bold primary CTA. */}
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: hasContext ? 0.75 : 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            color="inherit"
+            startIcon={
+              <Icon
+                name={hasContext ? 'edit' : 'add_comment'}
+                size={14}
+                color={hasContext ? '#0065BD' : '#475569'}
+              />
+            }
+            onClick={() => onContext && onContext(item)}
+            sx={{
+              flex: 1, minHeight: 36, textTransform: 'none', fontSize: 12,
+              fontWeight: hasContext ? 600 : 500,
+              color: hasContext ? '#0065BD' : '#475569',
+              borderColor: hasContext ? '#0065BD' : '#CBD5E1',
+              bgcolor: '#fff',
+              '&:hover': hasContext
+                ? { borderColor: '#004A8A', bgcolor: 'rgba(0,101,189,0.04)' }
+                : { borderColor: '#94A3B8', bgcolor: '#F8FAFC' }
+            }}
+          >
+            {hasContext ? 'Edit context' : 'Add context'}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="inherit"
+            disabled={!undoable}
+            startIcon={<Icon name="undo" size={14} color={undoable ? '#B91C1C' : '#94A3B8'} />}
+            onClick={() => onUndo && onUndo(item)}
+            sx={{
+              flex: 1, minHeight: 36, textTransform: 'none', fontSize: 12,
+              color: '#B91C1C', borderColor: '#FCA5A5', bgcolor: '#fff',
+              '&:hover': { borderColor: '#F87171', bgcolor: '#FEF2F2' },
+              '&.Mui-disabled': { color: '#94A3B8', borderColor: '#F1F5F9' }
+            }}
+          >
+            Undo
+          </Button>
+        </Stack>
       </CardContent>
     </Card>
   );
 }
 
-function AiActivityList({ items, onContext, onUndo }) {
+function AiActivityList({ items, onContext, onUndo, contextedIds = new Set() }) {
   const list = items || aiActivity;
   if (list.length === 0) {
     return (
@@ -10750,7 +11022,7 @@ function AiActivityList({ items, onContext, onUndo }) {
   return (
     <Stack spacing={1}>
       {list.map((a) => (
-        <AiActivityCard key={a.id} item={a} onContext={onContext} onUndo={onUndo} />
+        <AiActivityCard key={a.id} item={a} onContext={onContext} onUndo={onUndo} hasContext={contextedIds.has(a.id)} />
       ))}
     </Stack>
   );
@@ -10759,7 +11031,7 @@ function AiActivityList({ items, onContext, onUndo }) {
 // Full-page AI activity view (replaces the prior bottom-sheet drawer).
 // Includes a search input and an action-type filter strip so the MD can
 // scan a longer window (72 hours) without losing the thread.
-function AiActivityTab({ onContext, onUndo }) {
+function AiActivityTab({ onContext, onUndo, contextedIds = new Set() }) {
   const [query, setQuery] = React.useState('');
   const [actionFilter, setActionFilter] = React.useState('all');
   // Pull the unique action verbs from the activity log so the chip strip
@@ -10781,24 +11053,28 @@ function AiActivityTab({ onContext, onUndo }) {
   }, [query, actionFilter]);
   const isFiltering = query.trim().length > 0 || actionFilter !== 'all';
   return (
-    <Box sx={{ px: 1.5, pt: 1.5, pb: 1 }}>
-      <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 1.5 }}>
-        <Box
+    <Box sx={{ px: 1.5, pt: 3, pb: 1 }}>
+      {/* Header — DSX h4 title, with the time window baseline-aligned at
+          the top right (matching the section headers on other pages). */}
+      <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 1.5 }}>
+        <Typography
+          component="h4"
           sx={{
-            width: 36, height: 36, borderRadius: '10px',
-            bgcolor: '#EEF2FF', display: 'grid', placeItems: 'center', flexShrink: 0
+            color: '#293036',
+            fontFeatureSettings: "'liga' off, 'clig' off",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontSize: 18,
+            fontStyle: 'normal',
+            fontWeight: 700,
+            lineHeight: '133.3%',
+            letterSpacing: '-0.252px'
           }}
         >
-          <Icon name="auto_awesome" size={20} color="#4338CA" />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle1" sx={{ lineHeight: 1.15, fontWeight: 700 }}>
-            AI activity
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#64748B' }}>
-            Last 72 hours · {isFiltering ? `${filtered.length} of ${aiActivity.length}` : `${aiActivity.length}`} actions · newest first
-          </Typography>
-        </Box>
+          AI activity
+        </Typography>
+        <Typography component="span" sx={{ color: '#64748B', fontSize: 13, lineHeight: 1.25, flexShrink: 0 }}>
+          Last 72 hours
+        </Typography>
       </Stack>
 
       {/* Search field — outlined per DSX, bold label above the field. */}
@@ -10869,7 +11145,15 @@ function AiActivityTab({ onContext, onUndo }) {
         })}
       </Stack>
 
-      <AiActivityList items={filtered} onContext={onContext} onUndo={onUndo} />
+      {/* Result count + sort order — sits left-aligned just above the list. */}
+      <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 1 }}>
+        <Box component="span" sx={{ fontWeight: 700, color: '#293036' }}>
+          {isFiltering ? `${filtered.length} of ${aiActivity.length}` : aiActivity.length} actions
+        </Box>
+        {' · newest first'}
+      </Typography>
+
+      <AiActivityList items={filtered} onContext={onContext} onUndo={onUndo} contextedIds={contextedIds} />
     </Box>
   );
 }
@@ -10985,6 +11269,12 @@ export default function App() {
   const [day1Metric, setDay1Metric] = useState(null);
   const [undoItem, setUndoItem] = useState(null);
   const [contextTarget, setContextTarget] = useState(null);
+  // Review-card "add context" drawer — carries the review item so the sheet
+  // can offer Save / Save and modify / Save and approve in one place.
+  const [reviewContext, setReviewContext] = useState(null);
+  // Tracks which items have had context saved, so their "Add context"
+  // button can flip to "Edit context" with an added signifier.
+  const [contextedIds, setContextedIds] = useState(() => new Set());
   const [staffMember, setStaffMember] = useState(null);
   const [openedPattern, setOpenedPattern] = useState(null);
   const [coordPatternsOpen, setCoordPatternsOpen] = useState(false);
@@ -11081,12 +11371,43 @@ export default function App() {
       return next;
     });
   }, []);
-  // Build a success snack with a deep-link into AI activity (tab 5) and
-  // an optional Undo for the most recent action.
+  // Approving a card sweeps it off to the right before it's removed. The
+  // card listens for `sweeping` and animates; ~420ms later we mark it
+  // dispatched (which unmounts it) and run any follow-up (e.g. snackbar).
+  const [sweepingId, setSweepingId] = useState(null);
+  const sweepThenDismiss = React.useCallback((id, after) => {
+    if (!id) { if (after) after(); return; }
+    setSweepingId(id);
+    setTimeout(() => {
+      markDispatched(id);
+      setSweepingId(null);
+      if (after) after();
+    }, 420);
+  }, [markDispatched]);
+  // Shape a review / work-order item into the ItemDetailSheet payload so the
+  // snackbar's "View details" can open the applicable work-order drawer.
+  const toWoDetail = (item) => ({
+    id: item.id,
+    kind: item.kind || 'Work order',
+    title: item.title || item.summary || 'Work order',
+    icon: item.icon,
+    tone: item.tone,
+    status: item.status || 'Dispatched',
+    location: item.location,
+    assignee: item.suggestion?.tech || item.assignee || 'Assigned',
+    time: item.receivedAt || item.receivedAgo || item.when,
+    note: item.body || item.recommended || (Array.isArray(item.recommendations) ? item.recommendations[0]?.body : undefined),
+    priority: item.priority
+  });
+  // Build a success snack. "View details" opens the work-order drawer for the
+  // acted-on item when one is provided; otherwise it deep-links into AI
+  // activity (tab 5). An optional Undo reverses the most recent action.
   const successSnack = (message, opts = {}) => setSnack({
     message,
     actionLabel: opts.actionLabel || 'View details',
-    onAction: opts.onAction || (() => { setTab(5); setSnack(null); }),
+    onAction: opts.onAction || (opts.detailItem
+      ? () => { openItem(toWoDetail(opts.detailItem)); setSnack(null); }
+      : () => { setTab(5); setSnack(null); }),
     onUndo: opts.onUndo
   });
 
@@ -11185,9 +11506,19 @@ export default function App() {
       item?.recommendations ? item.recommendations[0]?.body
       : item?.recommended || item?.title || 'recommendation';
     const approvedId = item?.id;
-    markDispatched(approvedId);
-    successSnack(`Approved · ${what}`, {
-      onUndo: () => unmarkDispatched(approvedId)
+    sweepThenDismiss(approvedId, () => successSnack(`Approved · ${what}`, {
+      onUndo: () => unmarkDispatched(approvedId),
+      detailItem: item
+    }));
+  };
+
+  // Ignore — dismiss a recommendation the MD doesn't want to act on. Removes
+  // it from the approval queue with an Undo, same as approve/override.
+  const handleIgnore = (item) => {
+    const id = item?.id;
+    markDispatched(id);
+    successSnack(`Ignored · ${item?.kind || item?.title || 'recommendation'}`, {
+      onUndo: () => unmarkDispatched(id)
     });
   };
 
@@ -11206,7 +11537,7 @@ export default function App() {
     markDispatched(id);
     successSnack(
       kind === 'remember' ? 'New rule saved · AI will remember'
-      : kind === 'once' ? 'Treated as one-time override'
+      : kind === 'once' ? 'Treated as a one-time modification'
       : 'Context added to this decision',
       { onUndo: () => unmarkDispatched(id) }
     );
@@ -11317,18 +11648,22 @@ export default function App() {
           minWidth: 0,
           overflowY: 'auto',
           overflowX: 'hidden',
+          // All non-Dispatch tabs sit on the DSX blue50 surface.
+          // The Dispatch tab overlays its own gradient on top.
+          bgcolor: '#E5F1FA',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           '&::-webkit-scrollbar': { display: 'none' }
         }}
       >
-      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} onViewStaff={openStaffByName} onSnooze={(it) => setSnoozeTarget(it)} onContext={(it) => setContextTarget({ id: it.id, when: it.receivedAgo || it.when, title: it.title })} onPatternsTile={() => setCoordPatternsOpen(true)} onRisksTile={() => setRisksOpen(true)} onDismiss={markDispatched} onQueueForAgent={(wo) => setQueueForAgentItem(wo)} snoozedIds={extraWorkOrders.map((w) => w.id)} dispatchedIds={dispatchedIds} />}
+      {tab === 0 && <TodayTab openReason={openReason} openOverride={openOverride} onApprove={handleApprove} onIgnore={handleIgnore} onReviewContext={(it) => setReviewContext(it)} sweepingId={sweepingId} onWeatherAccept={({ undo }) => successSnack('Kept boiler + freeze-risk inspections at Critical for tonight', { onUndo: undo })} onViewActivity={() => setTab(5)} onPriorities={() => setPriorityOpen(true)} onCalibration={() => setCalOpen(true)} onDay1Metric={(k) => setDay1Metric(k)} onViewStaff={openStaffByName} onSnooze={(it) => setSnoozeTarget(it)} onContext={(it) => setContextTarget({ id: it.id, when: it.receivedAgo || it.when, title: it.title })} onPatternsTile={() => setCoordPatternsOpen(true)} onRisksTile={() => setRisksOpen(true)} onDismiss={markDispatched} onQueueForAgent={(wo) => setQueueForAgentItem(wo)} snoozedIds={extraWorkOrders.map((w) => w.id)} dispatchedIds={dispatchedIds} contextedIds={contextedIds} />}
       {tab === 1 && <ScheduleTab />}
       {tab === 2 && <WorkTab seg={workSeg} onSegChange={setWorkSeg} />}
       {tab === 3 && <KPIsTab onPatternsTile={() => setCoordPatternsOpen(true)} />}
       {tab === 4 && <SettingsTab />}
       {tab === 5 && (
         <AiActivityTab
+          contextedIds={contextedIds}
           onContext={(it) => setContextTarget({
             id: it.id, when: `${it.ago} · ${it.clock}`, title: it.title
           })}
@@ -11378,9 +11713,21 @@ export default function App() {
                 pendingReviews += 1;
               }
             }
-            const count = mode === 'sickDay'
-              ? pendingWOs.length + pendingReviews
-              : reviews.length + 1;
+            // Non-error modes: mirror the "Needs your approval" header so the
+            // badge drops as the MD approves / modifies / snoozes / ignores.
+            let count;
+            if (mode === 'sickDay') {
+              count = pendingWOs.length + pendingReviews;
+            } else if (mode === 'day1') {
+              const openReviews = reviews.filter((r) => !dispatchedIds.has(r.id)).length;
+              const incomingShown = (!dispatchedIds.has(incomingWorkOrder.id) && !extraWorkOrders.find((w) => w.id === incomingWorkOrder.id)) ? 1 : 0;
+              const pmShown = dispatchedIds.has(day1PmTradeoff.id) ? 0 : 1;
+              // +1 for the always-present weather signal card.
+              count = openReviews + incomingShown + pmShown + 1;
+            } else {
+              // Day 30 / 90 — exception review cards still awaiting the MD.
+              count = reviews.filter((r) => !dispatchedIds.has(r.id)).length;
+            }
             // Highest unresolved tier drives the badge color. Reviews count
             // as T1 (they're approval-blocking decisions), so as long as
             // any review is open the badge stays red.
@@ -11546,14 +11893,44 @@ export default function App() {
         item={contextTarget}
         onClose={() => setContextTarget(null)}
         onSave={(text) => {
+          if (contextTarget?.id != null) {
+            setContextedIds((prev) => {
+              const next = new Set(prev);
+              next.add(contextTarget.id);
+              return next;
+            });
+          }
           setContextTarget(null);
           const preview = text.length > 40 ? `${text.slice(0, 40)}…` : text;
           setSnack(`Context saved · "${preview}"`);
         }}
       />
+      {/* Review-card context drawer — save the note alone, or save and decide
+          (modify / approve) in the same step. */}
+      <AddContextSheet
+        open={Boolean(reviewContext)}
+        item={reviewContext}
+        onClose={() => setReviewContext(null)}
+        onSave={(text) => {
+          const preview = text.length > 40 ? `${text.slice(0, 40)}…` : text;
+          setReviewContext(null);
+          setSnack(`Context saved · "${preview}"`);
+        }}
+        onSaveModify={() => {
+          const it = reviewContext;
+          setReviewContext(null);
+          openOverride(it);
+        }}
+        onSaveApprove={() => {
+          const it = reviewContext;
+          setReviewContext(null);
+          handleApprove(it);
+        }}
+      />
 
       <Snackbar
         open={Boolean(snack)}
+        disablePortal
         autoHideDuration={typeof snack === 'object' && (snack?.actionLabel || snack?.onUndo) ? 6000 : 2600}
         onClose={() => setSnack(null)}
         message={typeof snack === 'string' ? snack : snack?.message}
@@ -11581,12 +11958,13 @@ export default function App() {
             </Stack>
           ) : undefined
         }
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         sx={{
           left: '0 !important',
           right: '0 !important',
           bottom: '60px !important',
           width: '100%',
+          transform: 'none !important',
           zIndex: 1400,
           '& .MuiSnackbarContent-root': {
             bgcolor: '#0F172A', color: '#fff', fontWeight: 600,
@@ -11661,20 +12039,23 @@ export default function App() {
       item={spSheet.item}
       onClose={() => setSpSheet({ open: false, item: null })}
       onAiDispatch={(vendor) => {
-        const id = spSheet.item?.id;
+        const it = spSheet.item;
+        const id = it?.id;
         setSpSheet({ open: false, item: null });
-        markDispatched(id);
-        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`, {
-          onUndo: () => unmarkDispatched(id)
-        });
+        // Close the drawer first, then sweep the card off to the right.
+        sweepThenDismiss(id, () => successSnack(`AI dispatched to ${vendor} · awaiting acceptance`, {
+          onUndo: () => unmarkDispatched(id),
+          detailItem: it
+        }));
       }}
       onManualCreate={(vendor) => {
-        const id = spSheet.item?.id;
+        const it = spSheet.item;
+        const id = it?.id;
         setSpSheet({ open: false, item: null });
-        markDispatched(id);
-        successSnack(`Service-request form opened · ${vendor}`, {
-          onUndo: () => unmarkDispatched(id)
-        });
+        sweepThenDismiss(id, () => successSnack(`Service-request form opened · ${vendor}`, {
+          onUndo: () => unmarkDispatched(id),
+          detailItem: it
+        }));
       }}
       onViewMore={() => {
         setSpListSheet({ open: true, item: spSheet.item });
@@ -11691,20 +12072,22 @@ export default function App() {
         setSpSheet({ open: true, item: it });
       }}
       onAiDispatch={(vendor) => {
-        const id = spListSheet.item?.id;
+        const it = spListSheet.item;
+        const id = it?.id;
         setSpListSheet({ open: false, item: null });
-        markDispatched(id);
-        successSnack(`AI dispatched to ${vendor} · awaiting acceptance`, {
-          onUndo: () => unmarkDispatched(id)
-        });
+        sweepThenDismiss(id, () => successSnack(`AI dispatched to ${vendor} · awaiting acceptance`, {
+          onUndo: () => unmarkDispatched(id),
+          detailItem: it
+        }));
       }}
       onManualCreate={(vendor) => {
-        const id = spListSheet.item?.id;
+        const it = spListSheet.item;
+        const id = it?.id;
         setSpListSheet({ open: false, item: null });
-        markDispatched(id);
-        successSnack(`Service-request form opened · ${vendor}`, {
-          onUndo: () => unmarkDispatched(id)
-        });
+        sweepThenDismiss(id, () => successSnack(`Service-request form opened · ${vendor}`, {
+          onUndo: () => unmarkDispatched(id),
+          detailItem: it
+        }));
       }}
     />
     <ForecastedRisksSheet

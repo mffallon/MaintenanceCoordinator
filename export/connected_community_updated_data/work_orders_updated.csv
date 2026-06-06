@@ -1,0 +1,23 @@
+id,source,title,category,location,priority,status,assignee,eta,kpi,opened,reason
+wo-1041,Dispatch board,Fire panel trouble signal — West Wing,,Bldg A · Panel 3,Critical,In progress,Marco D.,45m,Life Safety,,Flagged 11 min ago. Open trouble signal = citable life-safety deficiency; state survey window opens Monday.
+wo-1038,Dispatch board,Boiler #2 pre-freeze inspection,,Mech Room B,Critical,Queued,Jacob B.,1h 15m,Operational Continuity,,Elevated by weather signal — 22F overnight low. A freeze burst risks resident heat loss + a major repair bill.
+ut-214,Dispatch board,Unit 214 HVAC recommission,,Unit 214,High,At risk,Reassign needed,3h,Move-In Readiness,,Move-in tomorrow 10 AM. Filter stock low; vendor backup recommended.
+tk-1,Dispatch board,Test operation of doors and locks,,"Doors, Locks, Gates & Alarms",High,Overdue,Bruce Wayne,45m,Regulatory Comp.,,Overdue weekly regulatory check — bumped to High and slotted today; survey exposure grows daily.
+tk-2,Dispatch board,Generator visual inspection + logbook entry,,Emergency Power Generators,High,Overdue,Sasha P.,1h,Regulatory Comp.,,Overdue weekly exercise; logbook gap. AI assigned Sasha (capacity today).
+tk-3,Dispatch board,Test and log hot water temperatures,,Water Temperature Checks,High,Overdue,Diane K.,30m,Regulatory Comp.,,Overdue weekly Legionella-risk log. AI assigned Diane (capacity today).
+tk-4,Dispatch board,Check temperatures in freezers and refrigerators,,Refrigerator/Freezer Combos,High,Overdue,Diane K.,20m,Regulatory Comp.,,Overdue daily food-safety log. Batched onto Diane's afternoon route.
+ut-117,Dispatch board,Unit 117 paint touch-up + walkthrough,,Unit 117,High,On track,Sasha P.,90m,Move-In Readiness,,Sequenced after HVAC clears; resident orientation 4 PM.
+tk-6,Dispatch board,Fire extinguisher monthly visual inspection,,Fire Extinguishers,Medium,Open,Marco D.,1h 30m,Regulatory Comp.,,Monthly regulatory inspection due May 22 — batched with Marco's rounds.
+tk-7,Dispatch board,Replace air handler filters — common areas,,HVAC · Common,Low,Deferrable,Jacob B.,2h,PM Comp.,,Monthly PM due May 23 — deferrable; capacity reallocated to Unit 214.
+qw-3,Dispatch board,Batch: 4 light fixtures · 2 cabinet hinges,,Floor 2 · Various,Routine,Batched,Diane K.,55m,Resident Sat.,,Co-located along Diane's 2 PM route. Zero detour cost.
+wo-1052,Backlog,Replace worn carpet transition strip — 2F corridor,Flooring,Floor 2 · Corridor B,Low,Unassigned,,30m,,May 6,Cosmetic trip-edge in a low-traffic span; below today's capacity cut.
+wo-1053,Backlog,Patch & repaint drywall scuff — Activity Room,Drywall / Paint,Activity Room,Low,Unassigned,,45m,,May 9,Cosmetic only; deferred behind this week's move-in turns.
+wo-1054,Backlog,Replace parking-lot pole light fixture head,Exterior Lighting,North Lot · Pole 4,Medium,Awaiting parts,,1h 30m,,Apr 28,LED fixture head on order — vendor ETA May 22. Pole stays dark at night until then.
+wo-1055,Backlog,Repair walk-in cooler door gasket — Kitchen,Refrigeration,Kitchen · Walk-in cooler,Medium,Awaiting parts,,1h,,May 2,Gasket backordered — ETA May 20. Temps holding; monitored daily in the interim.
+wo-1056,Backlog,Re-caulk resident bathtubs — Units 203 & 207,Plumbing,"Units 203, 207",Low,Unassigned,,1h,,May 11,Preventive moisture seal; not urgent — pooled for a low-load day.
+wo-1057,Backlog,Replace bathroom exhaust fan motor — Unit 142,HVAC,Unit 142,Medium,Awaiting parts,,45m,,May 5,Replacement motor on order — ETA May 23. Fan noisy but still operational.
+wo-1058,Backlog,Realign automatic entry-door sensor — Main Lobby,Doors & Access,Main Lobby,Medium,Unassigned,,40m,,May 13,Door re-cycles intermittently; not a safety stop. Awaiting crew capacity.
+wo-1059,Backlog,Replace cracked window pane — Sunroom,Glazing,Sunroom,Low,Awaiting parts,,1h,,Apr 30,Tempered pane on order — ETA May 24. Crack is stable and taped.
+wo-1091,Predictive Engine,Memory Care East HVAC degradation trend,Predictive Maintenance,Memory Care East,Medium,Monitor,Maria S.,2h,PM Comp.,Forecasted,AI detected 4 HVAC-related work orders in 60 days after repeated PM deferrals. Forecasted emergency WO risk within 2 weeks.
+wo-1092,Operational Forecast,Freeze-risk boiler circulation checks,Seasonal Preparedness,Mechanical Rooms A-C,High,Queued,Jacob B.,90m,Operational Readiness,Today,AI elevated seasonal readiness work due to overnight temperatures forecasted below 20F.
+wo-1093,Learned Pattern,Unit turn reassignment — staffing optimization,Move-In Readiness,Unit 318,High,Auto-coordinated,Luis R.,2h 30m,Turn Time,Today,Luis historically completes unit turns 18% faster than team average during occupancy spikes.
