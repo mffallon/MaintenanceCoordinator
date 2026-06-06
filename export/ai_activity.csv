@@ -1,0 +1,12 @@
+id,time_ago,clock,action,title,detail,assignee,scheduled_when,target,status
+"ai-1","11 min ago","7:49 AM","Elevated","Fire panel trouble signal — West Wing","Raised to Critical — survey window opens Monday; 8-hr resolution target.","Marco D.","This morning","Bldg A · Panel 3","in-progress"
+"ai-2","34 min ago","7:26 AM","Elevated","Boiler #2 pre-freeze inspection","Elevated by weather signal — overnight low 22F forecast.","Jacob B.","This morning","Mech Room B","queued"
+"ai-3","1 hr ago","7:02 AM","Assigned","Generator visual inspection + logbook","Overdue weekly check — assigned to Sasha P. (had capacity today).","Sasha P.","This afternoon","Emergency Power Generators","queued"
+"ai-4","1 hr ago","6:58 AM","Prioritized","Unit 214 HVAC recommission","Bumped to High — move-in 10 AM tomorrow; vendor backup recommended.","Unassigned","This morning","Unit 214","in-progress"
+"ai-5","2 hrs ago","6:05 AM","Batched","4 overdue food-safety & water logs","Grouped onto Diane K.'s afternoon route to minimize travel.","Diane K.","This afternoon","Floors 1-3","queued"
+"ai-6","3 hrs ago","5:14 AM","Rescheduled","Quarterly filter replacement — Floor 3","Deferred to relieve Jacob's overload — no PM Comp. impact before May 31.","Jacob B.","Sat AM","Floor 3 common","queued"
+"ai-7","6 hrs ago","2:30 AM","Sequenced","Tomorrow's critical path pre-loaded","Ordered 31 work orders by risk and capacity for your review.","Whole team","Today","All buildings","completed"
+"ai-8","9 hrs ago","11:48 PM","Assigned","Emergency lighting spot check — East Wing","Routed to Marco D. on his Bldg B pass — zero added travel.","Marco D.","This morning","Bldg B","completed"
+"ai-9","14 hrs ago","6:20 PM","Snoozed","Corridor C ceiling-tile replacement","Low-risk cosmetic PM — held 24h while crew cleared move-in load.","Diane K.","Tomorrow AM","Corridor C","queued"
+"ai-10","19 hrs ago","1:05 PM","Dispatched","Apex Mechanical — Unit 214 vendor hold","Pre-staged vendor request pending your approval (3 repeat failures/90d).","Apex Mechanical","Tomorrow AM","Unit 214","in-progress"
+"ai-11","23 hrs ago","9:12 AM","Auto-closed","Fire extinguisher monthly initials","AI confirmed logbook upload to TELS and closed the task.","Marco D.","Yesterday AM","All floors","completed"
